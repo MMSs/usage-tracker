@@ -137,3 +137,48 @@ struct AnthropicReportMapperTests {
         #expect(report.windows.map(\.percentUsed) == [0, 0, 0])
     }
 }
+
+struct AnthropicAPIReportMapperTests {
+    private let calendar: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+
+        return calendar
+    }()
+
+    private func local(_ month: Int, _ day: Int) -> Date {
+        calendar.date(from: DateComponents(year: 2026, month: month, day: day))!
+    }
+
+    @Test func spendIsTheSumOfTheDailySeries() {
+        let month = CyclePeriod(start: local(10, 1), end: local(11, 1))
+        let days = [
+            AnthropicCostDay(day: local(10, 1), dollars: Decimal(string: "12.345678")!),
+            AnthropicCostDay(day: local(10, 3), dollars: Decimal(string: "2.995")!),
+        ]
+
+        let report = AnthropicReportMapper.api(days: days, month: month)
+
+        #expect(report.planName == nil)
+        #expect(report.windows.isEmpty)
+        #expect(report.extras.isEmpty)
+        #expect(report.spend == SpendPeriod(
+            period: month,
+            spent: Decimal(string: "15.340678")!,
+            limit: nil,
+            unit: .dollars,
+            daily: [
+                DaySpend(day: local(10, 1), amount: Decimal(string: "12.345678")!),
+                DaySpend(day: local(10, 3), amount: Decimal(string: "2.995")!),
+            ]
+        ))
+    }
+
+    @Test func noDaysIsAZeroSpendMonth() {
+        let month = CyclePeriod(start: local(10, 1), end: local(11, 1))
+
+        let report = AnthropicReportMapper.api(days: [], month: month)
+
+        #expect(report.spend == SpendPeriod(period: month, spent: 0, limit: nil, unit: .dollars, daily: []))
+    }
+}

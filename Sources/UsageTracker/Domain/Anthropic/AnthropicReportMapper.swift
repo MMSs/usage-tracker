@@ -54,6 +54,18 @@ enum AnthropicReportMapper {
         return ProviderReport(planName: snapshot.planName, windows: windows, extras: extras, spend: nil)
     }
 
+    static func api(days: [AnthropicCostDay], month: CyclePeriod) -> ProviderReport {
+        let spend = SpendPeriod(
+            period: month,
+            spent: days.reduce(0) { $0 + $1.dollars },
+            limit: nil,
+            unit: .dollars,
+            daily: days.map { DaySpend(day: $0.day, amount: $0.dollars) }
+        )
+
+        return ProviderReport(planName: nil, windows: [], extras: [], spend: spend)
+    }
+
     private static func modelWindows(_ usage: AnthropicUsageResponse) -> [LimitWindow] {
         let scopedLimits = usage.limits.filter { $0.kind == "weekly_scoped" }
         if !scopedLimits.isEmpty {
