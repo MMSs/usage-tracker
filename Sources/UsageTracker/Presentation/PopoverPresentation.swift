@@ -81,6 +81,12 @@ enum PopoverPresentation {
         return window.percentUsed / 100
     }
 
+    /// A window row's ideal-time tick and tint: paced by elapsed time when the
+    /// window has a length and is open, otherwise by how much of it is used.
+    static func rowPacing(window: LimitWindow, now: Date) -> (tick: Double?, tint: PacingTint) {
+        (TimePacing.idealFraction(for: window, now: now), PacingTint.forWindow(window, now: now))
+    }
+
     static func daysLeftText(_ pacing: Pacing) -> String {
         pacing.remainingDays == 1 ? "1 day left" : "\(pacing.remainingDays) days left"
     }

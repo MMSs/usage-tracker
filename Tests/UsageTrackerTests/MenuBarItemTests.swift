@@ -174,6 +174,51 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(list[1].tint == .nearingLimit)
     }
 
+    private func timedReport(session: LimitWindow, weekly: LimitWindow) -> ProviderReport {
+        ProviderReport(planName: "Max", windows: [session, weekly], extras: [], spend: nil)
+    }
+
+    @Test func sessionMeterCarriesTheTimeTick() throws {
+        // 2h left of 5h: 3h elapsed, so the ideal is 60%.
+        let session = LimitWindow(
+            id: "session", label: "Session", percentUsed: 65, resetsAt: now + 2 * 3600, parentID: nil, windowLength: 5 * 3600
+        )
+        let weekly = LimitWindow(id: "weekly", label: "Weekly", percentUsed: 10, resetsAt: nil, parentID: nil)
+        let list = meters(build(.anthropic, subscription: ready(timedReport(session: session, weekly: weekly)))?.subscription)
+
+        let tick = try #require(list[0].tick)
+        #expect(abs(tick - 0.6) < 0.0001)
+        #expect(list[0].fraction == 0.65)
+        // 65 / 60 is within 1.15 of the ideal.
+        #expect(list[0].tint == .nearingLimit)
+    }
+
+    @Test func weeklyMeterCarriesTheTimeTick() throws {
+        // 3d left of 7d: 4d elapsed, so the ideal is 4/7.
+        let session = LimitWindow(id: "session", label: "Session", percentUsed: 10, resetsAt: nil, parentID: nil)
+        let weekly = LimitWindow(
+            id: "weekly", label: "Weekly", percentUsed: 60, resetsAt: now + 3 * 86400, parentID: nil, windowLength: 7 * 86400
+        )
+        let list = meters(build(.anthropic, subscription: ready(timedReport(session: session, weekly: weekly)))?.subscription)
+
+        let tick = try #require(list[1].tick)
+        #expect(abs(tick - 4.0 / 7.0) < 0.0001)
+        // 60 / 57.1 is about 1.05.
+        #expect(list[1].tint == .nearingLimit)
+    }
+
+    @Test func closedWindowsHaveNoTickOrCountdown() throws {
+        let closed = LimitWindow(id: "session", label: "Session", percentUsed: 0, resetsAt: nil, parentID: nil, windowLength: 5 * 3600)
+        let weekly = LimitWindow(id: "weekly", label: "Weekly", percentUsed: 10, resetsAt: nil, parentID: nil)
+        let list = meters(build(.anthropic, subscription: ready(timedReport(session: closed, weekly: weekly)))?.subscription)
+
+        #expect(list[0].tick == nil)
+        #expect(list[0].countdown == nil)
+        #expect(list[0].text == "0%")
+        #expect(list[0].tint == PacingTint.forRemaining(percentUsed: 0))
+        #expect(PopoverPresentation.rowPacing(window: closed, now: now).tick == nil)
+    }
+
     @Test func unconfiguredHalvesMakeNoItem() {
         let none = HalfSnapshot(status: .unconfigured, report: nil, isStale: true)
         #expect(build(.anthropic, subscription: none, api: none) == nil)

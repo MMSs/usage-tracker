@@ -222,8 +222,8 @@ enum MenuBarItemBuilder {
             text: percentText(window.percentUsed),
             countdown: window.resetsAt.map { CountdownFormatter.compact(until: $0, now: now) },
             fraction: min(max(window.percentUsed / 100, 0), 1),
-            tick: nil,
-            tint: PacingTint.forRemaining(percentUsed: window.percentUsed)
+            tick: TimePacing.idealFraction(for: window, now: now),
+            tint: PacingTint.forWindow(window, now: now)
         )
     }
 

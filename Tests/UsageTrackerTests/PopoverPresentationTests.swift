@@ -105,4 +105,24 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(PopoverPresentation.headerSubtitle(cycle: nil, planName: "Pro", calendar: calendar) == "Pro")
         #expect(PopoverPresentation.headerSubtitle(cycle: nil, planName: nil, calendar: calendar) == nil)
     }
+
+    @Test func rowPacingFallsBackToRemainingTint() {
+        let window = LimitWindow(id: "weekly", label: "Weekly", percentUsed: 85, resetsAt: date(10, 27), parentID: nil)
+        let result = PopoverPresentation.rowPacing(window: window, now: date(10, 24))
+
+        #expect(result.tick == nil)
+        #expect(result.tint == .overBudget)
+    }
+
+    @Test func rowPacingUsesElapsedTimeWhenTheWindowHasALength() throws {
+        // 2h left of 5h: the ideal is 60%.
+        let window = LimitWindow(
+            id: "session", label: "Session", percentUsed: 30, resetsAt: date(10, 24, hour: 12), parentID: nil, windowLength: 5 * 3600
+        )
+        let result = PopoverPresentation.rowPacing(window: window, now: date(10, 24, hour: 10))
+
+        let tick = try #require(result.tick)
+        #expect(abs(tick - 0.6) < 0.0001)
+        #expect(result.tint == .onPace)
+    }
 }

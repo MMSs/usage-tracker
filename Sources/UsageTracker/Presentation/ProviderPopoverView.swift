@@ -134,6 +134,7 @@ struct ProviderPopoverView: View {
                     limitRow(window, in: report, pacing: pacing, now: now)
                     ForEach(report.children(of: window.id)) { child in
                         let money = report.extra(for: child.id)
+                        let childPacing = PopoverPresentation.rowPacing(window: child, now: now)
                         LimitRowView(
                             label: child.label,
                             text: PopoverPresentation.rowText(
@@ -145,8 +146,8 @@ struct ProviderPopoverView: View {
                             ),
                             fraction: PopoverPresentation.rowFraction(window: child, money: money),
                             indented: true,
-                            tick: nil,
-                            tint: PacingTint.forRemaining(percentUsed: child.percentUsed)
+                            tick: childPacing.tick,
+                            tint: childPacing.tint
                         )
                     }
                 }
@@ -180,6 +181,7 @@ struct ProviderPopoverView: View {
         let daysLeft = provider.descriptor.capabilities.hasCycle && isLong
             ? pacing.map(PopoverPresentation.daysLeftText)
             : nil
+        let timed = PopoverPresentation.rowPacing(window: window, now: now)
 
         return LimitRowView(
             label: window.label,
@@ -191,8 +193,8 @@ struct ProviderPopoverView: View {
             ),
             fraction: PopoverPresentation.rowFraction(window: window, money: money),
             indented: false,
-            tick: isPaced ? pacing?.tickFraction : nil,
-            tint: isPaced ? PacingTint.forPacing(pacing) : PacingTint.forRemaining(percentUsed: window.percentUsed)
+            tick: isPaced ? pacing?.tickFraction : timed.tick,
+            tint: isPaced ? PacingTint.forPacing(pacing) : timed.tint
         )
     }
 
