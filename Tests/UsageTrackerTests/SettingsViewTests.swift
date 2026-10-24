@@ -1,3 +1,4 @@
+import CoreGraphics
 import Testing
 @testable import UsageTracker
 
@@ -154,6 +155,34 @@ import Testing
         #expect(fit([100, 80], 10, 190) == .init(scale: 1, hidden: 0))
         #expect(fit([90, 90], 20, 160) == .init(scale: 0.8, hidden: 0))
         #expect(fit([], 10, 100) == .init(scale: 1, hidden: 0))
+    }
+
+    @Test func rowsThatFitAboveTheMinimumScaleHideNothingDespiteRounding() {
+        // 71.5 + 12 + 101 + 12 + 103.5 = 300; times 254.5 / 300 it comes to 254.50000000000003.
+        #expect(MenuBarPreviewStrip.fit(widths: [71.5, 101, 103.5], spacing: 12, available: 254.5).hidden == 0)
+
+        // Half-point widths, as rendered items have, from a fixed generator so every run is the same.
+        var seed: UInt64 = 42
+        func next() -> Double {
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            return Double(seed >> 11) / Double(1 << 53)
+        }
+        func halfPoints(_ value: Double) -> CGFloat {
+            CGFloat((value * 2).rounded() / 2)
+        }
+
+        var spurious: [[CGFloat]] = []
+        for _ in 0 ..< 1_000 {
+            let widths = (0 ..< 3).map { _ in halfPoints(40 + next() * 160) }
+            let natural = MenuBarPreviewStrip.naturalWidth(widths, spacing: 12)
+            // Between the minimum scale and full size, so the row always fits shrunk.
+            let available = halfPoints(Double(natural) * (0.72 + next() * 0.27))
+            if MenuBarPreviewStrip.fit(widths: widths, spacing: 12, available: available).hidden != 0 {
+                spurious.append(widths + [available])
+            }
+        }
+
+        #expect(spurious.isEmpty, "\(spurious.count) rows: \(spurious.prefix(3))")
     }
 
     @Test func previewItemsBelowTheMinimumScaleDropFromTheLeft() {

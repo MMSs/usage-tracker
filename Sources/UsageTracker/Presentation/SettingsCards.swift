@@ -44,6 +44,8 @@ struct MenuBarPreviewStrip: View {
     nonisolated static let itemSpacing: CGFloat = 12
     /// Smaller than this the items are too small to judge.
     nonisolated static let minimumScale: CGFloat = 0.7
+    /// Rounding slack: a row shrunk to exactly fit can come out a hair over.
+    nonisolated static let fitTolerance: CGFloat = 0.5
 
     /// How a row of items is fitted: one factor for every item and gap, and how many are left out from the left.
     struct Fit: Equatable {
@@ -67,7 +69,8 @@ struct MenuBarPreviewStrip: View {
 
         let scale = max(minimumScale, max(available, 0) / natural)
         var hidden = 0
-        while hidden < widths.count, naturalWidth(widths.dropFirst(hidden), spacing: spacing) * scale > available {
+        while hidden < widths.count,
+              naturalWidth(widths.dropFirst(hidden), spacing: spacing) * scale > available + fitTolerance {
             hidden += 1
         }
 
