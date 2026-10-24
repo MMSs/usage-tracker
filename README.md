@@ -104,7 +104,9 @@ fails, the error shows under the switch and in the log
 
 When a refresh fails, the menu bar item shows an error mark and the popover
 says which half failed (Plan usage or API spend), why, and how to fix it. The
-last successful report stays on screen, dimmed.
+last successful report stays on screen, dimmed. When a service is rate
+limiting requests, the popover says when the app will retry; scheduled
+refreshes of that half wait until then, while Refresh still asks right away.
 
 The app writes refreshes, HTTP responses, and scheduling to the system log
 under the subsystem `com.mohabsam.usage-tracker`. Watch it live:
