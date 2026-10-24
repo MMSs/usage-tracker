@@ -76,7 +76,7 @@ struct AnthropicUsageServiceTests {
         let snapshot = try await service.fetchSubscription(sessionKey: "k")
 
         #expect(snapshot.planName == "Max 5x")
-        #expect(snapshot.usage.fiveHour?.utilization == 37)
+        #expect(snapshot.usage.fiveHour?.utilization == 30)
         // A plain JSONDecoder would drop every resets_at.
         #expect(snapshot.usage.fiveHour?.resetsAt != nil)
         #expect(snapshot.spendLimit != nil)
@@ -182,7 +182,7 @@ struct AnthropicUsageServiceTests {
 
         #expect(snapshot.spendLimit == nil)
         #expect(snapshot.creditGrant == nil)
-        #expect(snapshot.usage.fiveHour?.utilization == 37)
+        #expect(snapshot.usage.fiveHour?.utilization == 30)
     }
 
     @Test func overageDecodingAndNotFoundFailuresYieldNilIndependently() async throws {

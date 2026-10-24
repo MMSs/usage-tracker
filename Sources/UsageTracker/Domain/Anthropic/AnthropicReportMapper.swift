@@ -79,11 +79,13 @@ enum AnthropicReportMapper {
         let scopedLimits = usage.limits.filter { $0.kind == "weekly_scoped" }
         if !scopedLimits.isEmpty {
             return scopedLimits.compactMap { limit in
-                guard let modelID = limit.modelID else { return nil }
+                let name = limit.modelDisplayName.flatMap { $0.trimmingCharacters(in: .whitespaces).isEmpty ? nil : $0 }
+                let modelID = limit.modelID.flatMap { $0.isEmpty ? nil : $0 }
+                guard let key = modelID ?? name.map(slug) else { return nil }
 
                 return LimitWindow(
-                    id: "\(weeklyID):\(modelID)",
-                    label: limit.modelDisplayName ?? modelID,
+                    id: "\(weeklyID):\(key)",
+                    label: name ?? key,
                     percentUsed: limit.percent ?? 0,
                     resetsAt: limit.resetsAt,
                     parentID: weeklyID,
@@ -108,6 +110,16 @@ enum AnthropicReportMapper {
                     windowLength: weeklyLength
                 )
             }
+    }
+
+    /// Lowercased, with each run of non-alphanumerics collapsed to one `-` and
+    /// the ends trimmed. A name with nothing alphanumeric falls back to `scoped`.
+    private static func slug(_ name: String) -> String {
+        let collapsed = name.lowercased()
+            .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+            .joined(separator: "-")
+
+        return collapsed.isEmpty ? "scoped" : collapsed
     }
 
     private static func legacyLabel(_ suffix: String) -> String {

@@ -17,11 +17,45 @@ import Testing
         try #require(ISO8601DateFormatter().date(from: iso))
     }
 
-    @Test func fixtureUsageDecodesWindowsAndScopedLimits() throws {
+    @Test func liveFixtureDecodesWindowsAndLimits() throws {
         let response = try AnthropicUsageResponse.decoder().decode(
             AnthropicUsageResponse.self,
             from: fixture("anthropic-usage")
         )
+
+        let fiveHourReset = try #require(response.fiveHour?.resetsAt)
+        #expect(response.fiveHour?.utilization == 30)
+        #expect(abs(fiveHourReset.timeIntervalSince(try date("2026-10-24T22:59:59Z")) - 0.862455) < 0.001)
+        #expect(response.sevenDay?.utilization == 25)
+        #expect(abs(try #require(response.sevenDay?.resetsAt).timeIntervalSince(try date("2026-10-27T06:59:59Z")) - 0.862474) < 0.001)
+
+        #expect(response.limits.map(\.kind) == ["session", "weekly_all", "weekly_scoped"])
+        #expect(response.limits.map(\.percent) == [30, 25, 15])
+
+        let scoped = response.limits[2]
+        #expect(scoped.modelID == nil)
+        #expect(scoped.modelDisplayName == "Fable")
+        #expect(response.limits[0].modelDisplayName == nil)
+
+        // Every `seven_day_<model>` key is null; `seven_day_breakdown` has no utilization.
+        #expect(response.legacyModelWindows.values.allSatisfy { $0.utilization == nil })
+    }
+
+    @Test func oldFixtureShapeDecodesWindowsAndScopedLimits() throws {
+        let response = try usage("""
+        {"five_hour":{"utilization":37.0,"resets_at":"2026-10-24T19:59:59.661633+00:00"},
+         "seven_day":{"utilization":"62.5","resets_at":"2026-10-29T07:00:00.000000+00:00"},
+         "seven_day_oauth_apps":null,
+         "seven_day_opus":{"utilization":12.0,"resets_at":"2026-10-29T07:00:00.000000+00:00"},
+         "seven_day_sonnet":{"utilization":48.0,"resets_at":null},
+         "limits":[
+           {"kind":"weekly_scoped","percent":18.5,"resets_at":"2026-10-29T07:00:00.000000+00:00",
+            "scope":{"model":{"id":"claude-opus-5-5","display_name":"Opus"}}},
+           {"kind":"weekly_scoped","percent":"54","resets_at":"2026-10-29T07:00:00.000000+00:00",
+            "scope":{"model":{"id":"claude-sonnet-5-5","display_name":"Sonnet"}}},
+           {"kind":"daily_scoped","percent":3.0,"resets_at":"2026-10-25T00:00:00.000000+00:00",
+            "scope":{"model":{"id":"claude-haiku-5-5","display_name":"Haiku"}}}]}
+        """)
 
         let fiveHourReset = try #require(response.fiveHour?.resetsAt)
         #expect(response.fiveHour?.utilization == 37)

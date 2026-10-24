@@ -77,14 +77,45 @@ struct AnthropicReportMapperTests {
                 scoped(id: "model_b", name: "Model B", percent: 12),
                 scoped(id: "model_a", name: nil, percent: 8),
                 scoped(id: nil, name: "No id", percent: 5),
+                scoped(id: nil, name: nil, percent: 4),
+                scoped(id: "empty", name: "", percent: 3),
                 scoped(id: "other", name: "Other", percent: 1, kind: "session"),
             ]
         ))
 
-        #expect(report.windows.map(\.id) == ["weekly", "weekly:model_b", "weekly:model_a"])
-        #expect(report.windows.map(\.label) == ["Weekly", "Model B", "model_a"])
-        #expect(report.children(of: "weekly").map(\.percentUsed) == [12, 8])
+        #expect(report.windows.map(\.id) == ["weekly", "weekly:model_b", "weekly:model_a", "weekly:no-id", "weekly:empty"])
+        #expect(report.windows.map(\.label) == ["Weekly", "Model B", "model_a", "No id", "empty"])
+        #expect(report.children(of: "weekly").map(\.percentUsed) == [12, 8, 5, 3])
         #expect(report.children(of: "weekly").allSatisfy { $0.windowLength == 7 * 86400 && $0.resetsAt == weeklyReset })
+    }
+
+    @Test func scopedLimitWithOnlyADisplayNameGetsASlugID() {
+        let report = AnthropicReportMapper.subscription(snapshot(
+            sevenDay: Window(utilization: 30, resetsAt: weeklyReset),
+            limits: [
+                scoped(id: nil, name: "Fable", percent: 15),
+                scoped(id: nil, name: "  Claude  Opus 5.5! ", percent: 7),
+                scoped(id: nil, name: "!!!", percent: 2),
+            ]
+        ))
+
+        #expect(report.windows.map(\.id) == ["weekly", "weekly:fable", "weekly:claude-opus-5-5", "weekly:scoped"])
+        #expect(report.windows.map(\.label) == ["Weekly", "Fable", "  Claude  Opus 5.5! ", "!!!"])
+        #expect(report.children(of: "weekly").allSatisfy { $0.parentID == "weekly" && $0.windowLength == 7 * 86400 })
+    }
+
+    @Test func liveFixtureYieldsSessionWeeklyAndFable() throws {
+        let url = try #require(Bundle.module.url(forResource: "anthropic-usage", withExtension: "json", subdirectory: "Fixtures"))
+        let usage = try AnthropicUsageResponse.decoder().decode(AnthropicUsageResponse.self, from: Data(contentsOf: url))
+
+        let report = AnthropicReportMapper.subscription(AnthropicSubscriptionSnapshot(
+            usage: usage, planName: nil, spendLimit: nil, creditGrant: nil
+        ))
+
+        #expect(report.windows.map(\.id) == ["session", "weekly", "weekly:fable"])
+        #expect(report.windows.map(\.label) == ["Session", "Weekly", "Fable"])
+        #expect(report.windows.map(\.percentUsed) == [30, 25, 15])
+        #expect(report.windows[2].parentID == "weekly")
     }
 
     @Test func legacyKeysAreUsedOnlyWithoutScopedLimits() {
