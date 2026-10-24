@@ -9,6 +9,7 @@ struct ProviderStatus: Equatable {
     let text: String
     let tone: Tone
 
+    /// `statuses` are the enabled halves' states; an empty list means every half is switched off.
     static func make(configured: Bool, enabled: Bool = true, statuses: [HalfStatus], planName: String?) -> ProviderStatus {
         guard configured else {
             return ProviderStatus(text: "Not set up", tone: .neutral)
@@ -16,6 +17,10 @@ struct ProviderStatus: Equatable {
 
         guard enabled else {
             return ProviderStatus(text: "Disabled", tone: .neutral)
+        }
+
+        guard !statuses.isEmpty else {
+            return ProviderStatus(text: "Nothing switched on", tone: .neutral)
         }
 
         if statuses.contains(.expired) {

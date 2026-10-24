@@ -17,6 +17,10 @@ import Testing
         #expect(ProviderStatus.make(configured: true, enabled: false, statuses: [.error], planName: "Pro") == ProviderStatus(text: "Disabled", tone: .neutral))
     }
 
+    @Test func noEnabledHalvesReadsNothingSwitchedOn() {
+        #expect(ProviderStatus.make(configured: true, enabled: true, statuses: [], planName: "Pro") == ProviderStatus(text: "Nothing switched on", tone: .neutral))
+    }
+
     @Test func connectedShowsThePlan() {
         #expect(ProviderStatus.make(configured: true, statuses: [.ready], planName: "Pro").text == "Connected · Pro")
         #expect(ProviderStatus.make(configured: true, statuses: [.ready, .unconfigured], planName: nil).text == "Connected")

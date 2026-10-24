@@ -197,7 +197,7 @@ struct ProviderSettingsView: View {
     }
 
     private var status: ProviderStatus {
-        let halves = [provider.subscription, provider.api].compactMap { $0 }
+        let halves = [provider.subscription, provider.api].compactMap { $0 }.filter(\.isEnabled)
         return ProviderStatus.make(
             configured: provider.isConfigured,
             enabled: provider.isEnabled,
