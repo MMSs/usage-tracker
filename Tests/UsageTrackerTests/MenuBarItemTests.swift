@@ -241,3 +241,16 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(dataItem.accessibilityText(displayName: "Cursor") == "Cursor, D 4.20/7, C 73.50/200")
     }
 }
+
+@Test func forceSetUpShowsOnlyTheSetUpStatus() {
+    let item = MenuBarItemBuilder.make(
+        descriptor: ProviderRegistry.descriptor(for: .cursor),
+        subscription: HalfSnapshot(status: .unconfigured, report: nil, isStale: true),
+        api: nil,
+        apiBudget: nil,
+        now: now,
+        calendar: calendar,
+        forceSetUp: true
+    )
+    #expect(item == MenuBarItem(provider: .cursor, subscription: .status(.setUp), api: nil))
+}

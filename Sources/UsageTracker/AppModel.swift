@@ -13,6 +13,7 @@ final class AppModel: ObservableObject {
     private(set) var scheduler: RefreshScheduler!
 
     private var isStarted = false
+    private var providerObservers: [AnyCancellable] = []
 
     init(
         providers: [ProviderViewModel],
@@ -31,6 +32,11 @@ final class AppModel: ObservableObject {
         self.intervalStore = intervalStore
         self.appearanceStore = appearanceStore
         self.budgetStore = budgetStore
+
+        // Forward provider changes so the menu bar scenes re-evaluate `insertedProviders`.
+        providerObservers = providers.map { provider in
+            provider.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
+        }
 
         // The scheduler is owned by the model, so its closures hold the model weakly.
         scheduler = RefreshScheduler(
@@ -65,6 +71,13 @@ final class AppModel: ObservableObject {
     func setInterval(_ interval: RefreshInterval) {
         intervalStore.setInterval(interval)
         scheduler.setInterval(interval)
+    }
+
+    /// Configured providers in registry order; the first provider alone when none is
+    /// configured, so there is always an item to click.
+    var insertedProviders: [Provider] {
+        let configured = providers.filter(\.isConfigured).map(\.id)
+        return configured.isEmpty ? [ProviderRegistry.all[0].id] : configured
     }
 
     func provider(_ id: Provider) -> ProviderViewModel {

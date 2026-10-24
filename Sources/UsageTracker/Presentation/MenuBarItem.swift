@@ -79,8 +79,13 @@ enum MenuBarItemBuilder {
         api: HalfSnapshot?,
         apiBudget: Decimal?,
         now: Date,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        forceSetUp: Bool = false
     ) -> MenuBarItem? {
+        if forceSetUp {
+            return MenuBarItem(provider: descriptor.id, subscription: .status(.setUp), api: nil)
+        }
+
         let subscriptionDisplay = display(subscription) { report in
             subscriptionMeters(descriptor: descriptor, report: report, now: now, calendar: calendar)
         }

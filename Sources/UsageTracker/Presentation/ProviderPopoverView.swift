@@ -34,7 +34,11 @@ struct ProviderPopoverView: View {
     private var reportPage: some View {
         let now = Date()
 
-        return VStack(alignment: .leading, spacing: 14) {
+        guard provider.isConfigured else {
+            return AnyView(setUpPage)
+        }
+
+        return AnyView(VStack(alignment: .leading, spacing: 14) {
             header
 
             if let half = provider.subscription, half.status != .unconfigured {
@@ -46,6 +50,33 @@ struct ProviderPopoverView: View {
             }
 
             footer
+        }
+        .padding(16))
+    }
+
+    private var setUpPage: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            header
+
+            HStack {
+                Button("Set up") {
+                    isSettingsPresented = true
+                }
+                .buttonStyle(.borderedProminent)
+                .keyboardShortcut(.defaultAction)
+
+                Spacer()
+
+                Button {
+                    NSApplication.shared.terminate(nil)
+                } label: {
+                    Image(systemName: "power")
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut("q", modifiers: .command)
+                .help("Quit")
+                .accessibilityLabel("Quit")
+            }
         }
         .padding(16)
     }
