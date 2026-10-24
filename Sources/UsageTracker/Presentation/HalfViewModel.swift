@@ -100,6 +100,9 @@ final class HalfViewModel: ObservableObject {
             scheduledRetriesBlocked = false
             status = .ready
             cache.store(CachedReport(report: fetched, fetchedAt: date), provider: provider, half: half)
+        } catch is CancellationError {
+            // Cancelled, not failed: keep what the half showed before.
+            return
         } catch {
             guard generation == refreshGeneration else {
                 return

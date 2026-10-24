@@ -138,6 +138,10 @@ final class CursorUsageService: UsageFetching, DailySpendFetching {
         do {
             (data, response) = try await client.data(for: request)
         } catch {
+            // A cancelled request is not a failure; let callers tell the difference.
+            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+                throw CancellationError()
+            }
             throw FetchError.transport
         }
 

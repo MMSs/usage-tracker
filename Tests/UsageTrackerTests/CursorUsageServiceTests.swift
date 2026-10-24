@@ -71,6 +71,24 @@ struct CursorUsageServiceTests {
         }
     }
 
+    @Test func cancelledRequestIsCancellationNotTransport() async {
+        for error: any Error in [URLError(.cancelled), CancellationError()] {
+            let service = CursorUsageService(client: ThrowingHTTPClient(error: error))
+
+            await #expect(throws: CancellationError.self) {
+                try await service.fetchUsage(token: "session-token")
+            }
+        }
+    }
+
+    @Test func otherRequestFailureIsTransport() async {
+        let service = CursorUsageService(client: ThrowingHTTPClient(error: URLError(.notConnectedToInternet)))
+
+        await #expect(throws: FetchError.transport) {
+            try await service.fetchUsage(token: "session-token")
+        }
+    }
+
     @Test func urlSessionClientUsesAnEphemeralSessionWithoutAutomaticCookieHandling() {
         let configuration = URLSessionHTTPClient().configuration
 

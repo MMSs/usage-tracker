@@ -1,6 +1,19 @@
 import Foundation
 @testable import UsageTracker
 
+/// Fails every request with `error`, as URLSession does when offline or cancelled.
+final class ThrowingHTTPClient: HTTPClient {
+    private let error: any Error
+
+    init(error: any Error) {
+        self.error = error
+    }
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        throw error
+    }
+}
+
 final class RecordingHTTPClient: HTTPClient {
     enum Response {
         case ok(json: String)

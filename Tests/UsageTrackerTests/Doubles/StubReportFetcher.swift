@@ -21,6 +21,8 @@ final class SuspendedGate {
 @MainActor
 final class StubReportFetcher: ReportFetching {
     var result: Result<ProviderReport, FetchError>
+    /// Thrown in place of `result` when set, for errors that are not a FetchError.
+    var thrownError: (any Error)?
     var gate: SuspendedGate?
     private(set) var callCount = 0
     private(set) var lastCredentials: [String: String]?
@@ -35,6 +37,10 @@ final class StubReportFetcher: ReportFetching {
 
         if let gate {
             await gate.wait()
+        }
+
+        if let thrownError {
+            throw thrownError
         }
 
         return try result.get()

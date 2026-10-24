@@ -104,6 +104,18 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(!model.scheduledRetriesBlocked)
     }
 
+    @Test func cancelledFetchLeavesStateUnchanged() async {
+        store.values[key] = "tok"
+        let model = makeModel()
+        await model.refresh(manual: true)
+        fetcher.thrownError = CancellationError()
+        await model.refresh(manual: true)
+        #expect(model.status == .ready)
+        #expect(model.report == makeReport())
+        #expect(model.lastSuccess == now)
+        #expect(!model.scheduledRetriesBlocked)
+    }
+
     @Test func challengeIsAnErrorAndKeepsReport() async {
         store.values[key] = "tok"
         let model = makeModel()
