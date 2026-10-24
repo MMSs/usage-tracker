@@ -177,7 +177,7 @@ struct AnthropicAPIReportMapperTests {
             AnthropicCostDay(day: local(10, 3), dollars: Decimal(string: "2.995")!),
         ]
 
-        let report = AnthropicReportMapper.api(days: days, month: month)
+        let report = AnthropicReportMapper.api(days: days, month: month, today: local(10, 24), calendar: calendar)
 
         #expect(report.planName == nil)
         #expect(report.windows.isEmpty)
@@ -197,8 +197,46 @@ struct AnthropicAPIReportMapperTests {
     @Test func noDaysIsAZeroSpendMonth() {
         let month = CyclePeriod(start: local(10, 1), end: local(11, 1))
 
-        let report = AnthropicReportMapper.api(days: [], month: month)
+        let report = AnthropicReportMapper.api(days: [], month: month, today: local(10, 24), calendar: calendar)
 
         #expect(report.spend == SpendPeriod(period: month, spent: 0, limit: nil, unit: .dollars, daily: []))
+    }
+
+    @Test func bucketsAfterLocalTodayFoldIntoToday() {
+        let month = CyclePeriod(start: local(10, 1), end: local(11, 1))
+        // 24 Oct 20:00 in Los Angeles is already 25 Oct in UTC, so the Admin
+        // API can have a bucket for a local day that has not started.
+        let today = calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 20))!
+        let days = [
+            AnthropicCostDay(day: local(10, 23), dollars: 1),
+            AnthropicCostDay(day: local(10, 24), dollars: 2),
+            AnthropicCostDay(day: local(10, 25), dollars: Decimal(string: "0.5")!),
+        ]
+
+        let report = AnthropicReportMapper.api(days: days, month: month, today: today, calendar: calendar)
+
+        #expect(report.spend?.daily == [
+            DaySpend(day: local(10, 23), amount: 1),
+            DaySpend(day: local(10, 24), amount: Decimal(string: "2.5")!),
+        ])
+        #expect(report.spend?.spent == Decimal(string: "3.5"))
+    }
+
+    @Test func futureBucketCreatesTodayWhenTodayHasNoEntry() {
+        let month = CyclePeriod(start: local(10, 1), end: local(11, 1))
+        let today = calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 20))!
+        let days = [
+            AnthropicCostDay(day: local(10, 22), dollars: 1),
+            AnthropicCostDay(day: local(10, 25), dollars: 4),
+            AnthropicCostDay(day: local(10, 26), dollars: 1),
+        ]
+
+        let report = AnthropicReportMapper.api(days: days, month: month, today: today, calendar: calendar)
+
+        #expect(report.spend?.daily == [
+            DaySpend(day: local(10, 22), amount: 1),
+            DaySpend(day: local(10, 24), amount: 5),
+        ])
+        #expect(report.spend?.spent == 6)
     }
 }

@@ -18,7 +18,7 @@ final class AnthropicAPIReportService: ReportFetching {
         let month = try monthPeriod(containing: today)
         let days = try await service.fetchMonthToDate(adminKey: adminKey, month: month, calendar: calendar)
 
-        return AnthropicReportMapper.api(days: days, month: month)
+        return AnthropicReportMapper.api(days: days, month: month, today: today, calendar: calendar)
     }
 
     /// The Admin API buckets by UTC day, so the month is the UTC calendar

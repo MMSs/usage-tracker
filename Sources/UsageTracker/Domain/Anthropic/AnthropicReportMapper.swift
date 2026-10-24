@@ -54,13 +54,22 @@ enum AnthropicReportMapper {
         return ProviderReport(planName: snapshot.planName, windows: windows, extras: extras, spend: nil)
     }
 
-    static func api(days: [AnthropicCostDay], month: CyclePeriod) -> ProviderReport {
+    /// The Admin API buckets by UTC day, so near the end of a local day the
+    /// newest bucket can be a local day that has not started. Those amounts
+    /// fold into today so the chart never plots the future.
+    static func api(days: [AnthropicCostDay], month: CyclePeriod, today: Date, calendar: Calendar) -> ProviderReport {
+        let startOfToday = calendar.startOfDay(for: today)
+        var totals: [Date: Decimal] = [:]
+        for day in days {
+            totals[min(day.day, startOfToday), default: 0] += day.dollars
+        }
+
         let spend = SpendPeriod(
             period: month,
             spent: days.reduce(0) { $0 + $1.dollars },
             limit: nil,
             unit: .dollars,
-            daily: days.map { DaySpend(day: $0.day, amount: $0.dollars) }
+            daily: totals.map { DaySpend(day: $0.key, amount: $0.value) }.sorted { $0.day < $1.day }
         )
 
         return ProviderReport(planName: nil, windows: [], extras: [], spend: spend)

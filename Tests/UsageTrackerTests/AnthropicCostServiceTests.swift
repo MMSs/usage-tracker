@@ -230,7 +230,7 @@ struct AnthropicAPIReportServiceTests {
         let month = CyclePeriod(start: local(2026, 10, 1), end: local(2026, 11, 1))
         #expect(fetcher.adminKeys == ["sk-ant-admin-test"])
         #expect(fetcher.months == [month])
-        #expect(report == AnthropicReportMapper.api(days: days, month: month))
+        #expect(report == AnthropicReportMapper.api(days: days, month: month, today: today, calendar: calendar))
         #expect(report.spend?.spent == Decimal(string: "15.340678"))
     }
 
@@ -275,5 +275,19 @@ struct AnthropicAPIReportServiceTests {
         _ = try await service.fetchReport(credentials: ["admin-key": "k"], today: today)
 
         #expect(fetcher.months == [CyclePeriod(start: local(2026, 12, 1), end: local(2027, 1, 1))])
+    }
+
+    @Test func reportFoldsFutureLocalBucketsIntoToday() async throws {
+        let today = calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 20))!
+        let fetcher = StubFetcher(days: [
+            AnthropicCostDay(day: local(2026, 10, 24), dollars: 2),
+            AnthropicCostDay(day: local(2026, 10, 25), dollars: 3),
+        ])
+        let service = AnthropicAPIReportService(service: fetcher, calendar: calendar)
+
+        let report = try await service.fetchReport(credentials: ["admin-key": "k"], today: today)
+
+        #expect(report.spend?.daily == [DaySpend(day: local(2026, 10, 24), amount: 5)])
+        #expect(report.spend?.spent == 5)
     }
 }
