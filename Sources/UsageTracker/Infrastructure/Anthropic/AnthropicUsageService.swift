@@ -121,7 +121,7 @@ final class AnthropicUsageService: AnthropicUsageFetching {
         do {
             let data = try await send(request(path: path, sessionKey: sessionKey))
 
-            return try HTTPResponseHandler.decode(type, from: data)
+            return try HTTPResponseHandler.decode(type, from: data, optional: true)
         } catch is CancellationError {
             throw CancellationError()
         } catch {

@@ -104,7 +104,8 @@ enum HTTPResponseHandler {
     static func decode<T: Decodable>(
         _ type: T.Type,
         from data: Data,
-        dates: JSONDecoder.DateDecodingStrategy = .deferredToDate
+        dates: JSONDecoder.DateDecodingStrategy = .deferredToDate,
+        optional: Bool = false
     ) throws -> T {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = dates
@@ -112,13 +113,20 @@ enum HTTPResponseHandler {
         do {
             return try decoder.decode(type, from: data)
         } catch {
-            logDecodingFailure(error, decoding: type)
+            logDecodingFailure(error, decoding: type, optional: optional)
             throw FetchError.decoding
         }
     }
 
     /// One line naming the type and where decoding stopped; never the data.
-    static func logDecodingFailure(_ error: any Error, decoding type: Any.Type) {
-        Log.http.error("decoding \(String(describing: type), privacy: .public) failed: \(LogFormat.decodingSummary(error), privacy: .public)")
+    /// A failure of an `optional` response, which the caller shrugs off, is
+    /// debug noise rather than an error.
+    static func logDecodingFailure(_ error: any Error, decoding type: Any.Type, optional: Bool = false) {
+        let line = "decoding \(String(describing: type)) failed: \(LogFormat.decodingSummary(error))"
+        if optional {
+            Log.http.debug("\(line, privacy: .public)")
+        } else {
+            Log.http.error("\(line, privacy: .public)")
+        }
     }
 }
