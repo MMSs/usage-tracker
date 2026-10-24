@@ -55,7 +55,7 @@ struct AnthropicReportMapperTests {
             spendLimit: AnthropicOverageSpendLimit(
                 isEnabled: true, usedCredits: .nan, monthlyCreditLimit: .infinity, currency: nil
             ),
-            creditGrant: AnthropicOverageCreditGrant(remainingBalance: -.infinity, totalGranted: nil, currency: nil)
+            creditGrant: AnthropicOverageCreditGrant(granted: true, amountMinorUnits: -.infinity, currency: nil)
         ))
 
         #expect(report.extras.map(\.amount) == [0, 0])
@@ -64,7 +64,7 @@ struct AnthropicReportMapperTests {
 
     @Test func hugeOverageAmountsDoNotProduceNaN() {
         let report = AnthropicReportMapper.subscription(snapshot(
-            creditGrant: AnthropicOverageCreditGrant(remainingBalance: 1e300, totalGranted: nil, currency: nil)
+            creditGrant: AnthropicOverageCreditGrant(granted: true, amountMinorUnits: 1e300, currency: nil)
         ))
 
         #expect(report.extras[0].amount.isFinite)
@@ -160,13 +160,25 @@ struct AnthropicReportMapperTests {
     @Test func extrasAppearWhenPresent() {
         let report = AnthropicReportMapper.subscription(snapshot(
             spendLimit: AnthropicOverageSpendLimit(isEnabled: true, usedCredits: 12.34, monthlyCreditLimit: 50, currency: "USD"),
-            creditGrant: AnthropicOverageCreditGrant(remainingBalance: 7.5, totalGranted: 10, currency: "USD")
+            creditGrant: AnthropicOverageCreditGrant(granted: true, amountMinorUnits: 1250, currency: "USD")
         ))
 
         #expect(report.extras == [
             MoneyRow(id: "overage", label: "Extra usage", amount: Decimal(string: "12.34")!, limit: 50),
-            MoneyRow(id: "credits", label: "Extra credits", amount: Decimal(string: "7.5")!, limit: nil),
+            MoneyRow(id: "credits", label: "Extra credits", amount: Decimal(string: "12.5")!, limit: nil),
         ])
+    }
+
+    @Test(arguments: [
+        AnthropicOverageCreditGrant(granted: false, amountMinorUnits: nil, currency: nil),
+        AnthropicOverageCreditGrant(granted: false, amountMinorUnits: 1250, currency: "USD"),
+        AnthropicOverageCreditGrant(granted: true, amountMinorUnits: nil, currency: "USD"),
+        AnthropicOverageCreditGrant(granted: nil, amountMinorUnits: 1250, currency: "USD"),
+    ])
+    func creditsAreShownOnlyWhenGrantedWithAnAmount(grant: AnthropicOverageCreditGrant) {
+        let report = AnthropicReportMapper.subscription(snapshot(creditGrant: grant))
+
+        #expect(report.extras.isEmpty)
     }
 
     @Test func fractionalAmountsStayExact() {

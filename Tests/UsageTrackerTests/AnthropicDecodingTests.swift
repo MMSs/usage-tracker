@@ -235,7 +235,31 @@ import Testing
             AnthropicOverageCreditGrant.self,
             from: fixture("anthropic-overage-credit-grant")
         )
-        #expect(grant == AnthropicOverageCreditGrant(remainingBalance: 7.5, totalGranted: 25, currency: "USD"))
+        // The live response of an account with no credit grant.
+        #expect(grant == AnthropicOverageCreditGrant(granted: false, amountMinorUnits: nil, currency: nil))
+        #expect(grant.grantedAmount == nil)
+    }
+
+    @Test func grantedCreditsDecodeMinorUnitsToDollars() throws {
+        let grant = try JSONDecoder().decode(
+            AnthropicOverageCreditGrant.self,
+            from: Data(#"{"available":true,"eligible":true,"granted":true,"amount_minor_units":1250,"currency":"USD","needs_payment_setup":false,"feature":"extra_usage","expires_at":"2026-12-01T00:00:00Z"}"#.utf8)
+        )
+
+        #expect(grant == AnthropicOverageCreditGrant(granted: true, amountMinorUnits: 1250, currency: "USD"))
+        #expect(grant.grantedAmount == 12.5)
+    }
+
+    @Test func creditGrantFieldsAreLossy() throws {
+        let grant = try JSONDecoder().decode(
+            AnthropicOverageCreditGrant.self,
+            from: Data(#"{"granted":"yes","amount_minor_units":"500","currency":7}"#.utf8)
+        )
+        #expect(grant == AnthropicOverageCreditGrant(granted: nil, amountMinorUnits: 500, currency: nil))
+        #expect(grant.grantedAmount == nil)
+
+        let empty = try JSONDecoder().decode(AnthropicOverageCreditGrant.self, from: Data("{}".utf8))
+        #expect(empty == AnthropicOverageCreditGrant(granted: nil, amountMinorUnits: nil, currency: nil))
     }
 
     @Test func overageNumbersDecodeFromStringsAndNulls() throws {
@@ -247,11 +271,6 @@ import Testing
             isEnabled: false, usedCredits: 4.5, monthlyCreditLimit: 0, currency: nil
         ))
 
-        let grant = try JSONDecoder().decode(
-            AnthropicOverageCreditGrant.self,
-            from: Data(#"{"remaining_balance":"3"}"#.utf8)
-        )
-        #expect(grant == AnthropicOverageCreditGrant(remainingBalance: 3, totalGranted: nil, currency: nil))
     }
 
     @Test func organizationsDecodeFromArrayAndObject() throws {

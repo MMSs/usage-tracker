@@ -42,11 +42,11 @@ enum AnthropicReportMapper {
             ))
         }
 
-        if let creditGrant = snapshot.creditGrant {
+        if let credits = snapshot.creditGrant?.grantedAmount {
             extras.append(MoneyRow(
                 id: "credits",
                 label: "Extra credits",
-                amount: decimal(creditGrant.remainingBalance),
+                amount: decimal(credits),
                 limit: nil
             ))
         }

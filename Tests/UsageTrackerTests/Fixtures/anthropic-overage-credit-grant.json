@@ -1,5 +1,10 @@
 {
-  "remaining_balance": 7.5,
-  "total_granted": 25,
-  "currency": "USD"
+  "available": false,
+  "eligible": false,
+  "granted": false,
+  "amount_minor_units": null,
+  "currency": null,
+  "needs_payment_setup": false,
+  "feature": null,
+  "expires_at": null
 }

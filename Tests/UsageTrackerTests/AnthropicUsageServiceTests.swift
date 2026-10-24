@@ -80,7 +80,7 @@ struct AnthropicUsageServiceTests {
         // A plain JSONDecoder would drop every resets_at.
         #expect(snapshot.usage.fiveHour?.resetsAt != nil)
         #expect(snapshot.spendLimit != nil)
-        #expect(snapshot.creditGrant == AnthropicOverageCreditGrant(remainingBalance: 7.5, totalGranted: 25, currency: "USD"))
+        #expect(snapshot.creditGrant == AnthropicOverageCreditGrant(granted: false, amountMinorUnits: nil, currency: nil))
     }
 
     @Test func organizationIsResolvedOnceAndCached() async throws {
@@ -209,7 +209,7 @@ struct AnthropicUsageServiceTests {
         let snapshot = try await service.fetchSubscription(sessionKey: "k")
 
         #expect(snapshot.spendLimit == nil)
-        #expect(snapshot.creditGrant?.remainingBalance == 7.5)
+        #expect(snapshot.creditGrant?.granted == false)
     }
 
     @Test func htmlChallengeIsReportedAsChallenge() async throws {

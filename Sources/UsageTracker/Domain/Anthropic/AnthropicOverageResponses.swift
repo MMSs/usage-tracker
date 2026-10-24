@@ -26,30 +26,39 @@ extension AnthropicOverageSpendLimit: Decodable {
     }
 }
 
-/// Prepaid overage credits granted to the account.
+/// Prepaid overage credits granted to the account. The live response carries
+/// more (`available`, `eligible`, `needs_payment_setup`, `feature`,
+/// `expires_at`); only what the report needs is read, and every field is
+/// lossy so a null or reshaped one never fails the decode.
 struct AnthropicOverageCreditGrant: Equatable, Sendable {
-    let remainingBalance: Double
-    let totalGranted: Double?
+    let granted: Bool?
+    /// Minor units of `currency` (cents for USD).
+    let amountMinorUnits: Double?
     let currency: String?
+
+    /// The granted amount in major units, or nil when no credit is granted.
+    /// Always cents-to-dollars: the only currency seen is USD, and a
+    /// different `currency` is not converted.
+    var grantedAmount: Double? {
+        guard granted == true, let amountMinorUnits else {
+            return nil
+        }
+
+        return amountMinorUnits / 100
+    }
 }
 
 extension AnthropicOverageCreditGrant: Decodable {
     private enum CodingKeys: String, CodingKey {
-        case remainingBalance = "remaining_balance"
-        case totalGranted = "total_granted"
+        case granted
+        case amountMinorUnits = "amount_minor_units"
         case currency
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        guard let balance = container.decodeLossyNumber(forKey: .remainingBalance) else {
-            throw DecodingError.keyNotFound(CodingKeys.remainingBalance, .init(
-                codingPath: decoder.codingPath,
-                debugDescription: "remaining_balance is missing or not numeric"
-            ))
-        }
-        remainingBalance = balance
-        totalGranted = container.decodeLossyNumber(forKey: .totalGranted)
-        currency = try container.decodeIfPresent(String.self, forKey: .currency)
+        granted = (try? container.decodeIfPresent(Bool.self, forKey: .granted)) ?? nil
+        amountMinorUnits = container.decodeLossyNumber(forKey: .amountMinorUnits)
+        currency = (try? container.decodeIfPresent(String.self, forKey: .currency)) ?? nil
     }
 }
