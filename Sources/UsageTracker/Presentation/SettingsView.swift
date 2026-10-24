@@ -95,8 +95,26 @@ struct ProviderSettingsView: View {
     let appModel: AppModel
     let helpFieldID: String?
 
+    private var status: ProviderStatus {
+        let halves = [provider.subscription, provider.api].compactMap { $0 }
+        return ProviderStatus.make(
+            configured: provider.isConfigured,
+            statuses: halves.map(\.status),
+            planName: halves.compactMap { $0.report?.planName }.first
+        )
+    }
+
     var body: some View {
         Form {
+            Section {
+                ProviderStatusHeader(
+                    provider: provider.id,
+                    displayName: provider.descriptor.displayName,
+                    status: status,
+                    updatedText: provider.isConfigured ? PopoverPresentation.updatedText(provider.updatedAt) : nil
+                )
+            }
+
             Section {
                 ForEach(provider.descriptor.subscriptionFields + provider.descriptor.apiFields) { field in
                     CredentialFieldView(
@@ -107,12 +125,17 @@ struct ProviderSettingsView: View {
                         opensHelp: field.id == helpFieldID,
                         onChange: { await appModel.provider(provider.id).credentialsChanged(half: field.half) }
                     )
+                    .padding(.vertical, 4)
                 }
+            } header: {
+                Text("Credentials")
+            } footer: {
+                Text("Stored only in your login Keychain. Nothing leaves this Mac.")
             }
         }
         .formStyle(.grouped)
-        // The title bar's scroll-edge effect blurs a pinned header within about 100pt of the top.
-        .contentMargins(.top, 40, for: .scrollContent)
+        // The detail toolbar region reaches about 106pt; content must start below it.
+        .contentMargins(.top, 44, for: .scrollContent)
     }
 }
 
@@ -130,9 +153,11 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Menu bar") {
-                preview
+            Section {
+                MenuBarPreviewStrip(item: previewItem, appearance: appearance, displayName: previewProvider?.descriptor.displayName ?? "")
+            }
 
+            Section {
                 Toggle("Show text", isOn: binding(\.showText) { $0.showingText($1) })
                     .disabled(appearance.showText && !appearance.showGraph)
                 Toggle("Countdown", isOn: binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
@@ -147,9 +172,13 @@ struct GeneralSettingsView: View {
                 .pickerStyle(.segmented)
 
                 Toggle("Colored", isOn: binding(\.colored) { var copy = $0; copy.colored = $1; return copy })
+            } header: {
+                Text("Menu bar")
+            } footer: {
+                Text("Colored tints the text and graph by remaining capacity or pacing.")
             }
 
-            Section("Refresh") {
+            Section {
                 Picker("Every", selection: Binding(
                     get: { interval },
                     set: { newValue in
@@ -162,11 +191,15 @@ struct GeneralSettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            } header: {
+                Text("Refresh")
+            } footer: {
+                Text("Refreshing pauses while the Mac is asleep or offline.")
             }
         }
         .formStyle(.grouped)
-        // The title bar's scroll-edge effect blurs a pinned header within about 100pt of the top.
-        .contentMargins(.top, 40, for: .scrollContent)
+        // The detail toolbar region reaches about 106pt; content must start below it.
+        .contentMargins(.top, 44, for: .scrollContent)
         .onAppear {
             appearance = appModel.appearanceStore.appearance()
             interval = appModel.intervalStore.interval()
@@ -178,10 +211,8 @@ struct GeneralSettingsView: View {
         appModel.providers.first(where: \.isConfigured) ?? appModel.providers.first(where: \.hasAnyHalf)
     }
 
-    @ViewBuilder
-    private var preview: some View {
-        let provider = previewProvider
-        let item = provider.flatMap { provider in
+    private var previewItem: MenuBarItem? {
+        previewProvider.flatMap { provider in
             MenuBarItemBuilder.make(
                 descriptor: provider.descriptor,
                 subscription: provider.subscription.map(HalfSnapshot.init),
@@ -189,15 +220,6 @@ struct GeneralSettingsView: View {
                 apiBudget: appModel.budgetStore.budget(for: provider.id),
                 now: Date()
             )
-        }
-
-        LabeledContent("Preview") {
-            if let provider, let item {
-                MenuBarLabel(item: item, appearance: appearance, displayName: provider.descriptor.displayName)
-            } else {
-                Text("No data yet")
-                    .foregroundStyle(.secondary)
-            }
         }
     }
 
@@ -215,4 +237,3 @@ struct GeneralSettingsView: View {
         )
     }
 }
-
