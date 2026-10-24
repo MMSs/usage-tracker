@@ -11,6 +11,8 @@ final class HalfViewModel: ObservableObject {
     @Published private(set) var status: HalfStatus = .unconfigured
     @Published private(set) var report: ProviderReport?
     @Published private(set) var lastSuccess: Date?
+    /// Why the last refresh failed; nil after a success.
+    @Published private(set) var lastFailure: RecordedFailure?
     /// False after the first success this run.
     @Published private(set) var isStale: Bool = true
     /// Off: nothing drawn, nothing fetched; the credential and last report are kept.
@@ -51,7 +53,7 @@ final class HalfViewModel: ObservableObject {
         } catch {
             // A failing store must not hide the last successful report.
             loadCached()
-            status = .error
+            fail(.keychain)
             return
         }
 
@@ -83,7 +85,7 @@ final class HalfViewModel: ObservableObject {
         do {
             values = try readValues()
         } catch {
-            status = .error
+            fail(.keychain)
             return
         }
 
@@ -92,6 +94,7 @@ final class HalfViewModel: ObservableObject {
             return
         }
 
+        let statusBefore = status
         if report == nil {
             status = .loading
         }
@@ -107,22 +110,22 @@ final class HalfViewModel: ObservableObject {
             lastSuccess = date
             isStale = false
             scheduledRetriesBlocked = false
+            lastFailure = nil
             status = .ready
             cache.store(CachedReport(report: fetched, fetchedAt: date), provider: provider, half: half)
         } catch is CancellationError {
-            // Cancelled, not failed: keep what the half showed before.
+            // Cancelled, not failed: keep what the half showed before, so a
+            // half with no report does not sit on "Loading…" hiding its error.
+            if generation == refreshGeneration, statusBefore == .error || statusBefore == .expired {
+                status = statusBefore
+            }
             return
         } catch {
             guard generation == refreshGeneration else {
                 return
             }
 
-            if let fetchError = error as? FetchError, fetchError == .unauthorized {
-                status = .expired
-                scheduledRetriesBlocked = true
-            } else {
-                status = .error
-            }
+            fail(RefreshFailure(error))
         }
     }
 
@@ -132,6 +135,17 @@ final class HalfViewModel: ObservableObject {
         refreshGeneration += 1
         scheduledRetriesBlocked = false
         await refresh(manual: true)
+    }
+
+    private func fail(_ cause: RefreshFailure) {
+        lastFailure = RecordedFailure(cause: cause, date: now())
+
+        if cause == .unauthorized {
+            status = .expired
+            scheduledRetriesBlocked = true
+        } else {
+            status = .error
+        }
     }
 
     private func loadCached() {
@@ -150,6 +164,7 @@ final class HalfViewModel: ObservableObject {
         status = .unconfigured
         report = nil
         lastSuccess = nil
+        lastFailure = nil
         scheduledRetriesBlocked = false
         cache.clear(provider: provider, half: half)
     }

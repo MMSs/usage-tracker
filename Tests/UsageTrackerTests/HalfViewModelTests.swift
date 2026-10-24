@@ -251,3 +251,144 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(apiFetcher.lastCredentials == ["admin-key": "adm"])
     }
 }
+
+@Suite @MainActor struct HalfViewModelFailureTests {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let store = MemoryCredentialStore()
+    let cache = MemoryReportCache()
+    let fetcher = StubReportFetcher(result: .success(makeReport()))
+    let key = CredentialKey(provider: .cursor, fieldID: "session-token")
+
+    private func makeModel() -> HalfViewModel {
+        let now = now
+        return HalfViewModel(
+            provider: .cursor, half: .subscription,
+            fields: ProviderRegistry.descriptor(for: .cursor).subscriptionFields,
+            fetcher: fetcher, credentialStore: store, cache: cache, now: { now }
+        )
+    }
+
+    @Test(arguments: [
+        (FetchError.transport, RefreshFailure.transport),
+        (.challenge, .challenge),
+        (.httpStatus(429), .httpStatus(429)),
+        (.decoding, .decoding),
+        (.invalidResponse, .decoding),
+        (.unauthorized, .unauthorized),
+    ])
+    func fetchErrorsMapToACause(error: FetchError, cause: RefreshFailure) {
+        #expect(RefreshFailure(error) == cause)
+    }
+
+    @Test func otherErrorsAreUnexpected() {
+        struct Odd: Error {}
+        #expect(RefreshFailure(Odd()) == .unexpected)
+    }
+
+    @Test func failureRecordsTheCauseAndTime() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.httpStatus(500))
+        let model = makeModel()
+        await model.refresh(manual: true)
+        #expect(model.status == .error)
+        #expect(model.lastFailure == RecordedFailure(cause: .httpStatus(500), date: now))
+    }
+
+    @Test func expiredRecordsUnauthorized() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.unauthorized)
+        let model = makeModel()
+        await model.refresh(manual: false)
+        #expect(model.status == .expired)
+        #expect(model.lastFailure?.cause == .unauthorized)
+    }
+
+    @Test func unexpectedErrorIsRecorded() async {
+        struct Odd: Error {}
+        store.values[key] = "tok"
+        fetcher.thrownError = Odd()
+        let model = makeModel()
+        await model.refresh(manual: true)
+        #expect(model.status == .error)
+        #expect(model.lastFailure?.cause == .unexpected)
+    }
+
+    @Test func successClearsTheFailure() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.transport)
+        let model = makeModel()
+        await model.refresh(manual: true)
+        #expect(model.lastFailure?.cause == .transport)
+
+        fetcher.result = .success(makeReport())
+        await model.refresh(manual: true)
+        #expect(model.status == .ready)
+        #expect(model.lastFailure == nil)
+    }
+
+    @Test func keychainFailureAtInitIsRecorded() {
+        store.values[key] = "tok"
+        store.readError = FetchError.transport
+        let model = makeModel()
+        #expect(model.status == .error)
+        #expect(model.lastFailure == RecordedFailure(cause: .keychain, date: now))
+    }
+
+    @Test func keychainFailureOnRefreshIsRecorded() async {
+        store.values[key] = "tok"
+        let model = makeModel()
+        await model.refresh(manual: true)
+        store.readError = FetchError.transport
+        await model.refresh(manual: true)
+        #expect(model.status == .error)
+        #expect(model.lastFailure?.cause == .keychain)
+        #expect(fetcher.callCount == 1)
+    }
+
+    @Test func removingTheCredentialClearsTheFailure() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.transport)
+        let model = makeModel()
+        await model.refresh(manual: true)
+        store.values[key] = nil
+        await model.credentialsChanged()
+        #expect(model.status == .unconfigured)
+        #expect(model.lastFailure == nil)
+    }
+
+    /// A refresh cancelled by sleep or going offline used to leave a half
+    /// with no report on "Loading…", hiding the error it had before.
+    @Test func cancelledRetryKeepsThePreviousErrorVisible() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.challenge)
+        let model = makeModel()
+        await model.refresh(manual: false)
+        #expect(model.status == .error)
+        #expect(model.report == nil)
+
+        let gate = SuspendedGate()
+        fetcher.gate = gate
+        fetcher.thrownError = CancellationError()
+        let task = Task { await model.refresh(manual: false) }
+        await settle()
+        #expect(model.status == .loading)
+        gate.resume()
+        await task.value
+
+        #expect(model.status == .error)
+        #expect(model.lastFailure?.cause == .challenge)
+    }
+
+    @Test func cancelledRetryKeepsExpiredVisible() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.unauthorized)
+        let model = makeModel()
+        await model.refresh(manual: true)
+
+        fetcher.thrownError = CancellationError()
+        await model.refresh(manual: true)
+
+        #expect(model.status == .expired)
+        #expect(model.scheduledRetriesBlocked)
+    }
+}
