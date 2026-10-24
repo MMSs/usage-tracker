@@ -27,6 +27,12 @@ final class URLSessionHTTPClient: HTTPClient {
         // A refresh must reach the server; usage changes behind a URL that does not.
         configuration.urlCache = nil
         configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        // Responses are small JSON. A refresh cycle waits for its fetches, so
+        // a trickling response must not hold it (and the provider's other
+        // half) for the default seven days; a minute is under the default
+        // two-minute interval.
+        configuration.timeoutIntervalForRequest = 30
+        configuration.timeoutIntervalForResource = 60
         session = URLSession(configuration: configuration)
     }
 

@@ -109,4 +109,13 @@ struct CursorUsageServiceTests {
         #expect(configuration.urlCache == nil)
         #expect(configuration.requestCachePolicy == .reloadIgnoringLocalCacheData)
     }
+
+    /// The default resource timeout is seven days: a trickling response
+    /// would hold its provider's refresh cycle, and its other half, that long.
+    @Test func urlSessionClientGivesUpWellWithinARefreshInterval() {
+        let configuration = URLSessionHTTPClient().configuration
+
+        #expect(configuration.timeoutIntervalForRequest == 30)
+        #expect(configuration.timeoutIntervalForResource == 60)
+    }
 }
