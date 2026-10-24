@@ -87,10 +87,12 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(PopoverPresentation.rowFraction(window: cycleWindow, money: cycleMoney(limit: nil)) == nil)
     }
 
-    @Test func updatedTextUses24HourClock() {
-        #expect(PopoverPresentation.updatedText(date(10, 24, hour: 14, minute: 31), calendar: calendar) == "Updated 14:31")
-        #expect(PopoverPresentation.updatedText(date(10, 24, hour: 9, minute: 5), calendar: calendar) == "Updated 09:05")
-        #expect(PopoverPresentation.updatedText(nil, calendar: calendar) == "Updated —")
+    @Test func updatedTextFollowsTheClock() {
+        #expect(PopoverPresentation.updatedText(date(10, 24, hour: 14, minute: 31), calendar: calendar, uses24Hour: true) == "Updated 14:31")
+        #expect(PopoverPresentation.updatedText(date(10, 24, hour: 9, minute: 5), calendar: calendar, uses24Hour: true) == "Updated 09:05")
+        #expect(PopoverPresentation.updatedText(date(10, 24, hour: 14, minute: 31), calendar: calendar, uses24Hour: false) == "Updated 2:31pm")
+        #expect(PopoverPresentation.updatedText(date(10, 24, hour: 9, minute: 5), calendar: calendar, uses24Hour: false) == "Updated 9:05am")
+        #expect(PopoverPresentation.updatedText(nil, calendar: calendar, uses24Hour: false) == "Updated —")
     }
 
     private static let claude = HalfService(name: "claude.ai", host: "claude.ai")
@@ -124,10 +126,10 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
-    private func rateLimited(until: Date, now: Date) -> HalfErrorMessage? {
+    private func rateLimited(until: Date, now: Date, uses24Hour: Bool = true) -> HalfErrorMessage? {
         PopoverPresentation.halfError(
             half: .api, status: .error, failure: .rateLimited(until: until),
-            service: Self.console, now: now, calendar: calendar
+            service: Self.console, now: now, calendar: calendar, uses24Hour: uses24Hour
         )
     }
 
@@ -139,9 +141,16 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
+    @Test func rateLimitedSaysWhenItRetriesOnTheTwelveHourClock() {
+        #expect(rateLimited(until: date(10, 24, hour: 21, minute: 5), now: date(10, 24, hour: 20, minute: 55), uses24Hour: false)?.text
+            == "API spend: Anthropic API is rate limiting requests; retrying at 9:05pm.")
+    }
+
     @Test func rateLimitedPastMidnightNamesTheDay() {
         #expect(rateLimited(until: date(10, 25, hour: 0, minute: 30), now: date(10, 24, hour: 23, minute: 50))?.text
             == "API spend: Anthropic API is rate limiting requests; retrying at 25 Oct, 00:30.")
+        #expect(rateLimited(until: date(10, 25, hour: 0, minute: 30), now: date(10, 24, hour: 23, minute: 50), uses24Hour: false)?.text
+            == "API spend: Anthropic API is rate limiting requests; retrying at 25 Oct, 12:30am.")
     }
 
     /// A wait already over gives no time: "retrying at <past time>" would be wrong.
@@ -230,9 +239,15 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
 
     @Test func lastSuccessShowsTheTimeTodayAndTheDayOtherwise() {
         let now = date(10, 24, hour: 16)
-        #expect(PopoverPresentation.lastSuccessText(date(10, 24, hour: 14, minute: 31), now: now, calendar: calendar) == "Last success 14:31")
-        #expect(PopoverPresentation.lastSuccessText(date(10, 22, hour: 9, minute: 5), now: now, calendar: calendar) == "Last success 22 Oct, 09:05")
-        #expect(PopoverPresentation.lastSuccessText(nil, now: now, calendar: calendar) == nil)
+        func text(_ date: Date?, uses24Hour: Bool) -> String? {
+            PopoverPresentation.lastSuccessText(date, now: now, calendar: calendar, uses24Hour: uses24Hour)
+        }
+
+        #expect(text(date(10, 24, hour: 14, minute: 31), uses24Hour: true) == "Last success 14:31")
+        #expect(text(date(10, 22, hour: 9, minute: 5), uses24Hour: true) == "Last success 22 Oct, 09:05")
+        #expect(text(date(10, 24, hour: 14, minute: 31), uses24Hour: false) == "Last success 2:31pm")
+        #expect(text(date(10, 22, hour: 9, minute: 5), uses24Hour: false) == "Last success 22 Oct, 9:05am")
+        #expect(text(nil, uses24Hour: false) == nil)
     }
 
     @Test func monthNameIsEnglishWide() {

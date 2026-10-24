@@ -106,41 +106,25 @@ enum PopoverPresentation {
         pacing.remainingDays == 1 ? "1 day left" : "\(pacing.remainingDays) days left"
     }
 
-    static func updatedText(_ date: Date?, calendar: Calendar = .current) -> String {
+    static func updatedText(
+        _ date: Date?, calendar: Calendar = .current, uses24Hour: Bool = CountdownFormatter.systemUses24Hour
+    ) -> String {
         guard let date else {
             return "Updated —"
         }
 
-        return "Updated " + clockTime(date, calendar: calendar)
+        return "Updated " + CountdownFormatter.clockTime(date, calendar: calendar, uses24Hour: uses24Hour)
     }
 
-    /// "14:31".
-    private static func clockTime(_ date: Date, calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
-    }
-
-    /// "Last success 14:31", with the day when it was not today; nil with no success.
-    static func lastSuccessText(_ date: Date?, now: Date, calendar: Calendar = .current) -> String? {
+    /// "Last success 2:31pm", with the day when it was not today; nil with no success.
+    static func lastSuccessText(
+        _ date: Date?, now: Date, calendar: Calendar = .current, uses24Hour: Bool = CountdownFormatter.systemUses24Hour
+    ) -> String? {
         guard let date else {
             return nil
         }
 
-        return "Last success " + clockTime(date, now: now, calendar: calendar)
-    }
-
-    /// "14:31", or "25 Oct, 00:30" when `date` is not on `now`'s day.
-    private static func clockTime(_ date: Date, now: Date, calendar: Calendar) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.calendar = calendar
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = calendar.isDate(date, inSameDayAs: now) ? "HH:mm" : "d MMM, HH:mm"
-        return formatter.string(from: date)
+        return "Last success " + CountdownFormatter.clockTime(date, now: now, calendar: calendar, uses24Hour: uses24Hour)
     }
 
     /// What went wrong with a half and how to fix it; nil when nothing did.
@@ -153,14 +137,15 @@ enum PopoverPresentation {
         service: HalfService,
         display: HalfDisplay? = nil,
         now: Date = Date(),
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        uses24Hour: Bool = CountdownFormatter.systemUses24Hour
     ) -> HalfErrorMessage? {
         let explanation: (text: String, fix: String?, severity: HalfErrorMessage.Severity)
         switch status {
         case .expired:
-            explanation = failureExplanation(.unauthorized, service: service, now: now, calendar: calendar)
+            explanation = failureExplanation(.unauthorized, service: service, now: now, calendar: calendar, uses24Hour: uses24Hour)
         case .error:
-            explanation = failure.map { failureExplanation($0, service: service, now: now, calendar: calendar) }
+            explanation = failure.map { failureExplanation($0, service: service, now: now, calendar: calendar, uses24Hour: uses24Hour) }
                 ?? ("Unable to refresh.", retries, .warning)
         case .needsOrganization:
             // Settings has the picker on the half's tab; "in Settings" would point at itself there.
@@ -207,7 +192,8 @@ enum PopoverPresentation {
         _ failure: RefreshFailure,
         service: HalfService,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        uses24Hour: Bool
     ) -> (text: String, fix: String?, severity: HalfErrorMessage.Severity) {
         switch failure {
         case .transport:
@@ -217,7 +203,7 @@ enum PopoverPresentation {
         case let .httpStatus(code):
             ("\(service.name) returned an error (HTTP \(code)).", retries, .warning)
         case let .rateLimited(until?) where until > now:
-            ("\(service.name) is rate limiting requests; retrying at \(clockTime(until, now: now, calendar: calendar)).", nil, .warning)
+            ("\(service.name) is rate limiting requests; retrying at \(CountdownFormatter.clockTime(until, now: now, calendar: calendar, uses24Hour: uses24Hour)).", nil, .warning)
         case .rateLimited:
             // No time, or one already past: the next scheduled refresh asks.
             ("\(service.name) is rate limiting requests.", retries, .warning)

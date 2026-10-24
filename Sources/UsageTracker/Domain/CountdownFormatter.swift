@@ -94,15 +94,40 @@ enum CountdownFormatter {
         return parts.compactMap { $0 }.joined(separator: " ")
     }
 
-    private static func exactTime(
-        _ date: Date, now: Date, style: ResetStyle, calendar: Calendar, uses24Hour: Bool
+    /// "2:31pm" or "14:31"; with `now`, "25 Oct, 12:30am" when `date` is not on `now`'s day.
+    static func clockTime(
+        _ date: Date,
+        now: Date? = nil,
+        calendar: Calendar = .current,
+        uses24Hour: Bool = systemUses24Hour
     ) -> String {
+        let formatter = formatter(calendar: calendar)
+        formatter.dateFormat = uses24Hour ? "HH:mm" : "h:mma"
+        let time = formatter.string(from: date)
+
+        guard let now, !calendar.isDate(date, inSameDayAs: now) else {
+            return time
+        }
+
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: date) + ", " + time
+    }
+
+    /// English month and weekday names whatever the system language, with am/pm in lower case.
+    private static func formatter(calendar: Calendar) -> DateFormatter {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
         formatter.amSymbol = "am"
         formatter.pmSymbol = "pm"
+        return formatter
+    }
+
+    private static func exactTime(
+        _ date: Date, now: Date, style: ResetStyle, calendar: Calendar, uses24Hour: Bool
+    ) -> String {
+        let formatter = formatter(calendar: calendar)
 
         func string(_ format: String) -> String {
             formatter.dateFormat = format
