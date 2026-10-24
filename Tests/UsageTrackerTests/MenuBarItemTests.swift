@@ -90,7 +90,8 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(list[0].tick == nil)
         #expect(list[1].letter == "C")
         #expect(list[1].text == "43%")
-        #expect(list[1].tick == 0.4)
+        let tick = try #require(list[1].tick)
+        #expect(abs(tick - 13.0 / 30.0) < 0.0001)
         #expect(list[1].countdown == "17d")
         #expect(item.subscription == .meters(list, stale: false, errorMark: false))
         #expect(item.api == nil)
@@ -104,7 +105,7 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(list[0].text == "4.20/7")
         #expect(list[1].text == "73.50/200")
         let tick = try #require(list[1].tick)
-        #expect(abs(tick - 0.4) < 0.0001)
+        #expect(abs(tick - 13.0 / 30.0) < 0.0001)
         #expect(list[1].tint == .onPace)
     }
 
@@ -215,7 +216,7 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(apiMeter.letter == "$")
         #expect(abs(try #require(apiMeter.fraction) - 0.3784) < 0.0001)
         let tick = try #require(apiMeter.tick)
-        #expect(abs(tick - 23.0 / 31.0) < 0.0001)
+        #expect(abs(tick - 24.0 / 31.0) < 0.0001)
         #expect(item.subscription == nil)
     }
 

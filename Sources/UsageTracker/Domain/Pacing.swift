@@ -8,6 +8,9 @@ enum PacingStatus: Equatable, Sendable {
 
 struct Pacing: Equatable, Sendable {
     let totalDays: Int, elapsedDays: Int, remainingDays: Int
+    /// Spend so far in the period, today included; what `status` and the tint compare.
+    let spent: Decimal
+    /// budget × (elapsedDays + 1) / totalDays: where spend may reach by the end of today.
     let idealSpend: Decimal
     let status: PacingStatus
     /// max(budget − spentBeforeToday, 0) / remainingDays
@@ -45,7 +48,9 @@ enum PacingCalculator {
         let elapsedDays = calendar.dateComponents([.day], from: startDay, to: todayDay).day ?? 0
         let remainingDays = totalDays - elapsedDays
 
-        let idealSpend = budget * Decimal(elapsedDays) / Decimal(totalDays)
+        // `spent` already includes today, so today counts as elapsed: an
+        // exactly on-pace spender stays on track all day.
+        let idealSpend = budget * Decimal(elapsedDays + 1) / Decimal(totalDays)
         let difference = idealSpend - spent
         let status: PacingStatus = difference >= 0
             ? .onTrack(by: difference)
@@ -62,6 +67,7 @@ enum PacingCalculator {
             totalDays: totalDays,
             elapsedDays: elapsedDays,
             remainingDays: remainingDays,
+            spent: spent,
             idealSpend: idealSpend,
             status: status,
             todayBudget: todayBudget,
@@ -117,7 +123,7 @@ enum PacingTint: Equatable, Sendable {
             return .neutral
         }
 
-        let actual = pacing.spentSoFar
+        let actual = pacing.spent
 
         guard pacing.idealSpend > 0 else {
             return actual > 0 ? .nearingLimit : .onPace
@@ -169,18 +175,6 @@ enum PacingTint: Equatable, Sendable {
             return .red
         case .neutral:
             return .secondary
-        }
-    }
-}
-
-private extension Pacing {
-    /// Recovers the spend from the status, which is `ideal − spent` or `spent − ideal`.
-    var spentSoFar: Decimal {
-        switch status {
-        case .onTrack(let by):
-            return idealSpend - by
-        case .over(let by):
-            return idealSpend + by
         }
     }
 }

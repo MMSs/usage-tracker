@@ -15,27 +15,37 @@ private func day(_ year: Int, _ month: Int, _ day: Int) -> Date {
 @Suite struct PacingTests {
     let period = CyclePeriod(start: day(2026, 10, 12), end: day(2026, 11, 11))   // 30 days
 
-    @Test func idealSpendIsBudgetTimesElapsedOverTotal() {
+    @Test func idealSpendCountsTodayAsElapsed() {
         let p = PacingCalculator.make(spent: 100, spentToday: 10, budget: 300, period: period, today: day(2026, 10, 24), calendar: pacingCalendar)!
         #expect(p.totalDays == 30)
         #expect(p.elapsedDays == 12)
         #expect(p.remainingDays == 18)
-        #expect(p.idealSpend == 120)
-        #expect(p.status == .onTrack(by: 20))
-        #expect(p.tickFraction == 0.4)
+        #expect(p.idealSpend == 130)
+        #expect(p.spent == 100)
+        #expect(p.status == .onTrack(by: 30))
+        #expect(abs(p.tickFraction - 13.0 / 30.0) < 0.0001)
     }
 
     @Test func overBudgetWhenSpentExceedsIdeal() {
         let p = PacingCalculator.make(spent: 150, spentToday: 10, budget: 300, period: period, today: day(2026, 10, 24), calendar: pacingCalendar)!
-        #expect(p.status == .over(by: 30))
+        #expect(p.status == .over(by: 20))
     }
 
-    @Test func firstDayHasZeroIdealAndProjectsNothing() {
+    @Test func firstDayIdealIsOneDaysShareAndProjectsNothing() {
         let p = PacingCalculator.make(spent: 5, spentToday: 5, budget: 300, period: period, today: day(2026, 10, 12), calendar: pacingCalendar)!
         #expect(p.elapsedDays == 0)
-        #expect(p.idealSpend == 0)
+        #expect(p.idealSpend == 10)
+        #expect(p.status == .onTrack(by: 5))
         #expect(p.projectedSpend == nil)
         #expect(p.todayBudget == 10)
+    }
+
+    @Test func exactlyOnPaceSpenderIsOnTrackAllDay() {
+        // Day 2 of 30 at 10 a day: by evening today's 10 is already spent.
+        let p = PacingCalculator.make(spent: 20, spentToday: 10, budget: 300, period: period, today: day(2026, 10, 13), calendar: pacingCalendar)!
+        #expect(p.idealSpend == 20)
+        #expect(p.status == .onTrack(by: 0))
+        #expect(PacingTint.forPacing(p) == .onPace)
     }
 
     @Test func lastDayStillHasOneRemainingDay() {
@@ -84,9 +94,9 @@ private func day(_ year: Int, _ month: Int, _ day: Int) -> Date {
         #expect(PacingTint.forRemaining(percentUsed: 70) == .nearingLimit)
         #expect(PacingTint.forRemaining(percentUsed: 82) == .overBudget)
 
-        // Budget 250 over 12 of 30 days gives an ideal spend of exactly 100.
-        let nearing = PacingCalculator.make(spent: 110, spentToday: 0, budget: 250, period: period, today: day(2026, 10, 24), calendar: pacingCalendar)
-        let over = PacingCalculator.make(spent: 120, spentToday: 0, budget: 250, period: period, today: day(2026, 10, 24), calendar: pacingCalendar)
+        // Budget 300 on day 10 of 30 gives an ideal spend of exactly 100.
+        let nearing = PacingCalculator.make(spent: 110, spentToday: 0, budget: 300, period: period, today: day(2026, 10, 21), calendar: pacingCalendar)
+        let over = PacingCalculator.make(spent: 120, spentToday: 0, budget: 300, period: period, today: day(2026, 10, 21), calendar: pacingCalendar)
         #expect(PacingTint.forPacing(nearing) == .nearingLimit)
         #expect(PacingTint.forPacing(over) == .overBudget)
         #expect(PacingTint.forPacing(nil) == .neutral)

@@ -15,7 +15,7 @@ private func date(_ month: Int, _ day: Int, hour: Int = 0, minute: Int = 0) -> D
 private func pacing(status: PacingStatus, remainingDays: Int = 18) -> Pacing {
     Pacing(
         totalDays: 30, elapsedDays: 30 - remainingDays, remainingDays: remainingDays,
-        idealSpend: 120, status: status, todayBudget: 10, leftForToday: 5,
+        spent: 120, idealSpend: 120, status: status, todayBudget: 10, leftForToday: 5,
         projectedSpend: nil, tickFraction: 0.4, fillFraction: 0.3
     )
 }
