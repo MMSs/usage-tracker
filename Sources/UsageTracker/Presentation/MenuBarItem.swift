@@ -29,14 +29,22 @@ enum HalfDisplay: Equatable {
     case meters([MenuBarMeter], stale: Bool, errorMark: Bool)
     case money(text: String, meter: MenuBarMeter?, stale: Bool, errorMark: Bool)
 
-    fileprivate func accessibilityText() -> String {
+    /// Names `half` when it failed, so VoiceOver can tell which half the error mark is on.
+    fileprivate func accessibilityText(half: Half) -> String {
+        let failed = "\(half.displayName): refresh failed"
+
         switch self {
+        case .status(.error):
+            return failed
+        case .status(.expired):
+            return "\(half.displayName): credential expired"
         case let .status(status):
-            status.title
-        case let .meters(meters, _, _):
-            meters.filter { $0.text != "—" }.map { "\($0.letter) \($0.text)" }.joined(separator: ", ")
-        case let .money(text, _, _, _):
-            "API \(text)"
+            return status.title
+        case let .meters(meters, _, errorMark):
+            let values = meters.filter { $0.text != "—" }.map { "\($0.letter) \($0.text)" }
+            return (values + (errorMark ? [failed] : [])).joined(separator: ", ")
+        case let .money(text, _, _, errorMark):
+            return (["API \(text)"] + (errorMark ? [failed] : [])).joined(separator: ", ")
         }
     }
 }
@@ -49,8 +57,11 @@ struct MenuBarItem: Equatable {
     var showsDivider: Bool { subscription != nil && api != nil }
 
     func accessibilityText(displayName: String) -> String {
-        ([displayName] + [subscription, api].compactMap { $0?.accessibilityText() })
-            .joined(separator: ", ")
+        let halves = [
+            subscription?.accessibilityText(half: .subscription),
+            api?.accessibilityText(half: .api),
+        ]
+        return ([displayName] + halves.compactMap { $0 }).joined(separator: ", ")
     }
 }
 

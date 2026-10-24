@@ -12,6 +12,22 @@ import Testing
         }
     }
 
+    @Test func halvesHaveDisplayNames() {
+        #expect(Half.subscription.displayName == "Plan usage")
+        #expect(Half.api.displayName == "API spend")
+    }
+
+    @Test func eachHalfNamesTheServiceItTalksTo() {
+        let anthropic = ProviderRegistry.descriptor(for: .anthropic)
+        #expect(anthropic.service(for: .subscription) == HalfService(name: "claude.ai", host: "claude.ai"))
+        #expect(anthropic.service(for: .api) == HalfService(name: "Anthropic API", host: "api.anthropic.com"))
+        #expect(ProviderRegistry.descriptor(for: .cursor).service(for: .subscription) == HalfService(name: "Cursor", host: "cursor.com"))
+    }
+
+    @Test func aHalfWithoutAServiceFallsBackToTheProviderName() {
+        #expect(ProviderRegistry.descriptor(for: .cursor).service(for: .api) == HalfService(name: "Cursor", host: "Cursor"))
+    }
+
     @Test func registryListsCursorAnthropicOpenAIInOrder() {
         #expect(ProviderRegistry.all.map(\.id) == [.cursor, .anthropic, .openai])
     }

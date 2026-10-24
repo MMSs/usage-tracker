@@ -326,7 +326,7 @@ private func apiReport(spent: Decimal) -> ProviderReport {
 
         let expired = HalfSnapshot(status: .expired, report: nil, isStale: true)
         let expiredItem = try #require(build(.anthropic, subscription: expired))
-        #expect(expiredItem.accessibilityText(displayName: "Anthropic") == "Anthropic, Expired")
+        #expect(expiredItem.accessibilityText(displayName: "Anthropic") == "Anthropic, Plan usage: credential expired")
 
         let cursor = cursorReport(unit: .percent, spent: 53, limit: 100, todaySpend: nil, percentUsed: 53)
         let cursorItem = try #require(build(.cursor, subscription: ready(cursor)))
@@ -335,6 +335,21 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         let withData = cursorReport(unit: .dollars, spent: Decimal(string: "73.5")!, limit: 200, todaySpend: Decimal(string: "4.2")!, percentUsed: 53)
         let dataItem = try #require(build(.cursor, subscription: ready(withData)))
         #expect(dataItem.accessibilityText(displayName: "Cursor") == "Cursor, D 4.20/7, C 73.50/200")
+    }
+
+    @Test func accessibilityTextNamesTheFailingHalf() throws {
+        let failedWithReport = HalfSnapshot(status: .error, report: anthropicReport, isStale: false)
+        let failedWithout = HalfSnapshot(status: .error, report: nil, isStale: true)
+
+        let subscriptionFailed = try #require(build(.anthropic, subscription: failedWithReport, api: ready(apiReport(spent: 1))))
+        #expect(subscriptionFailed.accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 70%, Plan usage: refresh failed, API $1.00")
+
+        let apiFailed = try #require(build(.anthropic, subscription: ready(anthropicReport), api: failedWithout))
+        #expect(apiFailed.accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 70%, API spend: refresh failed")
+
+        let apiFailedWithReport = HalfSnapshot(status: .error, report: apiReport(spent: 1), isStale: false)
+        let moneyFailed = try #require(build(.anthropic, subscription: nil, api: apiFailedWithReport))
+        #expect(moneyFailed.accessibilityText(displayName: "Anthropic") == "Anthropic, API $1.00, API spend: refresh failed")
     }
 }
 

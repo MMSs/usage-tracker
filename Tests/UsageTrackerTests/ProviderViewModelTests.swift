@@ -42,6 +42,44 @@ import Testing
         #expect(!unfetched.hasAnyHalf)
     }
 
+    /// A half the menu bar marks as failed must also get a popover section
+    /// (drawn for active halves only) with an explanation in it.
+    @Test func aFailedHalfWithNoReportIsDrawnAndExplained() async throws {
+        store.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        apiFetcher.result = .failure(.transport)
+        let model = makeModel(.anthropic, now: { t1 })
+        await model.refresh(manual: false)
+
+        let item = try #require(MenuBarItemBuilder.make(
+            descriptor: model.descriptor, subscription: model.snapshot(.subscription), api: model.snapshot(.api),
+            apiBudget: nil, now: t1
+        ))
+        #expect(item.api == .status(.error))
+        #expect(model.isConfigured)
+        let api = try #require(model.api)
+        #expect(api.isActive)
+        #expect(api.report == nil)
+        #expect(PopoverPresentation.halfError(api, descriptor: model.descriptor, display: item.api)?.text
+            == "API spend: Couldn't reach api.anthropic.com.")
+
+        api.isEnabled = false
+        #expect(model.snapshot(.api) == nil)
+        #expect(!api.isActive)
+    }
+
+    @Test func aFailedHalfWithACachedReportIsExplained() async throws {
+        store.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "tok"
+        let model = makeModel(.cursor, now: { t1 })
+        await model.refresh(manual: false)
+        subFetcher.result = .failure(.httpStatus(502))
+        await model.refresh(manual: false)
+
+        let half = try #require(model.subscription)
+        #expect(half.report != nil)
+        #expect(PopoverPresentation.halfError(half, descriptor: model.descriptor, display: nil)?.text
+            == "Plan usage: Cursor returned an error (HTTP 502).")
+    }
+
     @Test func aProviderWithBothFetchersHasTwoHalves() {
         let model = makeModel(.anthropic, now: { t1 })
         #expect(model.hasAnyHalf)

@@ -93,12 +93,96 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(PopoverPresentation.updatedText(nil, calendar: calendar) == "Updated —")
     }
 
-    @Test func halfErrorMapping() {
-        #expect(PopoverPresentation.halfErrorText(.error) == "Unable to refresh.")
-        #expect(PopoverPresentation.halfErrorText(.expired) == "Credential expired — replace it in Settings")
-        #expect(PopoverPresentation.halfErrorText(.ready) == nil)
-        #expect(PopoverPresentation.halfErrorText(.loading) == nil)
-        #expect(PopoverPresentation.halfErrorText(.unconfigured) == nil)
+    private static let claude = HalfService(name: "claude.ai", host: "claude.ai")
+    private static let console = HalfService(name: "Anthropic API", host: "api.anthropic.com")
+
+    private func error(_ failure: RefreshFailure?, half: Half = .subscription, service: HalfService = claude) -> HalfErrorMessage? {
+        PopoverPresentation.halfError(half: half, status: .error, failure: failure, service: service)
+    }
+
+    @Test func transportNamesTheHost() {
+        #expect(error(.transport, half: .api, service: Self.console) == HalfErrorMessage(
+            text: "API spend: Couldn't reach api.anthropic.com.",
+            fix: "Check your connection; it retries automatically.",
+            severity: .warning
+        ))
+    }
+
+    @Test func challengeSendsTheUserToTheBrowser() {
+        #expect(error(.challenge) == HalfErrorMessage(
+            text: "Plan usage: claude.ai asked for a browser check.",
+            fix: "Open claude.ai in your browser, then Refresh.",
+            severity: .warning
+        ))
+    }
+
+    @Test func httpStatusNamesTheServiceAndCode() {
+        #expect(error(.httpStatus(429), half: .api, service: Self.console) == HalfErrorMessage(
+            text: "API spend: Anthropic API returned an error (HTTP 429).",
+            fix: "It retries automatically.",
+            severity: .warning
+        ))
+    }
+
+    @Test func decodingSuggestsAnUpdate() {
+        #expect(error(.decoding) == HalfErrorMessage(
+            text: "Plan usage: claude.ai sent a response the app doesn't understand.",
+            fix: "It may have changed; check for an update.",
+            severity: .warning
+        ))
+    }
+
+    @Test func keychainFailure() {
+        #expect(error(.keychain)?.text == "Plan usage: Couldn't read the credential from Keychain.")
+        #expect(error(.keychain)?.fix == "Unlock the login keychain and allow access if asked, then Refresh.")
+    }
+
+    @Test func unexpectedFailure() {
+        #expect(error(.unexpected)?.text == "Plan usage: Refreshing from claude.ai failed unexpectedly.")
+        #expect(error(.unexpected)?.fix == "It retries automatically.")
+    }
+
+    @Test func errorWithoutACauseStillExplainsItself() {
+        #expect(error(nil) == HalfErrorMessage(text: "Plan usage: Unable to refresh.", fix: "It retries automatically.", severity: .warning))
+    }
+
+    @Test func expiredKeepsTheExistingText() {
+        let message = PopoverPresentation.halfError(half: .api, status: .expired, failure: .unauthorized, service: Self.console)
+        #expect(message == HalfErrorMessage(text: "API spend: Credential expired — replace it in Settings", fix: nil, severity: .critical))
+    }
+
+    @Test(arguments: [HalfStatus.ready, .loading, .unconfigured])
+    func healthyStatesHaveNoError(status: HalfStatus) {
+        #expect(PopoverPresentation.halfError(half: .subscription, status: status, failure: .transport, service: Self.claude) == nil)
+    }
+
+    /// The menu bar shows "Error" for a report with nothing it can draw; the popover must say why.
+    @Test(arguments: [HalfStatus.ready, .loading])
+    func reportTheMenuBarCannotDrawIsExplained(status: HalfStatus) {
+        let message = PopoverPresentation.halfError(
+            half: .api, status: status, failure: nil, service: Self.console, display: .status(.error)
+        )
+        #expect(message == HalfErrorMessage(
+            text: "API spend: Anthropic API sent nothing the app can show.",
+            fix: "It may have changed; check for an update.",
+            severity: .warning
+        ))
+
+        let drawable = HalfDisplay.money(text: "$1.00", meter: nil, stale: false, errorMark: false)
+        #expect(PopoverPresentation.halfError(half: .api, status: status, failure: nil, service: Self.console, display: drawable) == nil)
+        #expect(PopoverPresentation.halfError(half: .api, status: status, failure: nil, service: Self.console, display: .status(.loading)) == nil)
+    }
+
+    @Test func lineJoinsTextAndFix() {
+        #expect(error(.httpStatus(500))?.line == "Plan usage: claude.ai returned an error (HTTP 500). It retries automatically.")
+        #expect(HalfErrorMessage(text: "A", fix: nil, severity: .critical).line == "A")
+    }
+
+    @Test func lastSuccessShowsTheTimeTodayAndTheDayOtherwise() {
+        let now = date(10, 24, hour: 16)
+        #expect(PopoverPresentation.lastSuccessText(date(10, 24, hour: 14, minute: 31), now: now, calendar: calendar) == "Last success 14:31")
+        #expect(PopoverPresentation.lastSuccessText(date(10, 22, hour: 9, minute: 5), now: now, calendar: calendar) == "Last success 22 Oct, 09:05")
+        #expect(PopoverPresentation.lastSuccessText(nil, now: now, calendar: calendar) == nil)
     }
 
     @Test func monthNameIsEnglishWide() {

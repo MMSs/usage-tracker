@@ -85,6 +85,10 @@ window is open and leaves when it closes.
 
 ## Troubleshooting
 
+When a refresh fails, the menu bar item shows an error mark and the popover
+says which half failed (Plan usage or API spend), why, and how to fix it. The
+last successful report stays on screen, dimmed.
+
 The app writes refreshes, HTTP responses, and scheduling to the system log
 under the subsystem `com.mohab.usage-tracker`. Watch it live:
 

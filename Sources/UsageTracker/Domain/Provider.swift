@@ -8,6 +8,22 @@ enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
 
 enum Half: String, Codable, Sendable {
     case subscription, api
+
+    /// Names the half in status and error text.
+    var displayName: String {
+        switch self {
+        case .subscription: "Plan usage"
+        case .api: "API spend"
+        }
+    }
+}
+
+/// What a half fetches from, for naming it in error messages.
+struct HalfService: Equatable, Sendable {
+    /// "Anthropic API".
+    let name: String
+    /// "api.anthropic.com".
+    let host: String
 }
 
 struct CredentialField: Identifiable, Equatable, Sendable {
@@ -34,6 +50,7 @@ struct ProviderDescriptor: Identifiable, Sendable {
     let displayName: String
     let capabilities: ProviderCapabilities
     let fields: [CredentialField]
+    let services: [Half: HalfService]
     /// "session", or nil when the provider has no short window (Cursor).
     let shortWindowID: String?
     /// "weekly" or "cycle".
@@ -41,6 +58,11 @@ struct ProviderDescriptor: Identifiable, Sendable {
 
     var subscriptionFields: [CredentialField] { fields.filter { $0.half == .subscription } }
     var apiFields: [CredentialField] { fields.filter { $0.half == .api } }
+
+    /// The half's service; the provider's name when none is listed.
+    func service(for half: Half) -> HalfService {
+        services[half] ?? HalfService(name: displayName, host: displayName)
+    }
 }
 
 enum ProviderRegistry {
@@ -78,6 +100,7 @@ enum ProviderRegistry {
                 copyChip: "WorkosCursorSessionToken"
             ),
         ],
+        services: [.subscription: HalfService(name: "Cursor", host: "cursor.com")],
         shortWindowID: nil,
         longWindowID: "cycle"
     )
@@ -123,6 +146,10 @@ enum ProviderRegistry {
                 copyChip: nil
             ),
         ],
+        services: [
+            .subscription: HalfService(name: "claude.ai", host: "claude.ai"),
+            .api: HalfService(name: "Anthropic API", host: "api.anthropic.com"),
+        ],
         shortWindowID: "session",
         longWindowID: "weekly"
     )
@@ -166,6 +193,10 @@ enum ProviderRegistry {
                 helpSteps: [budgetExplanation],
                 copyChip: nil
             ),
+        ],
+        services: [
+            .subscription: HalfService(name: "ChatGPT", host: "chatgpt.com"),
+            .api: HalfService(name: "OpenAI API", host: "api.openai.com"),
         ],
         shortWindowID: "session",
         longWindowID: "weekly"

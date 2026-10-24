@@ -119,11 +119,100 @@ enum PopoverPresentation {
         return "Updated " + formatter.string(from: date)
     }
 
-    static func halfErrorText(_ status: HalfStatus) -> String? {
-        switch status {
-        case .error: "Unable to refresh."
-        case .expired: "Credential expired — replace it in Settings"
-        case .unconfigured, .loading, .ready: nil
+    /// "Last success 14:31", with the day when it was not today; nil with no success.
+    static func lastSuccessText(_ date: Date?, now: Date, calendar: Calendar = .current) -> String? {
+        guard let date else {
+            return nil
         }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = calendar.isDate(date, inSameDayAs: now) ? "HH:mm" : "d MMM, HH:mm"
+        return "Last success " + formatter.string(from: date)
+    }
+
+    /// What went wrong with a half and how to fix it; nil when nothing did.
+    /// `display` is the half's menu bar display: a ready report it cannot
+    /// draw shows there as an error, so it is explained here too.
+    static func halfError(
+        half: Half,
+        status: HalfStatus,
+        failure: RefreshFailure?,
+        service: HalfService,
+        display: HalfDisplay? = nil
+    ) -> HalfErrorMessage? {
+        let explanation: (text: String, fix: String?, severity: HalfErrorMessage.Severity)
+        switch status {
+        case .expired:
+            explanation = failureExplanation(.unauthorized, service: service)
+        case .error:
+            explanation = failure.map { failureExplanation($0, service: service) }
+                ?? ("Unable to refresh.", retries, .warning)
+        case .ready where display == .status(.error), .loading where display == .status(.error):
+            explanation = ("\(service.name) sent nothing the app can show.", mayHaveChanged, .warning)
+        case .ready, .loading, .unconfigured:
+            return nil
+        }
+
+        return HalfErrorMessage(
+            text: "\(half.displayName): \(explanation.text)",
+            fix: explanation.fix,
+            severity: explanation.severity
+        )
+    }
+
+    @MainActor
+    static func halfError(_ model: HalfViewModel, descriptor: ProviderDescriptor, display: HalfDisplay?) -> HalfErrorMessage? {
+        halfError(
+            half: model.half,
+            status: model.status,
+            failure: model.lastFailure?.cause,
+            service: descriptor.service(for: model.half),
+            display: display
+        )
+    }
+
+    private static let retries = "It retries automatically."
+    private static let mayHaveChanged = "It may have changed; check for an update."
+
+    private static func failureExplanation(
+        _ failure: RefreshFailure,
+        service: HalfService
+    ) -> (text: String, fix: String?, severity: HalfErrorMessage.Severity) {
+        switch failure {
+        case .transport:
+            ("Couldn't reach \(service.host).", "Check your connection; it retries automatically.", .warning)
+        case .challenge:
+            ("\(service.host) asked for a browser check.", "Open \(service.host) in your browser, then Refresh.", .warning)
+        case let .httpStatus(code):
+            ("\(service.name) returned an error (HTTP \(code)).", retries, .warning)
+        case .decoding:
+            ("\(service.name) sent a response the app doesn't understand.", mayHaveChanged, .warning)
+        case .unauthorized:
+            ("Credential expired — replace it in Settings", nil, .critical)
+        case .keychain:
+            ("Couldn't read the credential from Keychain.", "Unlock the login keychain and allow access if asked, then Refresh.", .warning)
+        case .unexpected:
+            ("Refreshing from \(service.name) failed unexpectedly.", retries, .warning)
+        }
+    }
+}
+
+/// One half's error, as the popover row and the Settings status show it.
+struct HalfErrorMessage: Equatable {
+    enum Severity: Equatable {
+        case warning, critical
+    }
+
+    /// Names the half: "Plan usage: Couldn't reach claude.ai."
+    let text: String
+    let fix: String?
+    let severity: Severity
+
+    /// Text and fix on one line.
+    var line: String {
+        [text, fix].compactMap { $0 }.joined(separator: " ")
     }
 }

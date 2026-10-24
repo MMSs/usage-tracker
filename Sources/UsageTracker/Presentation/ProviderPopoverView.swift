@@ -28,15 +28,24 @@ struct ProviderPopoverView: View {
             return AnyView(setUpPage)
         }
 
+        // The menu bar item, so a half it marks as failed is explained here.
+        let item = MenuBarItemBuilder.make(
+            descriptor: provider.descriptor,
+            subscription: provider.snapshot(.subscription),
+            api: provider.snapshot(.api),
+            apiBudget: appModel.budgetStore.budget(for: provider.id),
+            now: now
+        )
+
         return AnyView(VStack(alignment: .leading, spacing: 14) {
             header
 
             if let half = provider.subscription, half.isActive {
-                subscriptionSection(half, now: now)
+                subscriptionSection(half, display: item?.subscription, now: now)
             }
 
             if let half = provider.api, half.isActive {
-                apiSection(half, now: now)
+                apiSection(half, display: item?.api, now: now)
             }
 
             footer
@@ -98,15 +107,17 @@ struct ProviderPopoverView: View {
 
     @ViewBuilder
     private func sectionShell<Content: View>(
-        label: String, half: HalfViewModel, @ViewBuilder content: () -> Content
+        label: String, half: HalfViewModel, display: HalfDisplay?, now: Date, @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             sectionLabel(label)
 
-            if let error = PopoverPresentation.halfErrorText(half.status) {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            // Shown with or without a report, so the menu bar's error mark always has an explanation.
+            if let error = PopoverPresentation.halfError(half, descriptor: provider.descriptor, display: display) {
+                HalfErrorRow(
+                    message: error,
+                    lastSuccess: half.report == nil ? nil : PopoverPresentation.lastSuccessText(half.lastSuccess, now: now)
+                )
             }
 
             if half.report != nil {
@@ -125,14 +136,14 @@ struct ProviderPopoverView: View {
 
     // MARK: Subscription
 
-    private func subscriptionSection(_ half: HalfViewModel, now: Date) -> some View {
+    private func subscriptionSection(_ half: HalfViewModel, display: HalfDisplay?, now: Date) -> some View {
         let report = half.report
         let showsCycle = provider.descriptor.capabilities.hasCycle && report?.spend != nil
         let label = showsCycle
             ? "Cycle · " + (PopoverPresentation.headerSubtitle(cycle: report?.spend?.period, planName: report?.planName) ?? "")
             : "Limits"
 
-        return sectionShell(label: label, half: half) {
+        return sectionShell(label: label, half: half, display: display, now: now) {
             if let report {
                 let pacing = report.spend.flatMap { PacingCalculator.make($0, today: now) }
 
@@ -227,13 +238,13 @@ struct ProviderPopoverView: View {
 
     // MARK: API
 
-    private func apiSection(_ half: HalfViewModel, now: Date) -> some View {
+    private func apiSection(_ half: HalfViewModel, display: HalfDisplay?, now: Date) -> some View {
         let spend = half.report?.spend
         let month = spend.map { PopoverPresentation.monthName(for: $0.period.start) }
         let label = month.map { "API · \($0)" } ?? "API"
         let budget = PopoverPresentation.effectiveBudget(appModel.budgetStore.budget(for: provider.id))
 
-        return sectionShell(label: label, half: half) {
+        return sectionShell(label: label, half: half, display: display, now: now) {
             if let spend {
                 let spent = BudgetUnit.dollars.format(spend.spent)
                 let pacing = budget.flatMap { PacingCalculator.make(spend, budgetOverride: $0, today: now) }
