@@ -122,11 +122,17 @@ final class HalfViewModel: ObservableObject {
             cache.store(CachedReport(report: fetched, fetchedAt: date), provider: provider, half: half)
             Log.refresh.info("\(name, privacy: .public): refreshed")
         } catch is CancellationError {
-            // Cancelled, not failed: keep what the half showed before, so a
-            // half with no report does not sit on "Loading…" hiding its error.
+            // Cancelled, not failed: a half with no report must not sit on
+            // "Loading…" hiding its error. The last failure decides, not the
+            // status this refresh began from: an overlapping refresh whose
+            // result was superseded may have left that on "Loading…" too.
             Log.refresh.debug("\(name, privacy: .public): refresh cancelled")
-            if generation == refreshGeneration, statusBefore == .error || statusBefore == .expired {
-                status = statusBefore
+            if generation == refreshGeneration, report == nil, status == .loading {
+                status = switch lastFailure?.cause {
+                case .unauthorized: .expired
+                case .some: .error
+                case nil: statusBefore
+                }
             }
             return
         } catch {

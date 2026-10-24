@@ -24,6 +24,9 @@ final class StubReportFetcher: ReportFetching {
     /// Thrown in place of `result` when set, for errors that are not a FetchError.
     var thrownError: (any Error)?
     var gate: SuspendedGate?
+    /// Per-call gates and outcomes, consumed in call order before `gate`,
+    /// `thrownError` and `result`, so overlapping calls can end differently.
+    var script: [(gate: SuspendedGate?, outcome: Result<ProviderReport, any Error>)] = []
     private(set) var callCount = 0
     private(set) var lastCredentials: [String: String]?
 
@@ -34,6 +37,12 @@ final class StubReportFetcher: ReportFetching {
     func fetchReport(credentials: [String: String], today: Date) async throws -> ProviderReport {
         callCount += 1
         lastCredentials = credentials
+
+        if !script.isEmpty {
+            let step = script.removeFirst()
+            await step.gate?.wait()
+            return try step.outcome.get()
+        }
 
         if let gate {
             await gate.wait()

@@ -379,6 +379,48 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(model.lastFailure?.cause == .challenge)
     }
 
+    /// A manual refresh from the popover overlapping a scheduled one: the
+    /// older result is dropped as superseded, then sleep cancels the newer
+    /// one. The newer one began on the older one's "Loading…", so restoring
+    /// the status it started from left the half loading with its error hidden.
+    @Test(arguments: [
+        (true, FetchError.challenge, HalfStatus.error),
+        (false, .challenge, .error),
+        (true, .unauthorized, .expired),
+    ])
+    func overlappingRefreshCancelledAfterTheOlderWasSupersededShowsTheLastFailure(
+        olderSucceeds: Bool,
+        earlier: FetchError,
+        expected: HalfStatus
+    ) async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(earlier)
+        let model = makeModel()
+        await model.refresh(manual: true)
+        #expect(model.report == nil)
+
+        let olderGate = SuspendedGate()
+        let newerGate = SuspendedGate()
+        let older: Result<ProviderReport, any Error> = olderSucceeds ? .success(makeReport()) : .failure(FetchError.transport)
+        fetcher.script = [(olderGate, older), (newerGate, .failure(CancellationError()))]
+        let olderTask = Task { await model.refresh(manual: true) }
+        await settle()
+        // Scheduled refreshes are skipped once expired, so that overlap is two manual ones.
+        let newerTask = Task { await model.refresh(manual: earlier == .unauthorized) }
+        await settle()
+        #expect(fetcher.callCount == 3)
+        #expect(model.status == .loading)
+
+        olderGate.resume()
+        await olderTask.value
+        newerGate.resume()
+        await newerTask.value
+
+        #expect(model.status == expected)
+        #expect(model.report == nil)
+        #expect(model.lastFailure?.cause == RefreshFailure(earlier))
+    }
+
     @Test func cancelledRetryKeepsExpiredVisible() async {
         store.values[key] = "tok"
         fetcher.result = .failure(.unauthorized)
