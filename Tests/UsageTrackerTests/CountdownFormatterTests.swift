@@ -39,4 +39,11 @@ private let now = calendar.date(from: DateComponents(year: 2026, month: 10, day:
         #expect(CountdownFormatter.resetText(resetsAt: now - 60, now: now, calendar: calendar) == "resets now")
         #expect(CountdownFormatter.resetText(resetsAt: nil, now: now, calendar: calendar) == nil)
     }
+
+    @Test func resetTextShowsDayAndMonthAWeekOrMoreAway() {
+        let cycleEnd = calendar.date(from: DateComponents(year: 2026, month: 11, day: 11))!
+        #expect(CountdownFormatter.resetText(resetsAt: cycleEnd, now: now, calendar: calendar) == "resets 11 Nov")
+        #expect(CountdownFormatter.resetText(resetsAt: now + 7 * 86400, now: now, calendar: calendar) == "resets 31 Oct")
+        #expect(CountdownFormatter.resetText(resetsAt: now + 6 * 86400, now: now, calendar: calendar) == "resets Fri 09:00")
+    }
 }

@@ -30,7 +30,8 @@ enum CountdownFormatter {
         return "\(Int(interval / day))d"
     }
 
-    /// "resets in 2h 10m" within a day, "resets Tue 09:00" beyond.
+    /// "resets in 2h 10m" within a day, "resets Tue 09:00" within a week,
+    /// "resets 11 Nov" beyond.
     static func resetText(resetsAt: Date?, now: Date, calendar: Calendar = .current) -> String? {
         guard let resetsAt else {
             return nil
@@ -57,7 +58,7 @@ enum CountdownFormatter {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "EEE HH:mm"
+        formatter.dateFormat = interval < 7 * day ? "EEE HH:mm" : "d MMM"
         return "resets " + formatter.string(from: resetsAt)
     }
 }
