@@ -210,6 +210,8 @@ struct ProviderSettingsView: View {
         .padding(SettingsLayout.padding)
         .frame(width: SettingsLayout.pageWidth)
         .fixedSize(horizontal: false, vertical: true)
+        // Stays at the top while the window animates to the new height.
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     @ViewBuilder
@@ -282,9 +284,15 @@ struct GeneralSettingsView: View {
         )
     }
 
-    /// The configured provider shown in the preview, else the first listed one.
+    /// The enabled, configured provider shown in the preview, else the first enabled one with
+    /// something to fetch; disabled providers have no item to preview.
+    static func previewProvider(from providers: [ProviderViewModel]) -> ProviderViewModel? {
+        let enabled = providers.filter(\.isEnabled)
+        return enabled.first(where: \.isConfigured) ?? enabled.first(where: \.hasAnyHalf)
+    }
+
     private var previewProvider: ProviderViewModel? {
-        appModel.providers.first(where: \.isConfigured) ?? appModel.providers.first(where: \.hasAnyHalf)
+        Self.previewProvider(from: appModel.providers)
     }
 
     var body: some View {
@@ -292,7 +300,8 @@ struct GeneralSettingsView: View {
             MenuBarPreviewStrip(
                 item: previewProvider.flatMap { previewItem(for: $0, in: appModel) },
                 appearance: appearance.wrappedValue,
-                displayName: previewProvider?.descriptor.displayName ?? ""
+                displayName: previewProvider?.descriptor.displayName ?? "",
+                placeholder: previewProvider == nil ? "No provider enabled" : "No data yet"
             )
 
             SettingsSection(title: "Menu bar") {
@@ -307,5 +316,6 @@ struct GeneralSettingsView: View {
         .padding(SettingsLayout.padding)
         .frame(width: SettingsLayout.pageWidth)
         .fixedSize(horizontal: false, vertical: true)
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 }

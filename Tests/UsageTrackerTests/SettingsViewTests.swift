@@ -36,4 +36,25 @@ import Testing
         selection.apply(SettingsRequest(provider: .openai, opensHelp: true), listed: [.cursor])
         #expect(selection.page == .general)
     }
+
+    @Test func generalPreviewSkipsDisabledProviders() {
+        let credentials = MemoryCredentialStore()
+        credentials.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "secret"
+        let providers = ProviderRegistry.all.map { descriptor in
+            ProviderViewModel(
+                descriptor: descriptor,
+                subscriptionFetcher: StubReportFetcher(result: .success(makeReport(1))),
+                apiFetcher: nil,
+                credentialStore: credentials, cache: MemoryReportCache()
+            )
+        }
+
+        #expect(GeneralSettingsView.previewProvider(from: providers)?.id == .cursor)
+
+        providers[0].isEnabled = false
+        #expect(GeneralSettingsView.previewProvider(from: providers)?.id == .anthropic)
+
+        providers.forEach { $0.isEnabled = false }
+        #expect(GeneralSettingsView.previewProvider(from: providers) == nil)
+    }
 }

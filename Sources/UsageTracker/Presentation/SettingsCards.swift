@@ -7,6 +7,7 @@ struct MenuBarPreviewStrip: View {
     let appearance: MenuBarAppearance
     let displayName: String
     var caption = "How the item looks in the menu bar."
+    var placeholder = "No data yet"
 
     @Environment(\.colorScheme) private var colorScheme
 
@@ -26,7 +27,7 @@ struct MenuBarPreviewStrip: View {
                 if let item {
                     MenuBarLabel(item: item, appearance: appearance, displayName: displayName)
                 } else {
-                    Text("No data yet")
+                    Text(placeholder)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                 }
