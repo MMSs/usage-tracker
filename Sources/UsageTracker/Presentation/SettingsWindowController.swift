@@ -57,6 +57,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         dock.setVisible(true)
         dock.activate()
         window.makeKeyAndOrderFront(nil)
+        // Activation is cooperative, so the window is also ordered front on its own.
+        window.orderFrontRegardless()
     }
 
     func windowWillClose(_ notification: Notification) {
