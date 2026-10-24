@@ -529,6 +529,8 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
 @MainActor
 final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFetching {
     var listing: [AccountOrganization] = []
+    /// Thrown after listing, in place of the outcome.
+    var error: FetchError?
     private(set) var organizations: [AccountOrganization] = []
     private(set) var selectedOrganizationID: String?
     private(set) var callCount = 0
@@ -537,6 +539,9 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
     func fetchReport(credentials: [String: String], today: Date) async throws -> ProviderReport {
         callCount += 1
         organizations = listing
+        if let error {
+            throw error
+        }
         let chosen = listing.contains { $0.id == selectedOrganizationID }
         guard chosen || listing.count == 1 else {
             throw FetchError.needsOrganizationChoice
@@ -592,6 +597,37 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         await model.refresh(manual: true)
         #expect(fetcher.callCount == 2)
         #expect(model.status == .needsOrganization)
+    }
+
+    @Test func aFailureWhileWaitingForAChoiceRetriesOnSchedule() async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        await model.refresh(manual: false)
+
+        fetcher.error = .transport
+        await model.refresh(manual: true)
+        #expect(model.status == .error)
+        #expect(!model.scheduledRetriesBlocked)
+
+        // The scheduled retry lists again and is back to waiting for a choice.
+        fetcher.error = nil
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 3)
+        #expect(model.status == .needsOrganization)
+    }
+
+    @Test func expiredWhileWaitingForAChoiceStaysBlocked() async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        await model.refresh(manual: false)
+
+        fetcher.error = .unauthorized
+        await model.refresh(manual: true)
+
+        #expect(model.status == .expired)
+        #expect(model.scheduledRetriesBlocked)
     }
 
     @Test func choosingAnOrganizationStoresItAndRefreshesNow() async {
