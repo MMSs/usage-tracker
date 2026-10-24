@@ -164,4 +164,23 @@ import Testing
         // At 0.7 the last item alone is 140; nothing fits in 100.
         #expect(fit([100, 200], 10, 100) == .init(scale: 0.7, hidden: 2))
     }
+
+    @Test func helpOnAnAPIOnlyProviderSelectsTheAPITab() {
+        let anthropic = ProviderRegistry.descriptor(for: .anthropic)
+        let apiOnly = ProviderDescriptor(
+            id: .anthropic,
+            displayName: "Anthropic",
+            capabilities: ProviderCapabilities(
+                hasSubscription: false, hasAPISpend: true, hasCycle: false, hasDailyChart: true, canStartSession: false
+            ),
+            fields: anthropic.apiFields,
+            services: anthropic.services,
+            shortWindowID: nil,
+            longWindowID: "weekly"
+        )
+
+        #expect(SettingsHelp.tab(for: apiOnly, helpProvider: .anthropic) == .api)
+        #expect(SettingsHelp.tab(for: anthropic, helpProvider: .anthropic) == .subscription)
+        #expect(SettingsHelp.tab(for: apiOnly, helpProvider: .cursor) == nil)
+    }
 }

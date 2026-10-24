@@ -16,12 +16,9 @@ final class SettingsSelection: ObservableObject {
         helpProvider = request.opensHelp ? request.provider : nil
 
         // The help opens on a field, so show the tab that holds it.
-        if request.opensHelp, let provider = request.provider, page == .provider(provider) {
-            let descriptor = ProviderRegistry.descriptor(for: provider)
-            if let fieldID = SettingsHelp.fieldID(for: descriptor, helpProvider: provider),
-               let tab = ProviderSettingsTab.holding(fieldID: fieldID, in: descriptor) {
-                tabs[provider] = tab
-            }
+        if request.opensHelp, let provider = request.provider, page == .provider(provider),
+           let tab = SettingsHelp.tab(for: ProviderRegistry.descriptor(for: provider), helpProvider: provider) {
+            tabs[provider] = tab
         }
     }
 
@@ -82,6 +79,11 @@ enum SettingsHelp {
         }
 
         return (descriptor.subscriptionFields + descriptor.apiFields).first?.id
+    }
+
+    /// The tab holding that field, which a help request selects.
+    static func tab(for descriptor: ProviderDescriptor, helpProvider: Provider?) -> ProviderSettingsTab? {
+        fieldID(for: descriptor, helpProvider: helpProvider).flatMap { ProviderSettingsTab.holding(fieldID: $0, in: descriptor) }
     }
 }
 
