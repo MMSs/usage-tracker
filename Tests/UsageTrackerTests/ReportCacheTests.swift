@@ -35,8 +35,9 @@ import Testing
     }
 
     @Test func aStoredReportRoundTrips() throws {
-        let (defaults, suiteName) = try makeIsolatedDefaults()
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let isolated = IsolatedDefaults()
+        defer { isolated.remove() }
+        let defaults = isolated.defaults
         let cache = UserDefaultsReportCache(defaults: defaults)
         let cached = makeCachedReport()
 
@@ -46,8 +47,9 @@ import Testing
     }
 
     @Test func anAbsentReportReadsAsNil() throws {
-        let (defaults, suiteName) = try makeIsolatedDefaults()
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let isolated = IsolatedDefaults()
+        defer { isolated.remove() }
+        let defaults = isolated.defaults
         let cache = UserDefaultsReportCache(defaults: defaults)
 
         #expect(defaults.data(forKey: "report.anthropic.api") == nil)
@@ -55,8 +57,9 @@ import Testing
     }
 
     @Test func corruptDataReadsAsNilWithoutThrowing() throws {
-        let (defaults, suiteName) = try makeIsolatedDefaults()
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let isolated = IsolatedDefaults()
+        defer { isolated.remove() }
+        let defaults = isolated.defaults
         let key = "report.cursor.subscription"
         let garbage = Data("not json".utf8)
         defaults.set(garbage, forKey: key)
@@ -71,8 +74,9 @@ import Testing
     }
 
     @Test func clearRemovesOnlyTheRequestedHalf() throws {
-        let (defaults, suiteName) = try makeIsolatedDefaults()
-        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let isolated = IsolatedDefaults()
+        defer { isolated.remove() }
+        let defaults = isolated.defaults
         let cache = UserDefaultsReportCache(defaults: defaults)
         let cached = makeCachedReport()
         cache.store(cached, provider: .anthropic, half: .subscription)
@@ -83,13 +87,5 @@ import Testing
         #expect(defaults.data(forKey: "report.anthropic.subscription") == nil)
         #expect(cache.cached(provider: .anthropic, half: .subscription) == nil)
         #expect(cache.cached(provider: .anthropic, half: .api) == cached)
-    }
-
-    private func makeIsolatedDefaults() throws -> (UserDefaults, String) {
-        let suiteName = UUID().uuidString
-        let defaults = try #require(UserDefaults(suiteName: suiteName))
-        defaults.removePersistentDomain(forName: suiteName)
-
-        return (defaults, suiteName)
     }
 }

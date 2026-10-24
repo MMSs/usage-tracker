@@ -4,13 +4,13 @@ import Testing
 
 @Suite struct ProviderSettingsStoreTests {
     @Test func anEmptyStoreReadsBackTheDefaults() {
-        withDefaults { defaults in
+        withIsolatedDefaults { defaults in
             #expect(UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .cursor) == .default)
         }
     }
 
     @Test func settingsSurviveTheRoundTripPerProvider() {
-        withDefaults { defaults in
+        withIsolatedDefaults { defaults in
             let store = UserDefaultsProviderSettingsStore(defaults: defaults)
             let override = MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: true)
             let cursor = ProviderSettings(isEnabled: false, refreshInterval: .oneHour, appearanceOverride: override)
@@ -23,7 +23,7 @@ import Testing
     }
 
     @Test func missingAndUnknownValuesFallBackToDefaults() {
-        withDefaults { defaults in
+        withIsolatedDefaults { defaults in
             defaults.set(Data(#"{"isEnabled":false,"refreshInterval":"thirtyDays","appearanceOverride":{"bogus":1}}"#.utf8),
                          forKey: UserDefaultsProviderSettingsStore.key(for: .openai))
 
@@ -36,7 +36,7 @@ import Testing
     }
 
     @Test func halfFlagsRoundTripAndDefaultToOn() {
-        withDefaults { defaults in
+        withIsolatedDefaults { defaults in
             let store = UserDefaultsProviderSettingsStore(defaults: defaults)
             var settings = ProviderSettings()
             settings.setEnabled(false, for: .api)
@@ -54,17 +54,10 @@ import Testing
     }
 
     @Test func corruptDataReadsBackTheDefaults() {
-        withDefaults { defaults in
+        withIsolatedDefaults { defaults in
             defaults.set(Data("nope".utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .cursor))
 
             #expect(UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .cursor) == .default)
         }
-    }
-
-    private func withDefaults(_ body: (UserDefaults) -> Void) {
-        let suiteName = UUID().uuidString
-        let defaults = UserDefaults(suiteName: suiteName)!
-        body(defaults)
-        defaults.removePersistentDomain(forName: suiteName)
     }
 }
