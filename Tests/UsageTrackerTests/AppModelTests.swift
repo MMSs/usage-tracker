@@ -196,7 +196,18 @@ import Testing
 
     @Test func insertedProvidersFallsBackToFirstProviderWhenNothingIsConfigured() {
         let model = makeModel()
+        #expect(model.showsSetUpItem)
         #expect(model.insertedProviders == [.cursor])
+    }
+
+    @Test func aConfiguredProviderReplacesTheSetUpItemEvenWhenSwitchedOff() {
+        credentials.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "secret"
+        let model = makeModel()
+
+        #expect(!model.showsSetUpItem)
+
+        model.setSettings(ProviderSettings(isEnabled: false), for: .cursor)
+        #expect(!model.showsSetUpItem)
     }
 
     @Test func insertedProvidersContainsOnlyConfiguredProviders() {

@@ -462,14 +462,17 @@ struct GeneralSettingsView: View {
         )
     }
 
-    /// The providers whose items the menu bar shows, in its order. None while
-    /// nothing is configured: the menu bar then holds only a set-up item.
+    /// The providers whose items the menu bar shows, left to right as they
+    /// appear on screen. NSStatusBar puts each newly inserted item to the left
+    /// of the others, so that is `insertedProviders` reversed; a Cmd-drag
+    /// rearrangement cannot be seen here. None while the menu bar holds only
+    /// the set-up item.
     static func previewProviders(in appModel: AppModel) -> [ProviderViewModel] {
-        guard appModel.providers.contains(where: \.isConfigured) else {
+        guard !appModel.showsSetUpItem else {
             return []
         }
 
-        return appModel.insertedProviders.map(appModel.provider)
+        return appModel.insertedProviders.reversed().map(appModel.provider)
     }
 
     /// Each item as the menu bar draws it, with its provider's override if it has one.

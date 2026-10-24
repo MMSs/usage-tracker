@@ -165,12 +165,17 @@ final class AppModel: ObservableObject {
     /// is always an item to click. When everything configured is switched
     /// off, nothing: the app is reached by opening it.
     var insertedProviders: [Provider] {
-        let configured = providers.filter(\.isConfigured)
-        guard !configured.isEmpty else {
+        guard !showsSetUpItem else {
             return [ProviderRegistry.all[0].id]
         }
 
-        return configured.filter { $0.isEnabled && $0.hasActiveHalf }.map(\.id)
+        return providers.filter { $0.isConfigured && $0.isEnabled && $0.hasActiveHalf }.map(\.id)
+    }
+
+    /// True while nothing is configured, so the menu bar holds only the first
+    /// provider's set-up item rather than any usage.
+    var showsSetUpItem: Bool {
+        !providers.contains(where: \.isConfigured)
     }
 
     func provider(_ id: Provider) -> ProviderViewModel {

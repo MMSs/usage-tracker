@@ -124,13 +124,14 @@ import Testing
         )
     }
 
-    @Test func generalPreviewShowsEveryEnabledConfiguredProviderInMenuBarOrder() {
+    @Test func generalPreviewShowsEveryEnabledConfiguredProviderLeftToRightAsOnScreen() {
         let model = makeModel(configured: [
             CredentialKey(provider: .openai, fieldID: "admin-key"),
             CredentialKey(provider: .cursor, fieldID: "session-token"),
         ])
 
-        #expect(GeneralSettingsView.previewProviders(in: model).map(\.id) == [.cursor, .openai])
+        #expect(model.insertedProviders == [.cursor, .openai])
+        #expect(GeneralSettingsView.previewProviders(in: model).map(\.id) == [.openai, .cursor], "later items sit further left")
 
         model.provider(.cursor).isEnabled = false
         #expect(GeneralSettingsView.previewProviders(in: model).map(\.id) == [.openai])
