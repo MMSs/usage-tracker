@@ -38,7 +38,7 @@ value saves shortly after you stop typing, and only to the login Keychain.
 ## Settings
 
 - Refresh interval: 1, 5, 15, or 60 minutes. The default is 5. Refreshing
-  pauses while the Mac is asleep or offline and resumes when either comes back.
+  pauses while the Mac is asleep or offline and resumes when both are back.
 - Menu bar: show text, a countdown, and a graph drawn as Rings or Bars. The
   Colored option tints the text and graph by remaining capacity or pacing.
 

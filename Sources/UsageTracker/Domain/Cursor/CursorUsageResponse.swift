@@ -53,8 +53,6 @@ extension CursorUsageResponse.IndividualUsage.Overall {
     }
 }
 
-
-/// Personal plans meter Auto (and Composer) separately from named API
 /// Personal plans meter Auto (and Composer) separately from named API
 /// models; each is a percentage of its own included allowance.
 struct PercentSplit: Equatable {
