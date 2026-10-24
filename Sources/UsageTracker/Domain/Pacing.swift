@@ -153,6 +153,32 @@ enum PacingTint: Equatable, Sendable {
         return ratio <= overBudgetRatio ? .nearingLimit : .overBudget
     }
 
+    /// Tint for the share of a timed window used against the share of its time
+    /// elapsed; both are percentages.
+    static func forTimePacing(percentUsed: Double, idealPercent: Double) -> PacingTint {
+        guard idealPercent > 0 else {
+            return percentUsed > 0 ? .nearingLimit : .onPace
+        }
+
+        let ratio = percentUsed / idealPercent
+
+        if ratio <= 1 {
+            return .onPace
+        }
+
+        return ratio <= NSDecimalNumber(decimal: overBudgetRatio).doubleValue ? .nearingLimit : .overBudget
+    }
+
+    /// Pace against elapsed time when the window has a length and is open,
+    /// otherwise by how much of it is used.
+    static func forWindow(_ window: LimitWindow, now: Date) -> PacingTint {
+        guard let ideal = TimePacing.idealFraction(for: window, now: now) else {
+            return forRemaining(percentUsed: window.percentUsed)
+        }
+
+        return forTimePacing(percentUsed: window.percentUsed, idealPercent: ideal * 100)
+    }
+
     /// Tint for the share of the budget already used, as a percentage.
     static func forRemaining(percentUsed: Double) -> PacingTint {
         switch percentUsed {

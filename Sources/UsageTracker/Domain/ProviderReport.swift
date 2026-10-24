@@ -57,6 +57,25 @@ struct LimitWindow: Codable, Equatable, Identifiable, Sendable {
     let percentUsed: Double
     let resetsAt: Date?
     let parentID: String?
+    /// How long the window lasts, when known (e.g. 5 hours); nil for cached
+    /// reports and providers that do not say.
+    let windowLength: TimeInterval?
+
+    init(
+        id: String,
+        label: String,
+        percentUsed: Double,
+        resetsAt: Date?,
+        parentID: String?,
+        windowLength: TimeInterval? = nil
+    ) {
+        self.id = id
+        self.label = label
+        self.percentUsed = percentUsed
+        self.resetsAt = resetsAt
+        self.parentID = parentID
+        self.windowLength = windowLength
+    }
 
     var isOpen: Bool { resetsAt != nil }
 }

@@ -98,4 +98,20 @@ import Testing
         #expect(BudgetUnit.percent.format(4.25) == "4.3%")
         #expect(BudgetUnit.percent.format(53) == "53%")
     }
+
+    @Test func cachedReportsWithoutWindowLengthDecode() throws {
+        let json = #"{"id":"session","label":"Session","percentUsed":12,"resetsAt":1000}"#
+        let window = try JSONDecoder().decode(LimitWindow.self, from: Data(json.utf8))
+
+        #expect(window.windowLength == nil)
+        #expect(window.resetsAt == Date(timeIntervalSinceReferenceDate: 1000))
+    }
+
+    @Test func windowLengthRoundTripsThroughJSON() throws {
+        let window = LimitWindow(id: "session", label: "Session", percentUsed: 12, resetsAt: date(2026, 10, 24), parentID: nil, windowLength: 5 * 3600)
+        let decoded = try JSONDecoder().decode(LimitWindow.self, from: JSONEncoder().encode(window))
+
+        #expect(decoded == window)
+        #expect(decoded.windowLength == TimeInterval(18_000))
+    }
 }
