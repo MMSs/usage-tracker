@@ -27,19 +27,20 @@ and every later launch fails with `Launchd job spawn failed`.
 
 ## Setting up Cursor
 
-The menu bar shows a `Set up` item for each provider that is not configured
-yet. Click it, then choose Set up and Settings.
+On first launch the menu bar shows one Usage Tracker item. Click it, then click
+Set up to open Settings. Once a provider is configured it gets its own menu bar
+item; unconfigured providers show nothing.
 
 Paste the value of the `WorkosCursorSessionToken` cookie into the field. The
 help button beside the field explains where to find it in your browser. The
-value saves as you type and is stored only in the login Keychain.
+value saves shortly after you stop typing, and only to the login Keychain.
 
 ## Settings
 
 - Refresh interval: 1, 5, 15, or 60 minutes. The default is 5. Refreshing
   pauses while the Mac is asleep or offline and resumes when either comes back.
 - Menu bar: show text, a countdown, and a graph drawn as Rings or Bars. The
-  Colored option tints the graph.
+  Colored option tints the text and graph by remaining capacity or pacing.
 
 ## Status
 
