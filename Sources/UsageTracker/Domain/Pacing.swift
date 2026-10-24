@@ -132,6 +132,21 @@ enum PacingTint: Equatable, Sendable {
         return ratio <= overBudgetRatio ? .nearingLimit : .overBudget
     }
 
+    /// Tint for spend against a budget, e.g. today's spend against today's budget.
+    static func forSpend(_ spend: Decimal, budget: Decimal) -> PacingTint {
+        guard budget > 0 else {
+            return spend > 0 ? .overBudget : .onPace
+        }
+
+        let ratio = spend / budget
+
+        if ratio <= 1 {
+            return .onPace
+        }
+
+        return ratio <= overBudgetRatio ? .nearingLimit : .overBudget
+    }
+
     /// Tint for the share of the budget already used, as a percentage.
     static func forRemaining(percentUsed: Double) -> PacingTint {
         switch percentUsed {

@@ -92,3 +92,14 @@ private func day(_ year: Int, _ month: Int, _ day: Int) -> Date {
         #expect(PacingTint.forPacing(nil) == .neutral)
     }
 }
+
+@Suite struct PacingTintForSpendTests {
+    @Test func spendTintFollowsRatioToBudget() {
+        #expect(PacingTint.forSpend(10, budget: 10) == .onPace)
+        #expect(PacingTint.forSpend(11, budget: 10) == .nearingLimit)
+        #expect(PacingTint.forSpend(Decimal(string: "11.5")!, budget: 10) == .nearingLimit)
+        #expect(PacingTint.forSpend(12, budget: 10) == .overBudget)
+        #expect(PacingTint.forSpend(0, budget: 0) == .onPace)
+        #expect(PacingTint.forSpend(1, budget: 0) == .overBudget)
+    }
+}
