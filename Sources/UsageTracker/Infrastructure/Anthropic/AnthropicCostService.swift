@@ -46,9 +46,15 @@ final class AnthropicCostService: AnthropicCostFetching {
             )
             let page = try decode(data)
 
-            for bucket in page.data where !bucket.results.isEmpty {
+            for bucket in page.data {
+                // A null amount is no cost; a day with nothing else is omitted like an empty one.
+                let amounts = bucket.results.compactMap(\.amount)
+                guard !amounts.isEmpty else {
+                    continue
+                }
+
                 let day = try Self.localDay(of: bucket.startingAt, utc: utc, calendar: calendar)
-                let cents = try bucket.results.reduce(Decimal(0)) { try $0 + Self.cents($1.amount) }
+                let cents = try amounts.reduce(Decimal(0)) { try $0 + Self.cents($1) }
                 totals[day, default: 0] += cents / 100
             }
 

@@ -166,6 +166,39 @@ struct AnthropicCostServiceTests {
         }
     }
 
+    /// The API documents `amount` as a decimal string; a number, a null, or
+    /// a bucket without results later in the day must not fail the month.
+    @Test func numericAndNullAmountsAndMissingResultsAreRead() async throws {
+        let body = """
+        {"data":[
+          {"starting_at":"2026-10-01T00:00:00Z","ending_at":"2026-10-02T00:00:00Z","results":[
+            {"currency":"USD","amount":123.45},{"currency":"USD","amount":"100"},{"currency":"USD","amount":null},{"currency":"USD"}
+          ]},
+          {"starting_at":"2026-10-02T00:00:00Z","ending_at":"2026-10-03T00:00:00Z","results":[{"currency":"USD","amount":null}]},
+          {"starting_at":"2026-10-03T00:00:00Z","ending_at":"2026-10-04T00:00:00Z","results":null},
+          {"starting_at":"2026-10-04T00:00:00Z","ending_at":"2026-10-05T00:00:00Z"}
+        ],"has_more":false,"next_page":null}
+        """
+        let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: body)])
+        let service = AnthropicCostService(client: client)
+
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+
+        #expect(days == [AnthropicCostDay(day: local(2026, 10, 1), dollars: Decimal(string: "2.2345")!)])
+    }
+
+    @Test func amountOfAnotherTypeIsADecodingError() async throws {
+        let body = """
+        {"data":[{"starting_at":"2026-10-01T00:00:00Z","ending_at":"2026-10-02T00:00:00Z","results":[{"amount":true}]}],"has_more":false,"next_page":null}
+        """
+        let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: body)])
+        let service = AnthropicCostService(client: client)
+
+        await #expect(throws: FetchError.decoding) {
+            try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        }
+    }
+
     @Test func unparseableAmountIsADecodingError() async throws {
         let client = RoutingHTTPClient(routes: [
             "limit=31": .ok(json: page(starting: "2026-10-01T00:00:00Z", amounts: ["12,5"], hasMore: false, nextPage: nil)),
