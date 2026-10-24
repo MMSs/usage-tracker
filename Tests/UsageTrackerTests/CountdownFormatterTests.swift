@@ -27,6 +27,16 @@ private let now = calendar.date(from: DateComponents(year: 2026, month: 10, day:
         #expect(CountdownFormatter.compact(until: now - 60, now: now) == "0m")
     }
 
+    @Test(arguments: [
+        (Locale.HourCycle.zeroToTwentyThree, true),
+        (.oneToTwentyFour, true),
+        (.oneToTwelve, false),
+        (.zeroToEleven, false),
+    ])
+    func hourCycleDecidesTwelveOrTwentyFourHour(cycle: Locale.HourCycle, is24Hour: Bool) {
+        #expect(CountdownFormatter.uses24Hour(hourCycle: cycle) == is24Hour)
+    }
+
     private func date(
         _ day: Int, _ hour: Int, _ minute: Int = 0, month: Int = 10, in calendar: Calendar = calendar
     ) -> Date {

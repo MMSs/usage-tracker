@@ -40,8 +40,15 @@ enum CountdownFormatter {
 
     /// Whether the system clock is set to 24-hour time.
     static var systemUses24Hour: Bool {
-        let template = DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: .current) ?? ""
-        return !template.contains("a")
+        uses24Hour(hourCycle: Locale.autoupdatingCurrent.hourCycle)
+    }
+
+    static func uses24Hour(hourCycle: Locale.HourCycle) -> Bool {
+        switch hourCycle {
+        case .oneToTwelve, .zeroToEleven: false
+        case .zeroToTwentyThree, .oneToTwentyFour: true
+        @unknown default: true
+        }
     }
 
     /// The countdown with the exact time after it, e.g. "resets in 2h 33m · 11:00pm"
