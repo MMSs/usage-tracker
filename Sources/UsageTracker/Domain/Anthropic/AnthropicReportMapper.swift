@@ -108,8 +108,14 @@ enum AnthropicReportMapper {
     }
 
     /// Goes through the shortest decimal string so 12.34 stays 12.34 instead
-    /// of the nearest binary fraction.
+    /// of the nearest binary fraction. Anything that is not a finite amount is 0.
     private static func decimal(_ value: Double) -> Decimal {
-        Decimal(string: "\(value)") ?? Decimal(value)
+        guard value.isFinite else {
+            return 0
+        }
+
+        let converted = Decimal(string: "\(value)") ?? Decimal(value)
+
+        return converted.isFinite ? converted : 0
     }
 }

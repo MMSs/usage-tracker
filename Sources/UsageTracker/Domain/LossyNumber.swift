@@ -1,7 +1,8 @@
 import Foundation
 
 /// A number that APIs send as a JSON number or as a numeric string. Null,
-/// non-numeric strings and any other type decode as nil instead of throwing.
+/// non-numeric strings, non-finite values and any other type decode as nil
+/// instead of throwing.
 struct LossyNumber: Decodable, Equatable, Sendable {
     let value: Double?
 
@@ -11,13 +12,16 @@ struct LossyNumber: Decodable, Equatable, Sendable {
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        if let number = try? container.decode(Double.self) {
-            value = number
+        let number: Double?
+        if let decoded = try? container.decode(Double.self) {
+            number = decoded
         } else if let text = try? container.decode(String.self) {
-            value = Double(text.trimmingCharacters(in: .whitespaces))
+            // Double("nan") and Double("inf") parse; neither is a usable amount.
+            number = Double(text.trimmingCharacters(in: .whitespaces))
         } else {
-            value = nil
+            number = nil
         }
+        value = number.flatMap { $0.isFinite ? $0 : nil }
     }
 }
 

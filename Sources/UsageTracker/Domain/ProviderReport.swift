@@ -78,6 +78,14 @@ struct LimitWindow: Codable, Equatable, Identifiable, Sendable {
     }
 
     var isOpen: Bool { resetsAt != nil }
+
+    /// The whole percent with its sign, e.g. "53%". The value is clamped
+    /// first so a bad number can never overflow the integer conversion.
+    var percentText: String {
+        let clamped = percentUsed.isFinite ? min(max(percentUsed, 0), 999_999) : 0
+
+        return "\(Int(clamped.rounded()))%"
+    }
 }
 
 struct MoneyRow: Codable, Equatable, Identifiable, Sendable {

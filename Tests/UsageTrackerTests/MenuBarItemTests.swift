@@ -99,6 +99,16 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(!item.showsDivider)
     }
 
+    @Test(arguments: [1e300, -1e300, Double.infinity, Double.nan])
+    func extremePercentsRenderWithoutTrapping(percent: Double) throws {
+        let window = LimitWindow(id: "session", label: "Session", percentUsed: percent, resetsAt: nil, parentID: nil)
+        let report = ProviderReport(planName: nil, windows: [window], extras: [], spend: nil)
+        let list = meters(build(.anthropic, subscription: ready(report))?.subscription)
+
+        #expect(list.count == 1)
+        #expect(list[0].text.hasSuffix("%"))
+    }
+
     @Test func cursorTeamPlanShowsDollarsAndTick() throws {
         let report = cursorReport(unit: .dollars, spent: Decimal(string: "73.5")!, limit: 200, todaySpend: Decimal(string: "4.2")!, percentUsed: 36.75)
         let list = meters(build(.cursor, subscription: ready(report))?.subscription)

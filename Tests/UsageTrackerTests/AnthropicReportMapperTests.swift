@@ -50,6 +50,26 @@ struct AnthropicReportMapperTests {
         ])
     }
 
+    @Test func nonFiniteOverageAmountsMapToZero() {
+        let report = AnthropicReportMapper.subscription(snapshot(
+            spendLimit: AnthropicOverageSpendLimit(
+                isEnabled: true, usedCredits: .nan, monthlyCreditLimit: .infinity, currency: nil
+            ),
+            creditGrant: AnthropicOverageCreditGrant(remainingBalance: -.infinity, totalGranted: nil, currency: nil)
+        ))
+
+        #expect(report.extras.map(\.amount) == [0, 0])
+        #expect(report.extras[0].limit == 0)
+    }
+
+    @Test func hugeOverageAmountsDoNotProduceNaN() {
+        let report = AnthropicReportMapper.subscription(snapshot(
+            creditGrant: AnthropicOverageCreditGrant(remainingBalance: 1e300, totalGranted: nil, currency: nil)
+        ))
+
+        #expect(report.extras[0].amount.isFinite)
+    }
+
     @Test func scopedLimitsBecomeChildrenOfWeekly() {
         let report = AnthropicReportMapper.subscription(snapshot(
             sevenDay: Window(utilization: 30, resetsAt: weeklyReset),

@@ -51,6 +51,19 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(PopoverPresentation.rowText(window: cycleWindow, money: nil, resetText: nil, daysLeft: nil) == "53%")
     }
 
+    @Test(arguments: [1e300, -1e300, Double.infinity, -Double.infinity, Double.nan])
+    func rowTextSurvivesAnyPercent(percent: Double) {
+        let window = LimitWindow(id: "w", label: "W", percentUsed: percent, resetsAt: nil, parentID: nil)
+
+        #expect(PopoverPresentation.rowText(window: window, money: nil, resetText: nil, daysLeft: nil).hasSuffix("%"))
+    }
+
+    @Test func rowTextClampsHugePercents() {
+        let window = LimitWindow(id: "w", label: "W", percentUsed: 1e300, resetsAt: nil, parentID: nil)
+
+        #expect(PopoverPresentation.rowText(window: window, money: nil, resetText: nil, daysLeft: nil) == "999999%")
+    }
+
     @Test func rowTextAppendsResetText() {
         #expect(PopoverPresentation.rowText(window: cycleWindow, money: nil, resetText: "resets in 2h 10m", daysLeft: nil) == "53% · resets in 2h 10m")
     }

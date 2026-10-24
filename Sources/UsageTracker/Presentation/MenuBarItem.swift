@@ -208,7 +208,7 @@ enum MenuBarItemBuilder {
 
         return MenuBarMeter(
             letter: letter,
-            text: percentText(window.percentUsed),
+            text: window.percentText,
             countdown: countdown,
             fraction: pacing.fillFraction,
             tick: pacing.tickFraction,
@@ -219,7 +219,7 @@ enum MenuBarItemBuilder {
     private static func windowMeter(letter: String, window: LimitWindow, now: Date) -> MenuBarMeter {
         MenuBarMeter(
             letter: letter,
-            text: percentText(window.percentUsed),
+            text: window.percentText,
             countdown: window.resetsAt.map { CountdownFormatter.compact(until: $0, now: now) },
             fraction: min(max(window.percentUsed / 100, 0), 1),
             tick: TimePacing.idealFraction(for: window, now: now),
@@ -279,10 +279,6 @@ enum MenuBarItemBuilder {
             tick: pacing.tickFraction,
             tint: PacingTint.forPacing(pacing)
         )
-    }
-
-    private static func percentText(_ percentUsed: Double) -> String {
-        "\(Int(percentUsed.rounded()))%"
     }
 
     private static let posix = Locale(identifier: "en_US_POSIX")

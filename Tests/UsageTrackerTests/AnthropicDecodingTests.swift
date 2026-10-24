@@ -84,6 +84,13 @@ import Testing
         #expect(try decode("[true]") == nil)
     }
 
+    @Test(arguments: ["nan", "NaN", "inf", "-inf", "Infinity", "1e999"])
+    func lossyNumberRejectsNonFiniteStrings(text: String) throws {
+        let values = try JSONDecoder().decode([LossyNumber].self, from: Data(#"["\#(text)"]"#.utf8))
+
+        #expect(values[0].value == nil)
+    }
+
     @Test func unknownKindsAndMissingScopesAreSkipped() throws {
         let response = try usage("""
         {"limits":[

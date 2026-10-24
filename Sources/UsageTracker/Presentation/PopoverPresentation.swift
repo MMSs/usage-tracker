@@ -62,7 +62,7 @@ enum PopoverPresentation {
             let amount = BudgetUnit.dollars.format(money.amount)
             value = money.limit.map { "\(amount) / \(BudgetUnit.dollars.format($0))" } ?? amount
         } else {
-            value = "\(Int(window.percentUsed.rounded()))%"
+            value = window.percentText
         }
 
         guard let suffix = daysLeft ?? resetText else {
