@@ -1,21 +1,47 @@
 import ServiceManagement
 
-protocol LoginItemManaging {
-    func registerAtLogin()
-}
+/// What macOS says about the app's login item, independent of `SMAppService`
+/// so tests can drive it.
+enum LoginItemStatus: String, Equatable {
+    case enabled
+    case notRegistered
+    /// Registered, but the user has not allowed it (or switched it off) in System Settings.
+    case requiresApproval
+    case notFound
 
-struct AppStartup {
-    static func configure(loginItemManager: LoginItemManaging) {
-        loginItemManager.registerAtLogin()
+    init(_ status: SMAppService.Status) {
+        switch status {
+        case .enabled: self = .enabled
+        case .notRegistered: self = .notRegistered
+        case .requiresApproval: self = .requiresApproval
+        case .notFound: self = .notFound
+        @unknown default: self = .notFound
+        }
     }
 }
 
-final class LoginItemManager: LoginItemManaging {
-    func registerAtLogin() {
-        guard SMAppService.mainApp.status != .enabled else {
-            return
-        }
+protocol LoginItemManaging {
+    var status: LoginItemStatus { get }
+    func register() throws
+    func unregister() throws
+    /// Opens System Settings at Login Items & Extensions.
+    func openSystemSettings()
+}
 
-        try? SMAppService.mainApp.register()
+struct LoginItemManager: LoginItemManaging {
+    var status: LoginItemStatus {
+        LoginItemStatus(SMAppService.mainApp.status)
+    }
+
+    func register() throws {
+        try SMAppService.mainApp.register()
+    }
+
+    func unregister() throws {
+        try SMAppService.mainApp.unregister()
+    }
+
+    func openSystemSettings() {
+        SMAppService.openSystemSettingsLoginItems()
     }
 }

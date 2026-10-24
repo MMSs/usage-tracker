@@ -16,7 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        AppStartup.configure(loginItemManager: LoginItemManager())
+        model.loginItem.reconcileAtLaunch()
     }
 
     /// Finder, Spotlight or the Dock icon: bring Settings forward without changing the page.

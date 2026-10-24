@@ -28,6 +28,7 @@ import Testing
             providerSettingsStore: MemoryProviderSettingsStore(),
             appearanceStore: MemoryMenuBarAppearanceStore(),
             budgetStore: MemoryAPIBudgetStore(),
+            loginItem: .stub(),
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver()
         )

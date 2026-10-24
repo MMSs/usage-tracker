@@ -11,6 +11,7 @@ final class AppModel: ObservableObject {
     let providerSettingsStore: ProviderSettingsStoring
     let appearanceStore: MenuBarAppearanceStoring
     let budgetStore: APIBudgetStoring
+    let loginItem: LoginItemModel
     private(set) var scheduler: RefreshScheduler!
     /// Set by the app delegate; opens the Settings window. A no-op until then.
     var presentSettings: (SettingsRequest) -> Void = { _ in }
@@ -28,6 +29,7 @@ final class AppModel: ObservableObject {
         providerSettingsStore: ProviderSettingsStoring,
         appearanceStore: MenuBarAppearanceStoring,
         budgetStore: APIBudgetStoring,
+        loginItem: LoginItemModel,
         sleepObserver: SystemSleepObserving,
         networkObserver: NetworkReachabilityObserving,
         sleep: @escaping RefreshScheduler.Sleep = { duration in
@@ -39,6 +41,7 @@ final class AppModel: ObservableObject {
         self.providerSettingsStore = providerSettingsStore
         self.appearanceStore = appearanceStore
         self.budgetStore = budgetStore
+        self.loginItem = loginItem
         globalAppearance = appearanceStore.appearance()
         providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, providerSettingsStore.settings(for: $0.id)) })
 
@@ -195,6 +198,7 @@ final class AppModel: ObservableObject {
             providerSettingsStore: UserDefaultsProviderSettingsStore(),
             appearanceStore: UserDefaultsMenuBarAppearanceStore(),
             budgetStore: UserDefaultsAPIBudgetStore(),
+            loginItem: LoginItemModel(manager: LoginItemManager(), store: UserDefaultsLoginItemPreferenceStore()),
             sleepObserver: SystemSleepObserver(),
             networkObserver: NetworkReachabilityObserver()
         )

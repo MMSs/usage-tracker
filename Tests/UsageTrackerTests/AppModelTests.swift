@@ -29,6 +29,7 @@ import Testing
             providerSettingsStore: settingsStore,
             appearanceStore: MemoryMenuBarAppearanceStore(),
             budgetStore: MemoryAPIBudgetStore(),
+            loginItem: .stub(),
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver(),
             sleep: { [sleeper] duration in await sleeper.sleep(duration) }
@@ -51,6 +52,7 @@ import Testing
             providerSettingsStore: settingsStore,
             appearanceStore: MemoryMenuBarAppearanceStore(),
             budgetStore: MemoryAPIBudgetStore(),
+            loginItem: .stub(),
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver(),
             sleep: { [sleeper] duration in await sleeper.sleep(duration) }

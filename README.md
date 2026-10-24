@@ -76,12 +76,27 @@ window is open and leaves when it closes.
 
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings or Bars. Colored tints the text and graph by
-  remaining capacity or pacing.
+  remaining capacity or pacing. Open at login registers the app as a login
+  item; the line under the switch shows what macOS reports, with a button to
+  System Settings when it needs your approval.
 - Each provider tab: an Enabled switch (off removes the item and stops
   fetching, credentials stay), the refresh interval on a slider from 30 seconds to
   1 hour (default 5 minutes), and an optional custom appearance that overrides the defaults.
   Refreshing pauses while the Mac is asleep or offline and resumes when both
   are back.
+
+## Open at login
+
+A fresh install registers itself as a login item once, on its first launch
+(the renamed identifier counts as fresh). macOS lists it under **System
+Settings > General > Login Items & Extensions > Open at Login**. It is not
+under "Allow in the Background", because the app has no helper or agent.
+
+Turning it off sticks, in either place: switch it off in Settings, or remove
+it in System Settings, and the app does not register itself again on later
+launches. Turn the Settings switch back on to restore it. If registration
+fails, the error shows under the switch and in the log
+(`log show --last 1h --predicate 'subsystem == "com.mohabsam.usage-tracker" AND category == "login-item"'`).
 
 ## Troubleshooting
 

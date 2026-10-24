@@ -323,6 +323,43 @@ struct ProviderSettingsView: View {
     }
 }
 
+/// The Open at login switch with the live macOS status under it. Re-reads the
+/// status when the page appears and when the app comes back from System Settings.
+struct OpenAtLoginRows: View {
+    @ObservedObject var loginItem: LoginItemModel
+
+    private var isOn: Binding<Bool> {
+        Binding(get: { loginItem.isOn }, set: { loginItem.setOn($0) })
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsRow(label: "Open at login", isLast: loginItem.statusLine == nil) {
+                SwitchToggle(isOn: isOn)
+            }
+
+            if let line = loginItem.statusLine {
+                HStack {
+                    Text(line)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 12)
+                    if loginItem.needsApproval {
+                        Button("Open System Settings") { loginItem.openSystemSettings() }
+                            .controlSize(.small)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+        }
+        .onAppear { loginItem.refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            loginItem.refresh()
+        }
+    }
+}
+
 struct GeneralSettingsView: View {
     @ObservedObject var appModel: AppModel
 
@@ -355,6 +392,10 @@ struct GeneralSettingsView: View {
 
             SettingsSection(title: "Menu bar") {
                 MenuBarAppearanceRows(appearance: appearance)
+            }
+
+            SettingsSection(title: "Startup") {
+                OpenAtLoginRows(loginItem: appModel.loginItem)
             }
 
             Text("Defaults for every provider. A provider's tab can override them and sets its own refresh rate. Colored tints the item by remaining capacity or pacing.")
