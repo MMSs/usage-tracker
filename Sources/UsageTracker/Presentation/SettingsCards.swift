@@ -19,6 +19,8 @@ struct MenuBarPreviewStrip: View {
     let placeholder: String
 
     @Environment(\.colorScheme) private var colorScheme
+    /// The width offered to the items, for telling VoiceOver which are left out.
+    @State private var rowWidth: CGFloat?
 
     init(entries: [Entry], caption: String = "How the item looks in the menu bar.", placeholder: String = "No data yet") {
         self.entries = entries
@@ -88,22 +90,15 @@ struct MenuBarPreviewStrip: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 14) {
-                Spacer(minLength: 0)
-
                 if entries.isEmpty {
+                    Spacer(minLength: 0)
+
                     Text(placeholder)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
                         .fixedSize()
                 } else {
-                    UniformScaleRow(spacing: Self.itemSpacing) {
-                        ForEach(entries) { entry in
-                            itemView(entry)
-                        }
-                    }
-                    .clipped()
-                    // Takes all the width the clock leaves before the spacer gets any.
-                    .layoutPriority(1)
+                    items
                 }
 
                 Text("Tue 09:41")
@@ -128,15 +123,43 @@ struct MenuBarPreviewStrip: View {
         }
     }
 
+    /// The items, right-aligned in all the width the clock leaves. The row
+    /// places them; the same fit here hides the left-out ones from VoiceOver.
+    private var items: some View {
+        let images = entries.map { entry in
+            MenuBarItemImage.render(entry.item, appearance: entry.appearance, displayName: entry.displayName, darkMenuBar: isDark)
+        }
+        let widths = zip(entries, images).map { entry, image in
+            image?.size.width ?? Self.fallbackWidth(entry)
+        }
+        let hidden = rowWidth.map { Self.fit(widths: widths, spacing: Self.itemSpacing, available: $0).hidden } ?? 0
+
+        return UniformScaleRow(spacing: Self.itemSpacing) {
+            ForEach(Array(zip(entries, images).enumerated()), id: \.element.0.id) { index, pair in
+                itemView(pair.0, image: pair.1)
+                    .accessibilityHidden(index < hidden)
+            }
+        }
+        .clipped()
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { width in
+            rowWidth = width
+        }
+    }
+
+    private static let fallbackFont = NSFont.systemFont(ofSize: 13)
+
+    private static func fallbackWidth(_ entry: Entry) -> CGFloat {
+        (entry.item.accessibilityText(displayName: entry.displayName) as NSString)
+            .size(withAttributes: [.font: fallbackFont]).width
+    }
+
     /// The item drawn as `MenuBarLabel` draws it, but resizable so the row can shrink it.
     @ViewBuilder
-    private func itemView(_ entry: Entry) -> some View {
-        if let image = MenuBarItemImage.render(
-            entry.item,
-            appearance: entry.appearance,
-            displayName: entry.displayName,
-            darkMenuBar: isDark
-        ) {
+    private func itemView(_ entry: Entry, image: NSImage?) -> some View {
+        if let image {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)
