@@ -47,18 +47,18 @@ final class HalfViewModel: ObservableObject {
         do {
             values = try readValues()
         } catch {
+            // A failing store must not hide the last successful report.
+            loadCached()
             status = .error
             return
         }
 
-        guard !values.isEmpty else {
+        guard isConfigured(values) else {
+            cache.clear(provider: provider, half: half)
             return
         }
 
-        if let cached = cache.cached(provider: provider, half: half) {
-            report = cached.report
-            lastSuccess = cached.fetchedAt
-        }
+        loadCached()
         status = .loading
     }
 
@@ -78,10 +78,8 @@ final class HalfViewModel: ObservableObject {
             return
         }
 
-        guard values.count == credentialFieldIDs.count, !credentialFieldIDs.isEmpty else {
-            if status != .unconfigured || report != nil {
-                markUnconfigured()
-            }
+        guard isConfigured(values) else {
+            markUnconfigured()
             return
         }
 
@@ -99,6 +97,7 @@ final class HalfViewModel: ObservableObject {
             report = fetched
             lastSuccess = date
             isStale = false
+            scheduledRetriesBlocked = false
             status = .ready
             cache.store(CachedReport(report: fetched, fetchedAt: date), provider: provider, half: half)
         } catch {
@@ -121,6 +120,18 @@ final class HalfViewModel: ObservableObject {
         refreshGeneration += 1
         scheduledRetriesBlocked = false
         await refresh(manual: true)
+    }
+
+    private func loadCached() {
+        if let cached = cache.cached(provider: provider, half: half) {
+            report = cached.report
+            lastSuccess = cached.fetchedAt
+        }
+    }
+
+    /// Configured means every credential field (not the budget setting) has a value.
+    private func isConfigured(_ values: [String: String]) -> Bool {
+        !credentialFieldIDs.isEmpty && values.count == credentialFieldIDs.count
     }
 
     private func markUnconfigured() {

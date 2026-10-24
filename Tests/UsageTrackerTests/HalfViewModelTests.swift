@@ -31,11 +31,13 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
     }
 
     @Test func noCredentialIsUnconfigured() async {
+        cache.store(CachedReport(report: makeReport(), fetchedAt: now), provider: .cursor, half: .subscription)
         let model = makeModel()
         await model.refresh(manual: true)
         #expect(model.status == .unconfigured)
         #expect(!model.isConfigured)
         #expect(fetcher.callCount == 0)
+        #expect(cache.cached(provider: .cursor, half: .subscription) == nil)
     }
 
     @Test func successStoresReportAndCache() async {
@@ -72,6 +74,22 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
 
         await model.refresh(manual: true)
         #expect(fetcher.callCount == 2)
+    }
+
+    @Test func successfulManualRetryClearsTheBlock() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.unauthorized)
+        let model = makeModel()
+        await model.refresh(manual: true)
+        #expect(model.status == .expired)
+
+        fetcher.result = .success(makeReport())
+        await model.refresh(manual: true)
+        #expect(model.status == .ready)
+        #expect(!model.scheduledRetriesBlocked)
+
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 3)
     }
 
     @Test func errorKeepsLastReport() async {
@@ -119,10 +137,15 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(model.status == .unconfigured)
     }
 
-    @Test func throwingStoreAtInitIsAnError() {
+    @Test func throwingStoreAtInitIsAnErrorButKeepsCachedReport() {
+        cache.store(CachedReport(report: makeReport(42), fetchedAt: now), provider: .cursor, half: .subscription)
         store.readError = FetchError.transport
         let model = makeModel()
         #expect(model.status == .error)
+        #expect(model.report == makeReport(42))
+        #expect(model.lastSuccess == now)
+        #expect(model.isStale)
+        #expect(store.removedKeys.isEmpty)
     }
 
     @Test func cachedReportStaysVisibleWhileRefreshing() async {
