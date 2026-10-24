@@ -1,0 +1,25 @@
+name: CI
+
+# The app supports macOS 26 and later only, so one job on the oldest
+# supported macOS covers it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: check (macos-26)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - run: swift --version
+      - run: swift test
+      - run: scripts/build-app.sh
