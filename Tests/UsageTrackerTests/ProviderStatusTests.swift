@@ -34,6 +34,16 @@ import Testing
         ])
     }
 
+    @Test func aHalfWaitingForAnOrganizationIsNeutralGuidance() {
+        let choose = HalfErrorMessage(
+            text: "Plan usage: Choose an organization in Settings", fix: nil, severity: .notice,
+            settingsLine: "Plan usage: Choose an organization on the Subscription tab."
+        )
+        let status = ProviderStatus.make(configured: true, statuses: [.needsOrganization, .ready], errors: [choose], planName: nil)
+        #expect(status.lines == [.init(text: "Plan usage: Choose an organization on the Subscription tab.", tone: .neutral)])
+        #expect(ProviderStatus.make(configured: true, statuses: [.needsOrganization], planName: nil) == ProviderStatus(text: "Choose an organization", tone: .neutral))
+    }
+
     @Test func disabledComesAfterNotSetUpAndBeforeTheHalves() {
         #expect(ProviderStatus.make(configured: false, enabled: false, statuses: [], planName: nil) == ProviderStatus(text: "Not set up", tone: .neutral))
         #expect(ProviderStatus.make(configured: true, enabled: false, statuses: [.error], errors: [offline], planName: "Pro") == ProviderStatus(text: "Disabled", tone: .neutral))

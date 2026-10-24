@@ -277,6 +277,7 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         (.unauthorized, .unauthorized),
         (.rateLimited(until: Date(timeIntervalSince1970: 1_000_120)), .rateLimited(until: Date(timeIntervalSince1970: 1_000_120))),
         (.rateLimited(until: nil), .rateLimited(until: nil)),
+        (.needsOrganizationChoice, .needsOrganization),
     ])
     func fetchErrorsMapToACause(error: FetchError, cause: RefreshFailure) {
         #expect(RefreshFailure(error) == cause)
@@ -518,5 +519,153 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
 
         #expect(model.status == .expired)
         #expect(model.scheduledRetriesBlocked)
+    }
+}
+
+/// Lists `listing` on every fetch and, like the Anthropic service, needs a
+/// choice when it lists several organizations and none is chosen.
+@MainActor
+final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFetching {
+    var listing: [AccountOrganization] = []
+    private(set) var organizations: [AccountOrganization] = []
+    private(set) var selectedOrganizationID: String?
+    private(set) var callCount = 0
+    private(set) var resetCount = 0
+
+    func fetchReport(credentials: [String: String], today: Date) async throws -> ProviderReport {
+        callCount += 1
+        organizations = listing
+        let chosen = listing.contains { $0.id == selectedOrganizationID }
+        guard chosen || listing.count == 1 else {
+            throw FetchError.needsOrganizationChoice
+        }
+        return makeReport()
+    }
+
+    func selectOrganization(_ id: String) {
+        selectedOrganizationID = id
+    }
+
+    func resetOrganizations() {
+        resetCount += 1
+        selectedOrganizationID = nil
+        organizations = []
+    }
+}
+
+@Suite @MainActor struct HalfViewModelOrganizationTests {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let store = MemoryCredentialStore()
+    let cache = MemoryReportCache()
+    let fetcher = StubOrganizationScopedFetcher()
+    let key = CredentialKey(provider: .anthropic, fieldID: "session-key")
+    let two = [AccountOrganization(id: "org-a", name: "Personal"), AccountOrganization(id: "org-b", name: "Team")]
+
+    private func makeModel() -> HalfViewModel {
+        let now = now
+        return HalfViewModel(
+            provider: .anthropic, half: .subscription,
+            fields: ProviderRegistry.descriptor(for: .anthropic).subscriptionFields,
+            fetcher: fetcher, credentialStore: store, cache: cache, now: { now }
+        )
+    }
+
+    @Test func severalOrganizationsAndNoChoiceWaitForOneWithoutScheduledRefreshes() async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+
+        await model.refresh(manual: false)
+        #expect(model.status == .needsOrganization)
+        #expect(model.lastFailure?.cause == .needsOrganization)
+        #expect(model.organizations == two)
+        #expect(model.chosenOrganization == nil)
+        #expect(model.scheduledRetriesBlocked)
+
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 1)
+
+        // A manual refresh still asks, in case the account's organizations changed.
+        await model.refresh(manual: true)
+        #expect(fetcher.callCount == 2)
+        #expect(model.status == .needsOrganization)
+    }
+
+    @Test func choosingAnOrganizationStoresItAndRefreshesNow() async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        await model.refresh(manual: false)
+
+        await model.selectOrganization("org-b")
+
+        #expect(fetcher.selectedOrganizationID == "org-b")
+        #expect(fetcher.callCount == 2)
+        #expect(model.status == .ready)
+        #expect(model.chosenOrganization == two[1])
+        #expect(model.lastFailure == nil)
+        #expect(!model.scheduledRetriesBlocked)
+    }
+
+    @Test func aChoiceNoLongerListedIsNotChosen() async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        await model.selectOrganization("org-b")
+        #expect(model.chosenOrganization == two[1])
+
+        fetcher.listing = [two[0], AccountOrganization(id: "org-c", name: nil)]
+        await model.refresh(manual: true)
+
+        #expect(model.status == .needsOrganization)
+        #expect(model.chosenOrganization == nil)
+    }
+
+    @Test func aLoneOrganizationIsUsedWithoutAChoice() async {
+        store.values[key] = "sk"
+        fetcher.listing = [two[0]]
+        let model = makeModel()
+
+        await model.refresh(manual: false)
+
+        #expect(model.status == .ready)
+        #expect(model.organizations == [two[0]])
+        #expect(fetcher.selectedOrganizationID == nil)
+    }
+
+    @Test(arguments: [true, false])
+    func replacingOrRemovingTheCredentialForgetsTheChoice(replaced: Bool) async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        await model.selectOrganization("org-a")
+
+        store.values[key] = replaced ? "sk-other" : nil
+        await model.credentialsChanged()
+
+        #expect(fetcher.resetCount == 1)
+        #expect(fetcher.selectedOrganizationID == nil)
+        #expect(model.status == (replaced ? .needsOrganization : .unconfigured))
+        #expect(model.organizations == (replaced ? two : []))
+    }
+
+    @Test func noCredentialAtLaunchForgetsAnyStoredChoice() {
+        _ = makeModel()
+        #expect(fetcher.resetCount == 1)
+    }
+
+    @Test func aFetcherWithoutOrganizationsHasNone() async {
+        store.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "tok"
+        let model = HalfViewModel(
+            provider: .cursor, half: .subscription,
+            fields: ProviderRegistry.descriptor(for: .cursor).subscriptionFields,
+            fetcher: StubReportFetcher(result: .success(makeReport())), credentialStore: store, cache: cache
+        )
+
+        await model.refresh(manual: true)
+        await model.selectOrganization("org-a")
+
+        #expect(model.organizations.isEmpty)
+        #expect(model.status == .ready)
     }
 }

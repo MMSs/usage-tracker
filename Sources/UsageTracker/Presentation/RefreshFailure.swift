@@ -15,6 +15,8 @@ enum RefreshFailure: Equatable, Sendable {
     case decoding
     /// The credential could not be read from Keychain.
     case keychain
+    /// The credential sees several organizations and the user has not chosen one.
+    case needsOrganization
     /// Any other error.
     case unexpected
 
@@ -26,6 +28,7 @@ enum RefreshFailure: Equatable, Sendable {
         case let .httpStatus(code): self = .httpStatus(code)
         case let .rateLimited(until): self = .rateLimited(until: until)
         case .decoding, .invalidResponse: self = .decoding
+        case .needsOrganizationChoice: self = .needsOrganization
         case nil: self = .unexpected
         }
     }
@@ -41,6 +44,7 @@ extension RefreshFailure: CustomStringConvertible {
         case .rateLimited: "rate limited"
         case .decoding: "decoding"
         case .keychain: "keychain"
+        case .needsOrganization: "needs organization"
         case .unexpected: "unexpected"
         }
     }

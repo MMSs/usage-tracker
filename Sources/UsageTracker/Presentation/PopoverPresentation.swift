@@ -162,6 +162,14 @@ enum PopoverPresentation {
         case .error:
             explanation = failure.map { failureExplanation($0, service: service, now: now, calendar: calendar) }
                 ?? ("Unable to refresh.", retries, .warning)
+        case .needsOrganization:
+            // Settings has the picker on the half's tab; "in Settings" would point at itself there.
+            return HalfErrorMessage(
+                text: "\(half.displayName): Choose an organization in Settings",
+                fix: "The account belongs to more than one organization.",
+                severity: .notice,
+                settingsLine: "\(half.displayName): Choose an organization on the \(ProviderSettingsTab(half).title) tab."
+            )
         case .ready where display == .status(.error), .loading where display == .status(.error):
             explanation = ("\(service.name) sent nothing the app can show.", mayHaveChanged, .warning)
         case .ready, .loading, .unconfigured:
@@ -221,6 +229,9 @@ enum PopoverPresentation {
             ("Couldn't read the credential from Keychain.", "Unlock the login keychain and allow access if asked, then Refresh.", .warning)
         case .unexpected:
             ("Refreshing from \(service.name) failed unexpectedly.", retries, .warning)
+        case .needsOrganization:
+            // Its own status says so; this only shows if the status and cause ever disagree.
+            ("Choose an organization in Settings", nil, .notice)
         }
     }
 }
@@ -228,6 +239,8 @@ enum PopoverPresentation {
 /// One half's error, as the popover row and the Settings status show it.
 struct HalfErrorMessage: Equatable {
     enum Severity: Equatable {
+        /// Something the user has to do, not a failure.
+        case notice
         case warning, critical
     }
 
@@ -235,9 +248,11 @@ struct HalfErrorMessage: Equatable {
     let text: String
     let fix: String?
     let severity: Severity
+    /// The Settings status line, when it should differ from text and fix.
+    var settingsLine: String? = nil
 
-    /// Text and fix on one line.
+    /// The Settings status line: text and fix on one line unless `settingsLine` says otherwise.
     var line: String {
-        [text, fix].compactMap { $0 }.joined(separator: " ")
+        settingsLine ?? [text, fix].compactMap { $0 }.joined(separator: " ")
     }
 }

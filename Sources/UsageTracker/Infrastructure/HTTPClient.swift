@@ -9,6 +9,8 @@ enum FetchError: Error, Equatable {
     case invalidResponse
     case decoding
     case transport
+    /// The credential sees several organizations and none listed is chosen.
+    case needsOrganizationChoice
 }
 
 @MainActor

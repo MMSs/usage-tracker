@@ -190,6 +190,17 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(message == HalfErrorMessage(text: "API spend: Credential expired — replace it in Settings", fix: nil, severity: .critical))
     }
 
+    @Test func needingAnOrganizationAsksForAChoiceInsteadOfAnError() throws {
+        let message = try #require(PopoverPresentation.halfError(
+            half: .subscription, status: .needsOrganization, failure: .needsOrganization, service: Self.claude
+        ))
+        #expect(message.text == "Plan usage: Choose an organization in Settings")
+        #expect(message.fix == "The account belongs to more than one organization.")
+        #expect(message.severity == .notice)
+        // Settings has the picker on the half's tab, so it points there instead.
+        #expect(message.line == "Plan usage: Choose an organization on the Subscription tab.")
+    }
+
     @Test(arguments: [HalfStatus.ready, .loading, .unconfigured])
     func healthyStatesHaveNoError(status: HalfStatus) {
         #expect(PopoverPresentation.halfError(half: .subscription, status: status, failure: .transport, service: Self.claude) == nil)

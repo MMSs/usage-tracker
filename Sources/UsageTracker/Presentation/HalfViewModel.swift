@@ -3,6 +3,9 @@ import os
 
 enum HalfStatus: Equatable, Sendable {
     case unconfigured, loading, ready, error, expired
+    /// The credential sees several organizations and none is chosen; nothing
+    /// is fetched until the user picks one.
+    case needsOrganization
 }
 
 /// One independently fetched half (subscription or API spend) of a provider.
@@ -23,6 +26,11 @@ final class HalfViewModel: ObservableObject {
     /// ones do not. Only a success or a newer 429 changes it; another failure
     /// meanwhile has not said the limit lifted.
     private(set) var rateLimitedUntil: Date?
+    /// The organizations the fetcher can report on, when it is scoped to one;
+    /// empty otherwise or before the first listing.
+    @Published private(set) var organizations: [AccountOrganization] = []
+    /// The stored choice, which may no longer be listed; see `chosenOrganization`.
+    @Published private(set) var selectedOrganizationID: String?
 
     private let provider: Provider
     private let credentialFieldIDs: [String]
@@ -33,6 +41,15 @@ final class HalfViewModel: ObservableObject {
     private var refreshGeneration = 0
 
     var isConfigured: Bool { status != .unconfigured }
+
+    /// The chosen organization while it is still listed.
+    var chosenOrganization: AccountOrganization? {
+        organizations.first { $0.id == selectedOrganizationID }
+    }
+
+    private var organizationScope: OrganizationScopedFetching? {
+        fetcher as? OrganizationScopedFetching
+    }
 
     init(
         provider: Provider,
@@ -51,6 +68,7 @@ final class HalfViewModel: ObservableObject {
         self.credentialStore = credentialStore
         self.cache = cache
         self.now = now
+        selectedOrganizationID = organizationScope?.selectedOrganizationID
 
         let values: [String: String]
         do {
@@ -64,6 +82,9 @@ final class HalfViewModel: ObservableObject {
 
         guard isConfigured(values) else {
             cache.clear(provider: provider, half: half)
+            // A choice made for a credential that is gone means nothing now.
+            organizationScope?.resetOrganizations()
+            selectedOrganizationID = nil
             return
         }
 
@@ -82,7 +103,8 @@ final class HalfViewModel: ObservableObject {
         }
 
         if !manual, scheduledRetriesBlocked {
-            Log.refresh.debug("\(name, privacy: .public): skipped, blocked until the credential is replaced")
+            let until = status == .needsOrganization ? "an organization is chosen" : "the credential is replaced"
+            Log.refresh.debug("\(name, privacy: .public): skipped, blocked until \(until, privacy: .public)")
             return
         }
 
@@ -121,6 +143,7 @@ final class HalfViewModel: ObservableObject {
                 return
             }
 
+            syncOrganizations()
             let date = now()
             report = fetched
             lastSuccess = date
@@ -138,11 +161,7 @@ final class HalfViewModel: ObservableObject {
             // result was superseded may have left that on "Loading…" too.
             Log.refresh.debug("\(name, privacy: .public): refresh cancelled")
             if generation == refreshGeneration, report == nil, status == .loading {
-                status = switch lastFailure?.cause {
-                case .unauthorized: .expired
-                case .some: .error
-                case nil: statusBefore
-                }
+                status = lastFailure.map { Self.status(for: $0.cause) } ?? statusBefore
             }
             return
         } catch {
@@ -151,6 +170,7 @@ final class HalfViewModel: ObservableObject {
                 return
             }
 
+            syncOrganizations()
             let cause = RefreshFailure(error)
             if cause == .unexpected {
                 // The type name only: an error's description could quote a response.
@@ -166,7 +186,37 @@ final class HalfViewModel: ObservableObject {
         Log.refresh.debug("\(self.logName, privacy: .public): credential changed")
         refreshGeneration += 1
         scheduledRetriesBlocked = false
+        if let scope = organizationScope {
+            // The choice belonged to the old credential's account.
+            scope.resetOrganizations()
+            syncOrganizations()
+            Log.refresh.debug("\(self.logName, privacy: .public): organization choice cleared")
+        }
         await refresh(manual: true)
+    }
+
+    /// Stores the user's organization choice and refreshes with it now. Does
+    /// nothing when the fetcher is not scoped to an organization.
+    func selectOrganization(_ id: String) async {
+        guard let scope = organizationScope else {
+            return
+        }
+
+        scope.selectOrganization(id)
+        selectedOrganizationID = id
+        Log.refresh.info("\(self.logName, privacy: .public): organization chosen from \(self.organizations.count, privacy: .public) listed")
+        // Invalidates any fetch still in flight for the previous choice.
+        refreshGeneration += 1
+        scheduledRetriesBlocked = false
+        await refresh(manual: true)
+    }
+
+    private static func status(for cause: RefreshFailure) -> HalfStatus {
+        switch cause {
+        case .unauthorized: .expired
+        case .needsOrganization: .needsOrganization
+        default: .error
+        }
     }
 
     private func fail(_ cause: RefreshFailure) {
@@ -174,15 +224,33 @@ final class HalfViewModel: ObservableObject {
         if case let .rateLimited(until) = cause {
             rateLimitedUntil = until
         }
+        status = Self.status(for: cause)
         let name = logName
 
-        if cause == .unauthorized {
-            status = .expired
+        switch cause {
+        case .unauthorized:
             scheduledRetriesBlocked = true
             Log.refresh.error("\(name, privacy: .public): failed (unauthorized); expired, scheduled refreshes blocked")
-        } else {
-            status = .error
+        case .needsOrganization:
+            // Nothing changes until the user chooses, so the timer would only list them again.
+            scheduledRetriesBlocked = true
+            Log.refresh.notice("\(name, privacy: .public): several organizations, none chosen; scheduled refreshes wait for a choice")
+        default:
             Log.refresh.error("\(name, privacy: .public): failed (\(cause.description, privacy: .public))")
+        }
+    }
+
+    /// Copies the scoped fetcher's organizations and choice for the views.
+    private func syncOrganizations() {
+        guard let scope = organizationScope else {
+            return
+        }
+
+        if organizations != scope.organizations {
+            organizations = scope.organizations
+        }
+        if selectedOrganizationID != scope.selectedOrganizationID {
+            selectedOrganizationID = scope.selectedOrganizationID
         }
     }
 
@@ -210,6 +278,7 @@ final class HalfViewModel: ObservableObject {
         lastFailure = nil
         scheduledRetriesBlocked = false
         rateLimitedUntil = nil
+        organizations = []
         cache.clear(provider: provider, half: half)
     }
 

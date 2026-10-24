@@ -46,7 +46,12 @@ struct ProviderStatus: Equatable {
         // Each failing half says what went wrong, so two failures never collapse into one.
         guard errors.isEmpty else {
             return ProviderStatus(lines: errors.map { error in
-                Line(text: error.line, tone: error.severity == .critical ? .bad : .warning)
+                let tone: Tone = switch error.severity {
+                case .notice: .neutral
+                case .warning: .warning
+                case .critical: .bad
+                }
+                return Line(text: error.line, tone: tone)
             })
         }
 
@@ -56,6 +61,10 @@ struct ProviderStatus: Equatable {
 
         if statuses.contains(.error) {
             return ProviderStatus(text: "Unable to refresh", tone: .warning)
+        }
+
+        if statuses.contains(.needsOrganization) {
+            return ProviderStatus(text: "Choose an organization", tone: .neutral)
         }
 
         guard statuses.contains(.ready) else {

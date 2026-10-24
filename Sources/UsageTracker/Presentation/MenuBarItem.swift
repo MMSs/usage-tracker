@@ -132,6 +132,11 @@ enum MenuBarItemBuilder {
             return .status(.expired)
         }
 
+        // Nothing is fetched until the user chooses; an earlier report may be another organization's.
+        if snapshot.status == .needsOrganization {
+            return .status(.setUp)
+        }
+
         guard let report = snapshot.report else {
             return .status(snapshot.status == .error ? .error : .loading)
         }

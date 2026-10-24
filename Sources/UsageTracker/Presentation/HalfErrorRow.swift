@@ -9,14 +9,19 @@ struct HalfErrorRow: View {
 
     private var tint: Color {
         switch message.severity {
+        case .notice: .accentColor
         case .warning: .orange
         case .critical: .red
         }
     }
 
+    private var symbol: String {
+        message.severity == .notice ? "info.circle.fill" : "exclamationmark.triangle.fill"
+    }
+
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Image(systemName: "exclamationmark.triangle.fill")
+            Image(systemName: symbol)
                 .foregroundStyle(tint)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -61,6 +66,14 @@ struct HalfErrorRow: View {
         HalfErrorRow(
             message: HalfErrorMessage(
                 text: "Plan usage: Credential expired — replace it in Settings", fix: nil, severity: .critical
+            ),
+            lastSuccess: nil
+        )
+        HalfErrorRow(
+            message: HalfErrorMessage(
+                text: "Plan usage: Choose an organization in Settings",
+                fix: "The account belongs to more than one organization.",
+                severity: .notice
             ),
             lastSuccess: nil
         )

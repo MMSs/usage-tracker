@@ -245,33 +245,98 @@ struct AnthropicUsageServiceTests {
         #expect(count(client, suffix: "/organizations") == 1)
     }
 
-    @Test func chatOrganizationIsChosenOverAnEarlierAPIOrganization() async throws {
+    private static let twoOrganizations = """
+    [{"uuid":"org-a","name":"Personal","capabilities":["chat","claude_pro"],"rate_limit_tier":"default_claude_pro"},
+     {"uuid":"org-b","name":"Team","capabilities":["chat","claude_max"],"rate_limit_tier":"default_claude_max_20x"}]
+    """
+
+    @Test func chosenOrganizationIsUsedAndNamesThePlan() async throws {
         var routes = try routes(overage: false)
-        routes["/organizations"] = .ok(json: """
-        [{"uuid":"api-org","capabilities":["api"],"rate_limit_tier":"default_claude_pro"},
-         {"uuid":"chat-org","capabilities":["chat","claude_max"],"rate_limit_tier":"default_claude_max_20x"}]
-        """)
-        routes["/chat-org/usage"] = .ok(json: try fixture("anthropic-usage"))
+        routes["/organizations"] = .ok(json: Self.twoOrganizations)
+        routes["/org-b/usage"] = .ok(json: try fixture("anthropic-usage"))
         let client = RoutingHTTPClient(routes: routes)
         let service = AnthropicUsageService(client: client)
 
-        let snapshot = try await service.fetchSubscription(sessionKey: "k")
+        let snapshot = try await service.fetchSubscription(sessionKey: "k", organizationID: "org-b")
 
-        #expect(count(client, suffix: "/chat-org/usage") == 1)
-        #expect(count(client, suffix: "/api-org/usage") == 0)
+        #expect(count(client, suffix: "/org-b/usage") == 1)
+        #expect(count(client, suffix: "/org-a/usage") == 0)
         #expect(snapshot.planName == "Max 20x")
     }
 
-    @Test func firstOrganizationIsUsedWhenNoneHasChat() async throws {
-        var routes = try routes(overage: false)
-        routes["/organizations"] = .ok(json: #"[{"uuid":"one","capabilities":["api"]},{"uuid":"two"}]"#)
-        routes["/one/usage"] = .ok(json: try fixture("anthropic-usage"))
+    @Test func severalOrganizationsAndNoChoiceNeedAChoiceWithoutFetchingUsage() async throws {
+        var routes = try routes()
+        routes["/organizations"] = .ok(json: Self.twoOrganizations)
         let client = RoutingHTTPClient(routes: routes)
         let service = AnthropicUsageService(client: client)
 
-        _ = try await service.fetchSubscription(sessionKey: "k")
+        await #expect(throws: FetchError.needsOrganizationChoice) {
+            try await service.fetchSubscription(sessionKey: "k", organizationID: nil)
+        }
 
-        #expect(count(client, suffix: "/one/usage") == 1)
+        #expect(count(client, suffix: "/usage") == 0)
+        #expect(count(client, suffix: "/overage_spend_limit") == 0)
+        #expect(service.organizations(sessionKey: "k").map(\.uuid) == ["org-a", "org-b"])
+        #expect(service.organizations(sessionKey: "other").isEmpty)
+    }
+
+    @Test func aChoiceNoLongerListedNeedsANewOne() async throws {
+        var routes = try routes()
+        routes["/organizations"] = .ok(json: Self.twoOrganizations)
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        await #expect(throws: FetchError.needsOrganizationChoice) {
+            try await service.fetchSubscription(sessionKey: "k", organizationID: "gone")
+        }
+
+        #expect(count(client, suffix: "/usage") == 0)
+    }
+
+    @Test func aLoneOrganizationIsUsedWhateverTheStoredChoice() async throws {
+        let client = RoutingHTTPClient(routes: try routes())
+        let service = AnthropicUsageService(client: client)
+
+        let snapshot = try await service.fetchSubscription(sessionKey: "k", organizationID: "gone")
+
+        #expect(count(client, suffix: "/3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14/usage") == 1)
+        #expect(snapshot.planName == "Max 5x")
+    }
+
+    @Test func needingAChoiceListsTheOrganizationsAgainNextTime() async throws {
+        var routes = try routes(overage: false)
+        routes["/organizations"] = .ok(json: Self.twoOrganizations)
+        routes["/org-a/usage"] = .ok(json: try fixture("anthropic-usage"))
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        await #expect(throws: FetchError.needsOrganizationChoice) {
+            try await service.fetchSubscription(sessionKey: "k", organizationID: nil)
+        }
+        let snapshot = try await service.fetchSubscription(sessionKey: "k", organizationID: "org-a")
+        _ = try await service.fetchSubscription(sessionKey: "k", organizationID: "org-a")
+
+        #expect(count(client, suffix: "/organizations") == 2)
+        #expect(count(client, suffix: "/org-a/usage") == 2)
+        #expect(snapshot.planName == "Pro")
+    }
+
+    @Test func aChosenOrganizationThatDisappearsNeedsANewChoice() async throws {
+        let client = SwitchingOrganizationClient(
+            organizations: [
+                #"[{"uuid":"old-org"},{"uuid":"other-org"}]"#,
+                #"[{"uuid":"other-org"},{"uuid":"3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14"}]"#,
+            ],
+            usage: try fixture("anthropic-usage")
+        )
+        let service = AnthropicUsageService(client: client)
+
+        await #expect(throws: FetchError.needsOrganizationChoice) {
+            try await service.fetchSubscription(sessionKey: "k", organizationID: "old-org")
+        }
+
+        #expect(client.requestedPaths.filter { $0.hasSuffix("/usage") } == ["/api/organizations/old-org/usage"])
+        #expect(service.organizations(sessionKey: "k").map(\.uuid) == ["other-org", "3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14"])
     }
 
     @Test func malformedOrganizationElementsAreSkipped() async throws {

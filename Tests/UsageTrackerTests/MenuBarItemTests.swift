@@ -262,6 +262,12 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(try #require(build(.anthropic, subscription: expired)).subscription == .status(.expired))
     }
 
+    @Test(arguments: [false, true])
+    func waitingForAnOrganizationShowsTheSetUpStatus(hasCachedReport: Bool) throws {
+        let waiting = HalfSnapshot(status: .needsOrganization, report: hasCachedReport ? anthropicReport : nil, isStale: true)
+        #expect(try #require(build(.anthropic, subscription: waiting)).subscription == .status(.setUp))
+    }
+
     @Test func errorWithoutReportIsStatus() throws {
         let failed = HalfSnapshot(status: .error, report: nil, isStale: true)
         #expect(try #require(build(.anthropic, subscription: failed)).subscription == .status(.error))

@@ -19,15 +19,6 @@ extension AnthropicOrganizationsResponse.Organization: Decodable {
     }
 }
 
-extension AnthropicOrganizationsResponse {
-    /// The organization that carries the chat subscription: the first one
-    /// with the "chat" capability, else the first one listed. API-only
-    /// organizations can come first.
-    var primary: Organization? {
-        organizations.first { $0.capabilities?.contains("chat") == true } ?? organizations.first
-    }
-}
-
 extension AnthropicOrganizationsResponse: Decodable {
     private enum CodingKeys: String, CodingKey {
         case organizations

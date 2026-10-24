@@ -122,7 +122,7 @@ struct ProviderPopoverView: View {
 
             if half.report != nil {
                 VStack(alignment: .leading, spacing: 10, content: content)
-                    .opacity(half.isStale || half.status == .error || half.status == .expired ? 0.6 : 1)
+                    .opacity(half.isStale || [.error, .expired, .needsOrganization].contains(half.status) ? 0.6 : 1)
             } else if half.status == .loading {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)

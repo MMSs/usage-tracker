@@ -3,7 +3,12 @@ import os
 
 @MainActor
 protocol AnthropicUsageFetching {
-    func fetchSubscription(sessionKey: String) async throws -> AnthropicSubscriptionSnapshot
+    /// What the last listing found for `sessionKey`; empty when it was not the last one listed.
+    func organizations(sessionKey: String) -> [AnthropicOrganizationsResponse.Organization]
+    /// `organizationID` is the user's choice. A lone organization is used
+    /// whatever it is; with several, one of them must be chosen, or this
+    /// throws `FetchError.needsOrganizationChoice` without fetching usage.
+    func fetchSubscription(sessionKey: String, organizationID: String?) async throws -> AnthropicSubscriptionSnapshot
 }
 
 final class AnthropicUsageService: AnthropicUsageFetching {
@@ -16,25 +21,34 @@ final class AnthropicUsageService: AnthropicUsageFetching {
     }
 
     private let client: HTTPClient
-    private var organization: Organization?
-    /// The session key `organization` was resolved with; another key is
+    private var listedOrganizations: [AnthropicOrganizationsResponse.Organization] = []
+    /// The session key `listedOrganizations` belongs to; another key is
     /// another account.
-    private var organizationSessionKey: String?
+    private var listedSessionKey: String?
+    /// False when the listing may be out of date, so the next fetch lists again.
+    private var listingIsCurrent = false
 
     init(client: HTTPClient = URLSessionHTTPClient()) {
         self.client = client
     }
 
-    func fetchSubscription(sessionKey: String) async throws -> AnthropicSubscriptionSnapshot {
-        var organization = try await resolveOrganization(sessionKey: sessionKey)
+    func organizations(sessionKey: String) -> [AnthropicOrganizationsResponse.Organization] {
+        listedSessionKey == sessionKey ? listedOrganizations : []
+    }
+
+    func fetchSubscription(
+        sessionKey: String,
+        organizationID: String? = nil
+    ) async throws -> AnthropicSubscriptionSnapshot {
+        var organization = try await resolveOrganization(sessionKey: sessionKey, organizationID: organizationID)
         let usage: AnthropicUsageResponse
 
         do {
             usage = try await fetchUsage(organization: organization, sessionKey: sessionKey)
         } catch let error as FetchError where Self.isStaleOrganization(error) {
-            // The cached organization may be gone; resolve it once more.
-            self.organization = nil
-            organization = try await resolveOrganization(sessionKey: sessionKey)
+            // The listed organization may be gone; list them once more.
+            listingIsCurrent = false
+            organization = try await resolveOrganization(sessionKey: sessionKey, organizationID: organizationID)
             usage = try await fetchUsage(organization: organization, sessionKey: sessionKey)
         }
 
@@ -67,32 +81,39 @@ final class AnthropicUsageService: AnthropicUsageFetching {
         }
     }
 
-    private func resolveOrganization(sessionKey: String) async throws -> Organization {
-        if organizationSessionKey != sessionKey {
-            organization = nil
+    /// Lists the organizations once per session key, then takes the chosen
+    /// one, or the only one.
+    private func resolveOrganization(sessionKey: String, organizationID: String?) async throws -> Organization {
+        if listedSessionKey != sessionKey || !listingIsCurrent {
+            let data = try await send(request(path: "organizations", sessionKey: sessionKey))
+            let response = try HTTPResponseHandler.decode(AnthropicOrganizationsResponse.self, from: data)
+            listedOrganizations = response.organizations
+            listedSessionKey = sessionKey
+            listingIsCurrent = true
         }
-
-        if let organization {
-            return organization
-        }
-
-        let data = try await send(request(path: "organizations", sessionKey: sessionKey))
-        let response = try HTTPResponseHandler.decode(AnthropicOrganizationsResponse.self, from: data)
 
         // A session with no organization has nothing to report.
-        guard let chosen = response.primary else {
+        guard !listedOrganizations.isEmpty else {
+            listingIsCurrent = false
             Log.http.error("organizations response lists no usable organization")
             throw FetchError.decoding
         }
 
-        let resolved = Organization(
+        let chosen = listedOrganizations.first { $0.uuid == organizationID }
+            ?? (listedOrganizations.count == 1 ? listedOrganizations[0] : nil)
+
+        guard let chosen else {
+            // Listed again next time, so a manual refresh sees a membership change.
+            listingIsCurrent = false
+            let count = listedOrganizations.count
+            Log.http.info("\(count, privacy: .public) organizations and none chosen; waiting for a choice")
+            throw FetchError.needsOrganizationChoice
+        }
+
+        return Organization(
             uuid: chosen.uuid,
             planName: AnthropicPlanName.from(rateLimitTier: chosen.rateLimitTier, capabilities: chosen.capabilities)
         )
-        organization = resolved
-        organizationSessionKey = sessionKey
-
-        return resolved
     }
 
     private func fetchUsage(organization: Organization, sessionKey: String) async throws -> AnthropicUsageResponse {

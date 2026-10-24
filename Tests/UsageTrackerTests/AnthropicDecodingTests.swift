@@ -313,16 +313,6 @@ import Testing
         #expect(fromObject.organizations.map(\.uuid) == ["a", "b"])
     }
 
-    @Test func primaryOrganizationPrefersChat() {
-        typealias Organization = AnthropicOrganizationsResponse.Organization
-        let api = Organization(uuid: "api", capabilities: ["api"])
-        let chat = Organization(uuid: "chat", capabilities: ["api", "chat"])
-
-        #expect(AnthropicOrganizationsResponse(organizations: [api, chat]).primary == chat)
-        #expect(AnthropicOrganizationsResponse(organizations: [api, Organization(uuid: "bare")]).primary == api)
-        #expect(AnthropicOrganizationsResponse(organizations: []).primary == nil)
-    }
-
     @Test func planNameFromTier() {
         #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_5x", capabilities: nil) == "Max 5x")
         #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_20x", capabilities: nil) == "Max 20x")
