@@ -108,6 +108,7 @@ import Testing
         }
 
         model.start()
+        model.start()
         await settle()
         for provider in Provider.allCases {
             #expect(fetchers[provider]?.callCount == 1)
