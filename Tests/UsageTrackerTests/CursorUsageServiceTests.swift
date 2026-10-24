@@ -37,6 +37,59 @@ struct CursorUsageServiceTests {
         #expect(response.individualUsage.overall == .init(used: 0, limit: 2000))
     }
 
+    private func dailySpend(
+        _ json: String,
+        client: RoutingHTTPClient? = nil
+    ) async throws -> (response: DailySpendResponse, client: RoutingHTTPClient) {
+        let client = client ?? RoutingHTTPClient(routes: [
+            "get-user-organizations": .ok(json: "{}"),
+            "get-daily-spend-by-category": .ok(json: json),
+        ])
+        let service = CursorUsageService(client: client)
+        let start = Date(timeIntervalSince1970: 1_792_368_000)
+        let response = try await service.fetchDailySpend(
+            token: "t", periodStart: start, periodEnd: start.addingTimeInterval(30 * 86400)
+        )
+
+        return (response, client)
+    }
+
+    private func count(_ client: RoutingHTTPClient, suffix: String) -> Int {
+        client.requests.filter { $0.url!.absoluteString.hasSuffix(suffix) }.count
+    }
+
+    // A free account has no daily-spend list; Cursor omits empty repeated fields.
+    @Test(arguments: ["{}", #"{"categories":[]}"#, #"{"dailySpend":[]}"#])
+    func emptyDailySpendDecodesAsNoDays(json: String) async throws {
+        let (response, client) = try await dailySpend(json)
+
+        #expect(response.dailySpend.isEmpty)
+        // Not a decoding failure, so no identity retry.
+        #expect(count(client, suffix: "get-user-organizations") == 1)
+        #expect(count(client, suffix: "get-daily-spend-by-category") == 1)
+    }
+
+    @Test func populatedDailySpendIgnoresTheExtraKeys() async throws {
+        let url = try #require(Bundle.module.url(forResource: "cursor-daily-spend", withExtension: "json", subdirectory: "Fixtures"))
+        let (response, client) = try await dailySpend(String(contentsOf: url, encoding: .utf8))
+
+        #expect(response.dailySpend.count == 5)
+        #expect(response.dailySpend[0] == .init(day: "1792368000000", category: "claude-opus-5-5-low", spendCents: 95, totalTokens: "969191"))
+        #expect(count(client, suffix: "get-daily-spend-by-category") == 1)
+    }
+
+    @Test func malformedDailySpendStillRetriesTheIdentityOnce() async throws {
+        let client = RoutingHTTPClient(routes: [
+            "get-user-organizations": .ok(json: "{}"),
+            "get-daily-spend-by-category": .ok(json: #"{"dailySpend":"nope"}"#),
+        ])
+
+        await #expect(throws: FetchError.decoding) {
+            _ = try await dailySpend("", client: client)
+        }
+        #expect(count(client, suffix: "get-daily-spend-by-category") == 2)
+    }
+
     @Test func unauthorizedResponseMapsToUnauthorizedError() async {
         let service = CursorUsageService(client: RecordingHTTPClient(response: .status(401)))
 

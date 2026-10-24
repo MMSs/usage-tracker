@@ -1,0 +1,11 @@
+{
+  "dailySpend": [
+    {"day": "1792368000000", "category": "claude-opus-5-5-low", "spendCents": 95, "totalTokens": "969191"},
+    {"day": "1792368000000", "category": "claude-sonnet-5-5-low", "spendCents": 40, "totalTokens": "412008"},
+    {"day": "1792454400000", "category": "claude-opus-5-5-low", "spendCents": 210, "totalTokens": "2210450"},
+    {"day": "1792540800000", "category": "gpt-5.6-terra-high", "spendCents": 75, "totalTokens": "803112"},
+    {"day": "1792627200000", "category": "claude-opus-5-5-low", "spendCents": 130, "totalTokens": "1301877"}
+  ],
+  "categories": ["claude-opus-5-5-low", "claude-sonnet-5-5-low", "gpt-5.6-terra-high"],
+  "effectiveLimitCents": 30000
+}

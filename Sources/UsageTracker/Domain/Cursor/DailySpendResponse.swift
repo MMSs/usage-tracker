@@ -31,6 +31,20 @@ struct DailySpendResponse: Decodable, Equatable {
     let dailySpend: [Entry]
 }
 
+extension DailySpendResponse {
+    private enum CodingKeys: String, CodingKey {
+        case dailySpend
+    }
+
+    // Cursor omits empty repeated fields, so an account with no daily spend
+    // (a free plan) answers without `dailySpend`. The response's `categories`
+    // and `effectiveLimitCents` are not read.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        dailySpend = try container.decodeIfPresent([Entry].self, forKey: .dailySpend) ?? []
+    }
+}
+
 enum CursorDayConversion {
     /// Milliseconds of UTC midnight for the calendar day of `date`.
     static func apiMilliseconds(forLocalDay date: Date, calendar: Calendar = .current) -> Int64 {
