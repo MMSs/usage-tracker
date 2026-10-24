@@ -33,9 +33,9 @@ and every later launch fails with `Launchd job spawn failed`.
 
 ## Setting up Cursor
 
-Opening the app shows the Settings window; the menu bar gets one Usage
-Tracker item. Pick Cursor in the sidebar, or click the menu bar item and then
-Set up. Once a provider is configured it gets its own menu bar item;
+Launching the app adds one Usage Tracker item to the menu bar. Click it and
+then Set up to open Settings, or open the app a second time from Applications
+or Spotlight while it is running. Once a provider is configured it gets its own menu bar item;
 unconfigured providers show nothing.
 
 Paste the value of the `WorkosCursorSessionToken` cookie into the field. The
@@ -47,9 +47,9 @@ value so you can tell which one is in use; paste over it to replace it.
 ## Settings
 
 Settings is its own window. Open it from the gear in any menu bar popover, or
-by opening the app again from Finder or Spotlight. The app appears in the Dock
-while the window is open and leaves when it closes. Starting at login does not
-open it.
+by opening the app again from Applications or Spotlight while it is running.
+Launching the app never opens it. The app appears in the Dock while the
+window is open and leaves when it closes.
 
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings or Bars. Colored tints the text and graph by

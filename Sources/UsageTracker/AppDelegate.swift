@@ -1,7 +1,8 @@
 import AppKit
 
-/// Owns the model and the Settings window; opens Settings when the user
-/// launches or reopens the app, but not when the login item starts it.
+/// Owns the model and the Settings window. A launch only puts the items in
+/// the menu bar; reopening the running app (Finder, Spotlight, the Dock)
+/// brings up Settings.
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let model: AppModel
@@ -16,10 +17,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         AppStartup.configure(loginItemManager: LoginItemManager())
-
-        if !LaunchContext.isLoginItemLaunch {
-            model.presentSettings(.general)
-        }
     }
 
     /// Finder, Spotlight or the Dock icon: bring Settings forward without changing the page.
