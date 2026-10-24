@@ -199,6 +199,22 @@ struct ProviderSettingsView: View {
                 isEnabled: provider.isConfigured ? settings.isEnabled : nil
             )
 
+            if provider.isConfigured, !provider.isEnabled {
+                Text("Turn the provider on to see its settings. Its credentials are kept.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                sections
+            }
+        }
+        .padding(SettingsLayout.padding)
+        .frame(width: SettingsLayout.pageWidth)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    @ViewBuilder
+    private var sections: some View {
+        Group {
             SettingsSection(title: "Credentials") {
                 let fields = provider.descriptor.subscriptionFields + provider.descriptor.apiFields
                 ForEach(fields) { field in
@@ -253,9 +269,6 @@ struct ProviderSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
-        .padding(SettingsLayout.padding)
-        .frame(width: SettingsLayout.pageWidth)
-        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
