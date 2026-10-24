@@ -357,7 +357,7 @@ struct ProviderSettingsView: View {
             }
         }
 
-        SettingsSection(title: "Menu bar") {
+        SettingsSection(title: "Appearance") {
             SettingsRow(label: "Custom appearance", isLast: !usesCustomAppearance.wrappedValue) {
                 SwitchToggle(isOn: usesCustomAppearance)
             }
