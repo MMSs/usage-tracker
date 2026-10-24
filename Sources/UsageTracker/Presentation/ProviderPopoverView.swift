@@ -73,8 +73,14 @@ struct ProviderPopoverView: View {
 
     private var header: some View {
         HStack {
-            Text(provider.descriptor.displayName)
-                .font(.headline)
+            HStack(spacing: 6) {
+                ProviderGlyph(provider: provider.id)
+                    .fill(.primary)
+                    .frame(width: 16, height: 16)
+                Text(provider.descriptor.displayName)
+                    .font(.headline)
+            }
+            .accessibilityElement(children: .combine)
             Spacer()
             if let planName = provider.subscription?.report?.planName ?? provider.api?.report?.planName {
                 Text(planName)
