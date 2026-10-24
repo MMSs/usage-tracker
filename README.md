@@ -85,7 +85,8 @@ window is open and leaves when it closes.
 
 ## Status
 
-Early development. Cursor and Anthropic work. OpenAI follows in a later release.
+Early development. Cursor works. Anthropic is implemented but not yet verified
+against the live services. OpenAI follows in a later release.
 
 ## Trademarks
 
