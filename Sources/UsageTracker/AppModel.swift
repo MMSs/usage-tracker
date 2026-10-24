@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import os
 
 /// Composition root: owns the providers, the refresh scheduler, and the
 /// settings stores.
@@ -84,6 +85,7 @@ final class AppModel: ObservableObject {
     private func refresh(_ id: Provider, manual: Bool) async {
         let provider = provider(id)
         guard provider.isEnabled else {
+            Log.refresh.debug("\(id.rawValue, privacy: .public): skipped, provider switched off")
             return
         }
 

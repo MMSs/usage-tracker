@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 @MainActor
 protocol AnthropicUsageFetching {
@@ -80,6 +81,7 @@ final class AnthropicUsageService: AnthropicUsageFetching {
 
         // A session with no organization has nothing to report.
         guard let chosen = response.primary else {
+            Log.http.error("organizations response lists no usable organization")
             throw FetchError.decoding
         }
 
@@ -101,11 +103,13 @@ final class AnthropicUsageService: AnthropicUsageFetching {
         do {
             usage = try AnthropicUsageResponse.decoder().decode(AnthropicUsageResponse.self, from: data)
         } catch {
+            HTTPResponseHandler.logDecodingFailure(error, decoding: AnthropicUsageResponse.self)
             throw FetchError.decoding
         }
 
         // A response with neither window is a shape change, not an idle account.
         guard usage.fiveHour != nil || usage.sevenDay != nil else {
+            Log.http.error("usage response has neither the 5-hour nor the weekly window")
             throw FetchError.decoding
         }
 

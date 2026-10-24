@@ -83,6 +83,24 @@ window is open and leaves when it closes.
   Refreshing pauses while the Mac is asleep or offline and resumes when both
   are back.
 
+## Troubleshooting
+
+The app writes refreshes, HTTP responses, and scheduling to the system log
+under the subsystem `com.mohab.usage-tracker`. Watch it live:
+
+```zsh
+log stream --predicate 'subsystem == "com.mohab.usage-tracker"' --level debug
+```
+
+Failures are kept, so they can be read afterwards:
+
+```zsh
+log show --last 1h --predicate 'subsystem == "com.mohab.usage-tracker"'
+```
+
+The log never contains credentials, cookies, headers, query strings, or
+response bodies. Organization ids in paths are shown as `{uuid}`.
+
 ## Status
 
 Early development. Cursor works. Anthropic is implemented but not yet verified

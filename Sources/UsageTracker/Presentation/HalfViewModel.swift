@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 enum HalfStatus: Equatable, Sendable {
     case unconfigured, loading, ready, error, expired
@@ -70,16 +71,20 @@ final class HalfViewModel: ObservableObject {
     var isActive: Bool { isEnabled && isConfigured }
 
     func refresh(manual: Bool) async {
+        let name = logName
         guard isEnabled else {
+            Log.refresh.debug("\(name, privacy: .public): skipped, switched off")
             return
         }
 
         if !manual, scheduledRetriesBlocked {
+            Log.refresh.debug("\(name, privacy: .public): skipped, blocked until the credential is replaced")
             return
         }
 
         refreshGeneration += 1
         let generation = refreshGeneration
+        Log.refresh.debug("\(name, privacy: .public): refresh started (\(manual ? "manual" : "scheduled", privacy: .public))")
 
         let values: [String: String]
         do {
@@ -90,6 +95,7 @@ final class HalfViewModel: ObservableObject {
         }
 
         guard isConfigured(values) else {
+            Log.refresh.debug("\(name, privacy: .public): no credential")
             markUnconfigured()
             return
         }
@@ -102,6 +108,7 @@ final class HalfViewModel: ObservableObject {
         do {
             let fetched = try await fetcher.fetchReport(credentials: values, today: now())
             guard generation == refreshGeneration else {
+                Log.refresh.debug("\(name, privacy: .public): superseded result discarded")
                 return
             }
 
@@ -113,25 +120,34 @@ final class HalfViewModel: ObservableObject {
             lastFailure = nil
             status = .ready
             cache.store(CachedReport(report: fetched, fetchedAt: date), provider: provider, half: half)
+            Log.refresh.info("\(name, privacy: .public): refreshed")
         } catch is CancellationError {
             // Cancelled, not failed: keep what the half showed before, so a
             // half with no report does not sit on "Loading…" hiding its error.
+            Log.refresh.debug("\(name, privacy: .public): refresh cancelled")
             if generation == refreshGeneration, statusBefore == .error || statusBefore == .expired {
                 status = statusBefore
             }
             return
         } catch {
             guard generation == refreshGeneration else {
+                Log.refresh.debug("\(name, privacy: .public): superseded failure discarded")
                 return
             }
 
-            fail(RefreshFailure(error))
+            let cause = RefreshFailure(error)
+            if cause == .unexpected {
+                // The type name only: an error's description could quote a response.
+                Log.refresh.error("\(name, privacy: .public): unexpected \(String(describing: type(of: error)), privacy: .public)")
+            }
+            fail(cause)
         }
     }
 
     /// Called after Settings saved or removed a credential for this half.
     func credentialsChanged() async {
         // Invalidates any fetch still in flight for the old credentials.
+        Log.refresh.debug("\(self.logName, privacy: .public): credential changed")
         refreshGeneration += 1
         scheduledRetriesBlocked = false
         await refresh(manual: true)
@@ -139,13 +155,21 @@ final class HalfViewModel: ObservableObject {
 
     private func fail(_ cause: RefreshFailure) {
         lastFailure = RecordedFailure(cause: cause, date: now())
+        let name = logName
 
         if cause == .unauthorized {
             status = .expired
             scheduledRetriesBlocked = true
+            Log.refresh.error("\(name, privacy: .public): failed (unauthorized); expired, scheduled refreshes blocked")
         } else {
             status = .error
+            Log.refresh.error("\(name, privacy: .public): failed (\(cause.description, privacy: .public))")
         }
+    }
+
+    /// "anthropic api": names the half in log lines.
+    private var logName: String {
+        "\(provider.rawValue) \(half.rawValue)"
     }
 
     private func loadCached() {

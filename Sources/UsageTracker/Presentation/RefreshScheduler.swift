@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Fetching is pointless while the Mac is asleep or the network is down, so
 /// the scheduler runs its timers only while both hold and treats any entry
@@ -47,6 +48,7 @@ final class RefreshScheduler {
         }
 
         isStarted = true
+        Log.scheduler.debug("started")
 
         initialRefreshTask = Task {
             await initialRefresh()
@@ -74,6 +76,7 @@ final class RefreshScheduler {
         initialRefreshTask = nil
         cancelAllCycles()
         isStarted = false
+        Log.scheduler.debug("stopped")
     }
 
     /// Nil removes the provider's timer. A change restarts only that provider's countdown.
@@ -83,6 +86,7 @@ final class RefreshScheduler {
         }
 
         schedules[provider] = interval
+        Log.scheduler.debug("\(provider.rawValue, privacy: .public): interval \(interval.map { "\($0.duration)" } ?? "off", privacy: .public)")
 
         guard isStarted, isActive else {
             return
@@ -105,6 +109,7 @@ final class RefreshScheduler {
 
         let wasActive = isActive
         self.isAwake = isAwake
+        Log.scheduler.debug("\(isAwake ? "woke" : "sleeping", privacy: .public)")
         applyActivityChange(wasActive: wasActive)
     }
 
@@ -115,6 +120,7 @@ final class RefreshScheduler {
 
         let wasActive = isActive
         self.isOnline = isOnline
+        Log.scheduler.debug("\(isOnline ? "online" : "offline", privacy: .public)")
         applyActivityChange(wasActive: wasActive)
     }
 
@@ -124,10 +130,12 @@ final class RefreshScheduler {
         }
 
         guard isActive else {
+            Log.scheduler.debug("paused: refreshes wait for wake and network")
             cancelAllCycles()
             return
         }
 
+        Log.scheduler.debug("resumed: refreshing now")
         startAllCycles(refreshingImmediately: true)
     }
 
@@ -164,6 +172,7 @@ final class RefreshScheduler {
                     return
                 }
 
+                Log.scheduler.debug("\(provider.rawValue, privacy: .public): tick")
                 await periodicRefresh(provider)
             }
         }

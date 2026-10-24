@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 struct AnthropicCostDay: Equatable {
     /// Local midnight of the bucket's UTC calendar date.
@@ -72,6 +73,7 @@ final class AnthropicCostService: AnthropicCostFetching {
         do {
             return try AnthropicUsageResponse.decoder().decode(AnthropicCostReportResponse.self, from: data)
         } catch {
+            HTTPResponseHandler.logDecodingFailure(error, decoding: AnthropicCostReportResponse.self)
             throw FetchError.decoding
         }
     }
@@ -81,6 +83,7 @@ final class AnthropicCostService: AnthropicCostFetching {
         guard amount.range(of: #"^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil,
               let value = Decimal(string: amount, locale: posix)
         else {
+            Log.http.error("cost_report amount is not a decimal number")
             throw FetchError.decoding
         }
 
