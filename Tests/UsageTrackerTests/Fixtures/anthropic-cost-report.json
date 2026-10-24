@@ -1,0 +1,56 @@
+{
+  "data": [
+    {
+      "starting_at": "2026-10-01T00:00:00Z",
+      "ending_at": "2026-10-02T00:00:00Z",
+      "results": [
+        {
+          "currency": "USD",
+          "amount": "1234.5678",
+          "workspace_id": null,
+          "description": null,
+          "cost_type": null,
+          "context_window": null,
+          "model": null,
+          "service_tier": null,
+          "token_type": null
+        }
+      ]
+    },
+    {
+      "starting_at": "2026-10-02T00:00:00Z",
+      "ending_at": "2026-10-03T00:00:00Z",
+      "results": []
+    },
+    {
+      "starting_at": "2026-10-03T00:00:00Z",
+      "ending_at": "2026-10-04T00:00:00Z",
+      "results": [
+        {
+          "currency": "USD",
+          "amount": "250",
+          "workspace_id": "wrkspc_01FakeWorkspaceId",
+          "description": null,
+          "cost_type": null,
+          "context_window": null,
+          "model": null,
+          "service_tier": null,
+          "token_type": null
+        },
+        {
+          "currency": "USD",
+          "amount": "49.5",
+          "workspace_id": null,
+          "description": null,
+          "cost_type": null,
+          "context_window": null,
+          "model": null,
+          "service_tier": null,
+          "token_type": null
+        }
+      ]
+    }
+  ],
+  "has_more": false,
+  "next_page": null
+}

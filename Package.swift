@@ -7,6 +7,10 @@ let package = Package(
     products: [.executable(name: "UsageTracker", targets: ["UsageTracker"])],
     targets: [
         .executableTarget(name: "UsageTracker"),
-        .testTarget(name: "UsageTrackerTests", dependencies: ["UsageTracker"]),
+        .testTarget(
+            name: "UsageTrackerTests",
+            dependencies: ["UsageTracker"],
+            resources: [.copy("Fixtures")]
+        ),
     ]
 )

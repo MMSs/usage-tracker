@@ -1,0 +1,19 @@
+[
+  {
+    "id": 48213907,
+    "uuid": "3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14",
+    "name": "sam@example.com's Organization",
+    "settings": {},
+    "capabilities": ["chat", "claude_max"],
+    "rate_limit_tier": "default_claude_max_5x",
+    "billing_type": "stripe_subscription",
+    "free_credits_status": null,
+    "api_disabled_reason": null,
+    "api_disabled_until": null,
+    "billable_usage_paused_until": null,
+    "raven_type": null,
+    "created_at": "2024-03-11T09:42:17.204553Z",
+    "updated_at": "2026-09-02T14:05:51.880214Z",
+    "active_flags": []
+  }
+]

@@ -1,0 +1,54 @@
+{
+  "five_hour": {
+    "utilization": 37.0,
+    "resets_at": "2026-10-24T19:59:59.661633+00:00"
+  },
+  "seven_day": {
+    "utilization": "62.5",
+    "resets_at": "2026-10-29T07:00:00.000000+00:00"
+  },
+  "seven_day_oauth_apps": null,
+  "seven_day_opus": {
+    "utilization": 12.0,
+    "resets_at": "2026-10-29T07:00:00.000000+00:00"
+  },
+  "seven_day_sonnet": {
+    "utilization": 48.0,
+    "resets_at": null
+  },
+  "limits": [
+    {
+      "kind": "weekly_scoped",
+      "percent": 18.5,
+      "resets_at": "2026-10-29T07:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "id": "claude-opus-5-5",
+          "display_name": "Opus"
+        }
+      }
+    },
+    {
+      "kind": "weekly_scoped",
+      "percent": "54",
+      "resets_at": "2026-10-29T07:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "id": "claude-sonnet-5-5",
+          "display_name": "Sonnet"
+        }
+      }
+    },
+    {
+      "kind": "daily_scoped",
+      "percent": 3.0,
+      "resets_at": "2026-10-25T00:00:00.000000+00:00",
+      "scope": {
+        "model": {
+          "id": "claude-haiku-5-5",
+          "display_name": "Haiku"
+        }
+      }
+    }
+  ]
+}
