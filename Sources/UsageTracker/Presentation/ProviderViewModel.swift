@@ -10,6 +10,9 @@ final class ProviderViewModel: ObservableObject, Identifiable {
 
     nonisolated var id: Provider { descriptor.id }
 
+    /// False when no half can be fetched yet, so there is nothing to set up.
+    var hasAnyHalf: Bool { subscription != nil || api != nil }
+
     private var halfObservers: [AnyCancellable] = []
 
     init(

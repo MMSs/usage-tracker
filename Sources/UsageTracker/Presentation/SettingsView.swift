@@ -2,7 +2,8 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var appModel: AppModel
-    let expanded: Provider
+    /// The provider expanded first and shown in the preview; nil when none is listed.
+    let focused: Provider?
     let onBack: () -> Void
 
     @State private var expandedProviders: Set<Provider>
@@ -11,11 +12,22 @@ struct SettingsView: View {
 
     init(appModel: AppModel, expanded: Provider, onBack: @escaping () -> Void) {
         self.appModel = appModel
-        self.expanded = expanded
+        let focused = Self.focusedProvider(expanded: expanded, listed: appModel.providers.filter(\.hasAnyHalf).map(\.id))
+        self.focused = focused
         self.onBack = onBack
-        _expandedProviders = State(initialValue: [expanded])
+        _expandedProviders = State(initialValue: Set(focused.map { [$0] } ?? []))
         _appearance = State(initialValue: appModel.appearanceStore.appearance())
         _interval = State(initialValue: appModel.intervalStore.interval())
+    }
+
+    /// `expanded` when it is listed, otherwise the first listed provider.
+    static func focusedProvider(expanded: Provider, listed: [Provider]) -> Provider? {
+        listed.contains(expanded) ? expanded : listed.first
+    }
+
+    /// Providers with nothing to fetch yet are left out, so no credential is stored unused.
+    private var listedProviders: [ProviderViewModel] {
+        appModel.providers.filter(\.hasAnyHalf)
     }
 
     var body: some View {
@@ -23,7 +35,7 @@ struct SettingsView: View {
             VStack(alignment: .leading, spacing: 14) {
                 header
 
-                ForEach(appModel.providers) { provider in
+                ForEach(listedProviders) { provider in
                     providerSection(provider)
                 }
 
@@ -116,17 +128,19 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var preview: some View {
-        let provider = appModel.provider(expanded)
-        let item = MenuBarItemBuilder.make(
-            descriptor: provider.descriptor,
-            subscription: provider.subscription.map(HalfSnapshot.init),
-            api: provider.api.map(HalfSnapshot.init),
-            apiBudget: appModel.budgetStore.budget(for: expanded),
-            now: Date()
-        )
+        let provider = focused.map(appModel.provider)
+        let item = provider.flatMap { provider in
+            MenuBarItemBuilder.make(
+                descriptor: provider.descriptor,
+                subscription: provider.subscription.map(HalfSnapshot.init),
+                api: provider.api.map(HalfSnapshot.init),
+                apiBudget: appModel.budgetStore.budget(for: provider.id),
+                now: Date()
+            )
+        }
 
         HStack {
-            if let item {
+            if let provider, let item {
                 MenuBarLabel(item: item, appearance: appearance, displayName: provider.descriptor.displayName)
             } else {
                 Text("No data yet")

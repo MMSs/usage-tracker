@@ -31,6 +31,17 @@ import Testing
         #expect(anthropic.api != nil)
     }
 
+    @Test func hasAnyHalfOnlyWithAFetcher() {
+        #expect(makeModel(.cursor, now: { t1 }).hasAnyHalf)
+
+        let unfetched = ProviderViewModel(
+            descriptor: ProviderRegistry.descriptor(for: .anthropic),
+            subscriptionFetcher: nil, apiFetcher: nil,
+            credentialStore: store, cache: cache
+        )
+        #expect(!unfetched.hasAnyHalf)
+    }
+
     @Test func isConfiguredWhenAnyHalfIs() async {
         store.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
         let model = makeModel(.anthropic, now: { t1 })
