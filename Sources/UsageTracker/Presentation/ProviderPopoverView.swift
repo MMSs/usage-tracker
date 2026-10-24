@@ -255,7 +255,7 @@ struct ProviderPopoverView: View {
 
                 if provider.descriptor.capabilities.hasDailyChart, !spend.daily.isEmpty {
                     DailySpendChartView(
-                        title: label, subtitleRow: nil,
+                        title: "Daily spend", subtitleRow: nil,
                         days: spend.daily, period: spend.period, today: now, unit: .dollars
                     )
                 }
