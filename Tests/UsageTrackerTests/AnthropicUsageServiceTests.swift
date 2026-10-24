@@ -131,6 +131,21 @@ struct AnthropicUsageServiceTests {
         #expect(count(client, suffix: "/usage") == 2)
     }
 
+    @Test(arguments: ["{}", #"{"five_hour":null,"seven_day":null}"#])
+    func emptyUsageIsADecodingFailureAfterOneRetry(json: String) async throws {
+        var routes = try routes(overage: false)
+        routes["/usage"] = .ok(json: json)
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        await #expect(throws: FetchError.decoding) {
+            try await service.fetchSubscription(sessionKey: "k")
+        }
+
+        #expect(count(client, suffix: "/organizations") == 2)
+        #expect(count(client, suffix: "/usage") == 2)
+    }
+
     @Test func serverErrorOnUsageIsNotRetried() async throws {
         var routes = try routes(overage: false)
         routes["/usage"] = .status(500)

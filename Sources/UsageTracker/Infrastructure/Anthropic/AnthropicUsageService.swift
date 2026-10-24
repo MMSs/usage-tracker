@@ -89,11 +89,19 @@ final class AnthropicUsageService: AnthropicUsageFetching {
         let data = try await send(request(path: "organizations/\(organization.uuid)/usage", sessionKey: sessionKey))
 
         // The default decoder would silently drop every resets_at.
+        let usage: AnthropicUsageResponse
         do {
-            return try AnthropicUsageResponse.decoder().decode(AnthropicUsageResponse.self, from: data)
+            usage = try AnthropicUsageResponse.decoder().decode(AnthropicUsageResponse.self, from: data)
         } catch {
             throw FetchError.decoding
         }
+
+        // A response with neither window is a shape change, not an idle account.
+        guard usage.fiveHour != nil || usage.sevenDay != nil else {
+            throw FetchError.decoding
+        }
+
+        return usage
     }
 
     /// Nil on any failure except cancellation.
