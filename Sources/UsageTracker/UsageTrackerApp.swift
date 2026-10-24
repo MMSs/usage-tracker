@@ -32,7 +32,7 @@ struct ProviderMenuBarScene: Scene {
             descriptor: provider.descriptor,
             subscription: provider.snapshot(.subscription),
             api: provider.snapshot(.api),
-            apiBudget: model.budgetStore.budget(for: provider.id),
+            apiBudget: model.budget(for: provider.id),
             now: Date(),
             forceSetUp: !provider.isConfigured
         ) ?? MenuBarItem(provider: provider.id, subscription: .status(.loading), api: nil)

@@ -33,7 +33,7 @@ struct ProviderPopoverView: View {
             descriptor: provider.descriptor,
             subscription: provider.snapshot(.subscription),
             api: provider.snapshot(.api),
-            apiBudget: appModel.budgetStore.budget(for: provider.id),
+            apiBudget: appModel.budget(for: provider.id),
             now: now
         )
 
@@ -242,7 +242,7 @@ struct ProviderPopoverView: View {
         let spend = half.report?.spend
         let month = spend.map { PopoverPresentation.monthName(for: $0.period.start) }
         let label = month.map { "API · \($0)" } ?? "API"
-        let budget = PopoverPresentation.effectiveBudget(appModel.budgetStore.budget(for: provider.id))
+        let budget = PopoverPresentation.effectiveBudget(appModel.budget(for: provider.id))
 
         return sectionShell(label: label, half: half, display: display, now: now) {
             if let spend {

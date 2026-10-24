@@ -10,7 +10,7 @@ final class AppModel: ObservableObject {
     let credentialStore: CredentialStoring
     let providerSettingsStore: ProviderSettingsStoring
     let appearanceStore: MenuBarAppearanceStoring
-    let budgetStore: APIBudgetStoring
+    private let budgetStore: APIBudgetStoring
     let loginItem: LoginItemModel
     private(set) var scheduler: RefreshScheduler!
     /// Set by the app delegate; opens the Settings window. A no-op until then.
@@ -19,6 +19,8 @@ final class AppModel: ObservableObject {
     /// The appearance every provider uses unless it overrides it.
     @Published private(set) var globalAppearance: MenuBarAppearance
     @Published private(set) var providerSettings: [Provider: ProviderSettings]
+    /// Monthly API budgets that are set. The store alone would publish nothing.
+    @Published private(set) var apiBudgets: [Provider: Decimal]
 
     private var isStarted = false
     private var providerObservers: [AnyCancellable] = []
@@ -44,6 +46,9 @@ final class AppModel: ObservableObject {
         self.loginItem = loginItem
         globalAppearance = appearanceStore.appearance()
         providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, providerSettingsStore.settings(for: $0.id)) })
+        apiBudgets = Dictionary(uniqueKeysWithValues: providers.compactMap { provider in
+            budgetStore.budget(for: provider.id).map { (provider.id, $0) }
+        })
 
         for provider in providers {
             Self.apply(providerSettings[provider.id] ?? .default, to: provider)
@@ -138,6 +143,19 @@ final class AppModel: ObservableObject {
 
     private static func schedules(_ settings: [Provider: ProviderSettings]) -> [Provider: RefreshInterval] {
         settings.filter { $0.value.isEnabled }.mapValues(\.refreshInterval)
+    }
+
+    // MARK: API budget
+
+    func budget(for provider: Provider) -> Decimal? {
+        apiBudgets[provider]
+    }
+
+    /// Saves the budget and republishes what the store kept, so the menu bar
+    /// and popover redraw now rather than at the next refresh.
+    func setBudget(_ budget: Decimal?, for provider: Provider) {
+        budgetStore.setBudget(budget, for: provider)
+        apiBudgets[provider] = budgetStore.budget(for: provider)
     }
 
     // MARK: Menu bar

@@ -35,7 +35,7 @@ struct CredentialFieldView: View {
     let field: CredentialField
     let key: CredentialKey
     let store: CredentialStoring
-    var budgetStore: APIBudgetStoring?
+    var onBudgetChange: (Decimal?) -> Void = { _ in }
     var opensHelp = false
     let onChange: () async -> Void
 
@@ -53,19 +53,20 @@ struct CredentialFieldView: View {
         field: CredentialField,
         key: CredentialKey,
         store: CredentialStoring,
-        budgetStore: APIBudgetStoring? = nil,
+        budget: Decimal? = nil,
+        onBudgetChange: @escaping (Decimal?) -> Void = { _ in },
         opensHelp: Bool = false,
         onChange: @escaping () async -> Void
     ) {
         self.field = field
         self.key = key
         self.store = store
-        self.budgetStore = budgetStore
+        self.onBudgetChange = onBudgetChange
         self.opensHelp = opensHelp
         self.onChange = onChange
         _state = State(initialValue: CredentialFieldState(mask: nil))
         _showsHelp = State(initialValue: opensHelp)
-        _budget = State(initialValue: budgetStore?.budget(for: key.provider))
+        _budget = State(initialValue: budget)
     }
 
     private var isBudget: Bool { field.id == Self.budgetFieldID }
@@ -116,7 +117,7 @@ struct CredentialFieldView: View {
                 TextField("0", value: $budget, format: .number)
                     .textFieldStyle(.roundedBorder)
                     .onChange(of: budget) { _, newValue in
-                        budgetStore?.setBudget(newValue, for: key.provider)
+                        onBudgetChange(newValue)
                     }
             } else {
                 NonCopyableTokenTextField(

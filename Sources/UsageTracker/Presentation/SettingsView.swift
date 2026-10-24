@@ -179,7 +179,7 @@ func previewItem(for provider: ProviderViewModel, in appModel: AppModel) -> Menu
         descriptor: provider.descriptor,
         subscription: provider.snapshot(.subscription),
         api: provider.snapshot(.api),
-        apiBudget: appModel.budgetStore.budget(for: provider.id),
+        apiBudget: appModel.budget(for: provider.id),
         now: Date()
     )
 }
@@ -308,7 +308,8 @@ struct ProviderSettingsView: View {
                         field: field,
                         key: CredentialKey(provider: provider.id, fieldID: field.id),
                         store: appModel.credentialStore,
-                        budgetStore: appModel.budgetStore,
+                        budget: appModel.budget(for: provider.id),
+                        onBudgetChange: { appModel.setBudget($0, for: provider.id) },
                         opensHelp: field.id == helpFieldID,
                         onChange: { await appModel.provider(provider.id).credentialsChanged(half: field.half) }
                     )

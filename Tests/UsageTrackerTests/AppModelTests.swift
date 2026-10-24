@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Testing
 @testable import UsageTracker
@@ -6,6 +7,7 @@ import Testing
     let credentials = MemoryCredentialStore()
     let cache = MemoryReportCache()
     let settingsStore = MemoryProviderSettingsStore()
+    let budgets = MemoryAPIBudgetStore()
     let sleeper = ControllableSleeper()
     let fetchers: [Provider: StubReportFetcher] = [
         .cursor: StubReportFetcher(result: .success(makeReport(1))),
@@ -28,7 +30,7 @@ import Testing
             credentialStore: credentials,
             providerSettingsStore: settingsStore,
             appearanceStore: MemoryMenuBarAppearanceStore(),
-            budgetStore: MemoryAPIBudgetStore(),
+            budgetStore: budgets,
             loginItem: .stub(),
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver(),
@@ -51,7 +53,7 @@ import Testing
             credentialStore: credentials,
             providerSettingsStore: settingsStore,
             appearanceStore: MemoryMenuBarAppearanceStore(),
-            budgetStore: MemoryAPIBudgetStore(),
+            budgetStore: budgets,
             loginItem: .stub(),
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver(),
@@ -201,5 +203,41 @@ import Testing
         credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "secret"
         let model = makeModel(apiFetchers: [.anthropic: StubReportFetcher(result: .success(makeReport(2)))])
         #expect(model.insertedProviders == [.anthropic])
+    }
+
+    @Test func settingABudgetPublishesAndClearingRemovesIt() {
+        let model = makeModel()
+        var changes = 0
+        let subscription = model.objectWillChange.sink { changes += 1 }
+        defer { subscription.cancel() }
+
+        #expect(model.budget(for: .anthropic) == nil)
+
+        model.setBudget(50, for: .anthropic)
+
+        #expect(model.budget(for: .anthropic) == 50)
+        #expect(model.budget(for: .cursor) == nil)
+        #expect(changes == 1)
+
+        model.setBudget(nil, for: .anthropic)
+
+        #expect(model.budget(for: .anthropic) == nil)
+        #expect(changes == 2)
+    }
+
+    @Test func budgetsAlreadyStoredAreAvailableAtLaunch() {
+        budgets.setBudget(20, for: .anthropic)
+
+        let model = makeModel()
+
+        #expect(model.budget(for: .anthropic) == 20)
+    }
+
+    @Test func aBudgetIsPersistedToTheStore() {
+        let model = makeModel()
+
+        model.setBudget(35, for: .anthropic)
+
+        #expect(budgets.budget(for: .anthropic) == 35)
     }
 }
