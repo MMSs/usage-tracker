@@ -24,7 +24,7 @@ import Testing
 
     @Test func missingAndUnknownValuesFallBackToDefaults() {
         withDefaults { defaults in
-            defaults.set(Data(#"{"isEnabled":false,"refreshInterval":"thirtySeconds","appearanceOverride":{"bogus":1}}"#.utf8),
+            defaults.set(Data(#"{"isEnabled":false,"refreshInterval":"thirtyDays","appearanceOverride":{"bogus":1}}"#.utf8),
                          forKey: UserDefaultsProviderSettingsStore.key(for: .openai))
 
             let settings = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .openai)

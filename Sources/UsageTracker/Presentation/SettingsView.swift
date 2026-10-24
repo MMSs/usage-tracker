@@ -126,18 +126,28 @@ struct MenuBarAppearanceRows: View {
     }
 }
 
-struct RefreshIntervalPicker: View {
+/// A stepped slider over the refresh intervals with the chosen value beside it.
+struct RefreshIntervalSlider: View {
     @Binding var interval: RefreshInterval
 
+    private var step: Binding<Double> {
+        Binding(
+            get: { Double(interval.step) },
+            set: { interval = RefreshInterval.at(step: $0) }
+        )
+    }
+
     var body: some View {
-        Picker("Every", selection: $interval) {
-            ForEach(RefreshInterval.allCases) { option in
-                Text(option.title).tag(option)
-            }
+        HStack(spacing: 12) {
+            Slider(value: step, in: 0 ... Double(RefreshInterval.allCases.count - 1), step: 1)
+                .frame(width: 220)
+                .accessibilityLabel("Refresh interval")
+                .accessibilityValue(interval.title)
+
+            Text(interval.title)
+                .monospacedDigit()
+                .frame(width: 52, alignment: .trailing)
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .fixedSize()
     }
 }
 
@@ -242,7 +252,7 @@ struct ProviderSettingsView: View {
 
             SettingsSection(title: "Refresh") {
                 SettingsRow(label: "Every", isLast: true) {
-                    RefreshIntervalPicker(interval: settings.refreshInterval)
+                    RefreshIntervalSlider(interval: settings.refreshInterval)
                 }
             }
 

@@ -55,8 +55,8 @@ open it.
   and a graph drawn as Rings or Bars. Colored tints the text and graph by
   remaining capacity or pacing.
 - Each provider tab: an Enabled switch (off removes the item and stops
-  fetching, credentials stay), the refresh interval (1, 5, 15, or 60 minutes,
-  default 5), and an optional custom appearance that overrides the defaults.
+  fetching, credentials stay), the refresh interval on a slider from 30 seconds to
+  1 hour (default 5 minutes), and an optional custom appearance that overrides the defaults.
   Refreshing pauses while the Mac is asleep or offline and resumes when both
   are back.
 

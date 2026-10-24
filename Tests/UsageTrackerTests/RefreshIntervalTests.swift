@@ -2,10 +2,9 @@ import Testing
 @testable import UsageTracker
 
 @Suite struct RefreshIntervalTests {
-    @Test func everyChoiceMapsToItsDuration() {
-        #expect(RefreshInterval.oneMinute.duration == .seconds(60))
-        #expect(RefreshInterval.fiveMinutes.duration == .seconds(300))
-        #expect(RefreshInterval.fifteenMinutes.duration == .seconds(900))
+    @Test func everyStepMapsToItsDuration() {
+        #expect(RefreshInterval.allCases.map(\.seconds) == [30, 60, 120, 300, 600, 900, 1200, 1800, 3600])
+        #expect(RefreshInterval.thirtySeconds.duration == .seconds(30))
         #expect(RefreshInterval.oneHour.duration == .seconds(3600))
     }
 
@@ -13,11 +12,22 @@ import Testing
         #expect(RefreshInterval.default == .fiveMinutes)
     }
 
-    @Test func theChoicesAreOfferedShortestFirst() {
-        #expect(RefreshInterval.allCases == [.oneMinute, .fiveMinutes, .fifteenMinutes, .oneHour])
+    @Test func theStepsAreOfferedShortestFirst() {
+        #expect(RefreshInterval.allCases == [
+            .thirtySeconds, .oneMinute, .twoMinutes, .fiveMinutes, .tenMinutes,
+            .fifteenMinutes, .twentyMinutes, .thirtyMinutes, .oneHour,
+        ])
     }
 
-    @Test func everyChoiceHasAPickerTitle() {
-        #expect(RefreshInterval.allCases.map(\.title) == ["1 min", "5 min", "15 min", "1 hour"])
+    @Test func everyStepHasATitle() {
+        #expect(RefreshInterval.allCases.map(\.title) == ["30 s", "1 min", "2 min", "5 min", "10 min", "15 min", "20 min", "30 min", "1 hour"])
+    }
+
+    @Test func sliderValuesRoundToTheNearestStepAndClamp() {
+        #expect(RefreshInterval.fiveMinutes.step == 3)
+        #expect(RefreshInterval.at(step: 3.4) == .fiveMinutes)
+        #expect(RefreshInterval.at(step: 3.6) == .tenMinutes)
+        #expect(RefreshInterval.at(step: -2) == .thirtySeconds)
+        #expect(RefreshInterval.at(step: 40) == .oneHour)
     }
 }
