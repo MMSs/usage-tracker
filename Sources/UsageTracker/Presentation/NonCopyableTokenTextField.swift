@@ -83,41 +83,73 @@ struct NonCopyableTokenTextField: NSViewRepresentable {
     @Binding var text: String
     var focusesOnAppear = false
     var allowsMultipleLines = false
+    var height: CGFloat = 26
 
     func makeCoordinator() -> Coordinator {
         Coordinator(text: $text)
     }
 
-    func makeNSView(context: Context) -> NSScrollView {
+    /// The single-line view is returned bare so it fills its frame; the multi-line one
+    /// sits in a scroll view and is at least `height` tall so a click anywhere focuses it.
+    static func makeContainer(
+        allowsMultipleLines: Bool,
+        height: CGFloat,
+        delegate: NSTextViewDelegate?
+    ) -> NSView {
         let textView = NonCopyableTokenTextView()
-        textView.delegate = context.coordinator
+        textView.delegate = delegate
         textView.allowsMultipleLines = allowsMultipleLines
+
+        guard allowsMultipleLines else {
+            return textView
+        }
+
         textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: height)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.frame = NSRect(x: 0, y: 0, width: 0, height: height)
 
         let scrollView = NSScrollView()
         scrollView.drawsBackground = false
-        scrollView.hasVerticalScroller = allowsMultipleLines
+        scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
         scrollView.documentView = textView
+        return scrollView
+    }
 
-        if focusesOnAppear {
+    static func textView(in container: NSView) -> NSTextView? {
+        (container as? NSScrollView)?.documentView as? NSTextView ?? container as? NSTextView
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let container = Self.makeContainer(
+            allowsMultipleLines: allowsMultipleLines,
+            height: height,
+            delegate: context.coordinator
+        )
+
+        if focusesOnAppear, let textView = Self.textView(in: container) {
             // The view joins its window after this returns.
             DispatchQueue.main.async {
                 textView.window?.makeFirstResponder(textView)
             }
         }
 
-        return scrollView
+        return container
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView, textView.string != text else {
+    func updateNSView(_ container: NSView, context: Context) {
+        guard let textView = Self.textView(in: container), textView.string != text else {
             return
         }
 
         textView.string = text
+
+        if text.isEmpty {
+            // A cleared secret must not come back through undo/redo.
+            textView.undoManager?.removeAllActions()
+        }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {

@@ -100,8 +100,10 @@ struct SettingsView: View {
             preview
 
             Toggle("Show text", isOn: binding(\.showText) { $0.showingText($1) })
+                .disabled(appearance.showText && !appearance.showGraph)
             Toggle("Countdown", isOn: binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
             Toggle("Show graph", isOn: binding(\.showGraph) { $0.showingGraph($1) })
+                .disabled(appearance.showGraph && !appearance.showText)
 
             Picker("Graph style", selection: binding(\.graphStyle) { var copy = $0; copy.graphStyle = $1; return copy }) {
                 ForEach(MenuBarGraphStyle.allCases) { style in

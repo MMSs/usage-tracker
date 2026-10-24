@@ -10,6 +10,8 @@ struct CredentialKey: Hashable, Sendable {
 
 protocol CredentialStoring: AnyObject {
     func credential(for key: CredentialKey) throws -> String?
+    /// Whether an item exists, without returning the secret.
+    func hasCredential(for key: CredentialKey) throws -> Bool
     func set(_ value: String, for key: CredentialKey) throws
     func remove(_ key: CredentialKey) throws
 }
@@ -41,6 +43,18 @@ final class KeychainCredentialStore: CredentialStoring {
             return nil
         default:
             throw KeychainCredentialStoreError.unexpectedStatus(status)
+        }
+    }
+
+    func hasCredential(for key: CredentialKey) throws -> Bool {
+        var query = baseQuery(for: key)
+        query[kSecReturnData as String] = false
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
+        switch SecItemCopyMatching(query as CFDictionary, nil) {
+        case errSecSuccess: return true
+        case errSecItemNotFound: return false
+        case let status: throw KeychainCredentialStoreError.unexpectedStatus(status)
         }
     }
 

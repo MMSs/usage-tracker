@@ -13,6 +13,13 @@ final class MemoryCredentialStore: CredentialStoring {
         return values[key]
     }
 
+    func hasCredential(for key: CredentialKey) throws -> Bool {
+        if let readError {
+            throw readError
+        }
+        return values[key] != nil
+    }
+
     func set(_ value: String, for key: CredentialKey) throws {
         values[key] = value
     }

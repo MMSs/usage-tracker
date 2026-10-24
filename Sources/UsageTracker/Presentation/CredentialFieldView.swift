@@ -40,7 +40,10 @@ struct CredentialFieldView: View {
     @State private var state: CredentialFieldState
     @State private var showsHelp: Bool
     @State private var showsCopied = false
+    @State private var hasLoaded = false
+    @State private var readFailed = false
     @State private var saveFailed = false
+    @State private var removeFailed = false
     @State private var commitTask: Task<Void, Never>?
     @State private var budget: Decimal?
 
@@ -58,7 +61,7 @@ struct CredentialFieldView: View {
         self.budgetStore = budgetStore
         self.opensHelp = opensHelp
         self.onChange = onChange
-        _state = State(initialValue: CredentialFieldState(isSaved: (try? store.credential(for: key)) != nil))
+        _state = State(initialValue: CredentialFieldState(isSaved: false))
         _showsHelp = State(initialValue: opensHelp)
         _budget = State(initialValue: budgetStore?.budget(for: key.provider))
     }
@@ -114,7 +117,7 @@ struct CredentialFieldView: View {
                         budgetStore?.setBudget(newValue, for: key.provider)
                     }
             } else {
-                NonCopyableTokenTextField(text: $state.draft, allowsMultipleLines: field.isMultiline)
+                NonCopyableTokenTextField(text: $state.draft, allowsMultipleLines: field.isMultiline, height: field.isMultiline ? 96 : 26)
                     .frame(height: field.isMultiline ? 96 : 26)
                     .accessibilityLabel(field.title)
                     .onChange(of: state.draft) {
@@ -122,11 +125,26 @@ struct CredentialFieldView: View {
                     }
             }
 
+            if readFailed {
+                Text("Unable to read credential.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if removeFailed {
+                Text("Unable to remove credential.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
             if saveFailed {
                 Text("Unable to save credential.")
                     .font(.caption)
                     .foregroundStyle(.red)
             }
+        }
+        .onAppear {
+            loadSavedState()
         }
         .onDisappear {
             commitTask?.cancel()
@@ -195,6 +213,25 @@ struct CredentialFieldView: View {
         }
     }
 
+    /// Seeds once; asks the store only whether an item exists, never for its value.
+    private func loadSavedState() {
+        guard !hasLoaded else {
+            return
+        }
+
+        hasLoaded = true
+
+        guard !isBudget else {
+            return
+        }
+
+        do {
+            state = CredentialFieldState(isSaved: try store.hasCredential(for: key))
+        } catch {
+            readFailed = true
+        }
+    }
+
     private func scheduleCommit() {
         commitTask?.cancel()
 
@@ -238,11 +275,11 @@ struct CredentialFieldView: View {
         do {
             try store.remove(key)
         } catch {
-            saveFailed = true
+            removeFailed = true
             return
         }
 
-        saveFailed = false
+        removeFailed = false
         state.markRemoved()
         Task { await onChange() }
     }

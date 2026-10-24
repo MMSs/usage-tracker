@@ -54,4 +54,33 @@ struct NonCopyableTokenTextViewTests {
         #expect(textView.textContainer?.maximumNumberOfLines == 0)
         #expect(textView.textContainer?.lineBreakMode == .byCharWrapping)
     }
+
+    @Test func singleLineFieldFillsItsFrameAndReceivesClicks() throws {
+        let container = NonCopyableTokenTextField.makeContainer(allowsMultipleLines: false, height: 26, delegate: nil)
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 268, height: 26))
+        container.frame = host.bounds
+        host.addSubview(container)
+        host.layoutSubtreeIfNeeded()
+
+        let textView = try #require(NonCopyableTokenTextField.textView(in: container))
+        #expect(textView.frame.height >= 26)
+
+        let hit = host.hitTest(NSPoint(x: 134, y: 13))
+        #expect(hit === textView || hit?.isDescendant(of: textView) == true)
+    }
+
+    @Test func multiLineFieldFillsItsBox() throws {
+        let container = NonCopyableTokenTextField.makeContainer(allowsMultipleLines: true, height: 96, delegate: nil)
+        let host = NSView(frame: NSRect(x: 0, y: 0, width: 268, height: 96))
+        container.frame = host.bounds
+        host.addSubview(container)
+        host.layoutSubtreeIfNeeded()
+
+        let textView = try #require(NonCopyableTokenTextField.textView(in: container))
+        #expect(textView.frame.height >= 96)
+        #expect(textView.frame.width >= 250)
+
+        let hit = host.hitTest(NSPoint(x: 134, y: 48))
+        #expect(hit === textView || hit?.isDescendant(of: textView) == true)
+    }
 }
