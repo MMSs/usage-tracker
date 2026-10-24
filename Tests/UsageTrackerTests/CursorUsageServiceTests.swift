@@ -97,4 +97,13 @@ struct CursorUsageServiceTests {
         #expect(configuration.httpShouldSetCookies == false)
         #expect(configuration.httpCookieAcceptPolicy == .never)
     }
+
+    /// Every refresh repeats the same URL (the API month's bounds change
+    /// once a month), so a cached response would pass for a fresh one.
+    @Test func urlSessionClientNeverAnswersFromACache() {
+        let configuration = URLSessionHTTPClient().configuration
+
+        #expect(configuration.urlCache == nil)
+        #expect(configuration.requestCachePolicy == .reloadIgnoringLocalCacheData)
+    }
 }

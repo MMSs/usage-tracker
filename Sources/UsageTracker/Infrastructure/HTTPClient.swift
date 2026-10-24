@@ -24,6 +24,9 @@ final class URLSessionHTTPClient: HTTPClient {
         configuration.httpCookieStorage = nil
         configuration.httpShouldSetCookies = false
         configuration.httpCookieAcceptPolicy = .never
+        // A refresh must reach the server; usage changes behind a URL that does not.
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
         session = URLSession(configuration: configuration)
     }
 
