@@ -21,6 +21,12 @@ scripts/install-app.sh
 open "/Applications/Usage Tracker.app"
 ```
 
+If an Apple Development certificate is in your Keychain, the build script
+signs the app with it. Without one the app is unsigned and macOS asks for your
+Keychain password once after every rebuild, because each unsigned build looks
+like a new app. Set `USAGE_TRACKER_SIGNING_IDENTITY` to pick a specific
+identity.
+
 Use the script rather than copying the bundle by hand. Copying over a copy that
 is already installed leaves LaunchServices holding a stale record for the path,
 and every later launch fails with `Launchd job spawn failed`.
