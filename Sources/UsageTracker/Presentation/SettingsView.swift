@@ -462,24 +462,41 @@ struct GeneralSettingsView: View {
         )
     }
 
-    /// The enabled, configured provider shown in the preview, else the first enabled one with
-    /// something to fetch; disabled providers have no item to preview.
-    static func previewProvider(from providers: [ProviderViewModel]) -> ProviderViewModel? {
-        let enabled = providers.filter(\.isEnabled)
-        return enabled.first(where: \.isConfigured) ?? enabled.first(where: \.hasAnyHalf)
+    /// The providers whose items the menu bar shows, in its order. None while
+    /// nothing is configured: the menu bar then holds only a set-up item.
+    static func previewProviders(in appModel: AppModel) -> [ProviderViewModel] {
+        guard appModel.providers.contains(where: \.isConfigured) else {
+            return []
+        }
+
+        return appModel.insertedProviders.map(appModel.provider)
     }
 
-    private var previewProvider: ProviderViewModel? {
-        Self.previewProvider(from: appModel.providers)
+    /// Each item as the menu bar draws it, with its provider's override if it has one.
+    private var previewEntries: [MenuBarPreviewStrip.Entry] {
+        Self.previewProviders(in: appModel).map { provider in
+            MenuBarPreviewStrip.Entry(
+                item: previewItem(for: provider, in: appModel)
+                    ?? MenuBarItem(provider: provider.id, subscription: .status(.loading), api: nil),
+                appearance: appModel.appearance(for: provider.id),
+                displayName: provider.descriptor.displayName
+            )
+        }
+    }
+
+    /// Disabled providers have no item to preview.
+    private var placeholder: String {
+        appModel.providers.contains { $0.isEnabled && $0.hasAnyHalf } ? "No data yet" : "No provider enabled"
     }
 
     var body: some View {
+        let entries = previewEntries
+
         VStack(alignment: .leading, spacing: 16) {
             MenuBarPreviewStrip(
-                item: previewProvider.flatMap { previewItem(for: $0, in: appModel) },
-                appearance: appearance.wrappedValue,
-                displayName: previewProvider?.descriptor.displayName ?? "",
-                placeholder: previewProvider == nil ? "No provider enabled" : "No data yet"
+                entries: entries,
+                caption: entries.count > 1 ? "How the items look in the menu bar." : "How the item looks in the menu bar.",
+                placeholder: placeholder
             )
 
             SettingsSection(title: "Menu bar") {

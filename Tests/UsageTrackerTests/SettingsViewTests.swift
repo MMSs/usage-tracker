@@ -98,24 +98,58 @@ import Testing
         #expect(selection.tabs[.anthropic] == .menuBar)
     }
 
-    @Test func generalPreviewSkipsDisabledProviders() {
+    private func makeModel(configured: [CredentialKey]) -> AppModel {
         let credentials = MemoryCredentialStore()
-        credentials.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "secret"
+        for key in configured {
+            credentials.values[key] = "secret"
+        }
         let providers = ProviderRegistry.all.map { descriptor in
             ProviderViewModel(
                 descriptor: descriptor,
                 subscriptionFetcher: StubReportFetcher(result: .success(makeReport(1))),
-                apiFetcher: nil,
+                apiFetcher: StubReportFetcher(result: .success(makeReport(2))),
                 credentialStore: credentials, cache: MemoryReportCache()
             )
         }
 
-        #expect(GeneralSettingsView.previewProvider(from: providers)?.id == .cursor)
+        return AppModel(
+            providers: providers,
+            credentialStore: credentials,
+            providerSettingsStore: MemoryProviderSettingsStore(),
+            appearanceStore: MemoryMenuBarAppearanceStore(),
+            budgetStore: MemoryAPIBudgetStore(),
+            loginItem: .stub(),
+            sleepObserver: ControllableSleepObserver(),
+            networkObserver: ControllableNetworkObserver()
+        )
+    }
 
-        providers[0].isEnabled = false
-        #expect(GeneralSettingsView.previewProvider(from: providers)?.id == .anthropic)
+    @Test func generalPreviewShowsEveryEnabledConfiguredProviderInMenuBarOrder() {
+        let model = makeModel(configured: [
+            CredentialKey(provider: .openai, fieldID: "admin-key"),
+            CredentialKey(provider: .cursor, fieldID: "session-token"),
+        ])
 
-        providers.forEach { $0.isEnabled = false }
-        #expect(GeneralSettingsView.previewProvider(from: providers) == nil)
+        #expect(GeneralSettingsView.previewProviders(in: model).map(\.id) == [.cursor, .openai])
+
+        model.provider(.cursor).isEnabled = false
+        #expect(GeneralSettingsView.previewProviders(in: model).map(\.id) == [.openai])
+
+        model.providers.forEach { $0.isEnabled = false }
+        #expect(GeneralSettingsView.previewProviders(in: model).isEmpty)
+    }
+
+    @Test func generalPreviewIsEmptyWhenNothingIsConfigured() {
+        let model = makeModel(configured: [])
+
+        #expect(model.insertedProviders == [.cursor], "the menu bar keeps a set-up item")
+        #expect(GeneralSettingsView.previewProviders(in: model).isEmpty)
+    }
+
+    @Test func previewItemsScaleDownTogetherOnlyWhenTheyOverflow() {
+        #expect(MenuBarPreviewStrip.scale(widths: [100, 80], spacing: 10, available: 400) == 1)
+        #expect(MenuBarPreviewStrip.scale(widths: [100, 80], spacing: 10, available: 190) == 1)
+        #expect(MenuBarPreviewStrip.scale(widths: [190, 190], spacing: 20, available: 200) == 0.5)
+        #expect(MenuBarPreviewStrip.scale(widths: [], spacing: 10, available: 100) == 1)
     }
 }
