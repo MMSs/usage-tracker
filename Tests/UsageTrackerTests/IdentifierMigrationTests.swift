@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import UsageTracker
 
@@ -99,10 +100,88 @@ import Testing
         old.failsRemovals = true
 
         withDomains { oldDefaults, oldDomain, newDefaults in
+            let migration = migration(old: old, new: new, oldDefaults: oldDefaults, oldDomain: oldDomain, newDefaults: newDefaults)
+            migration.run()
+            #expect(new.values == [cursorToken: "c"])
+            #expect(old.base.values == [cursorToken: "c"])
+            #expect(!newDefaults.bool(forKey: IdentifierMigration.completedKey))
+
+            // The copy is already in place, so the next launch has nothing left to do.
+            migration.run()
+            #expect(newDefaults.bool(forKey: IdentifierMigration.completedKey))
+        }
+    }
+
+    @Test func anExistingNewItemIsNeverReadFromTheOldStore() {
+        let old = FailingCredentialStore()
+        let new = MemoryCredentialStore()
+        old.base.values = [cursorToken: "old"]
+        old.secretReadError = KeychainCredentialStoreError.unexpectedStatus(errSecAuthFailed)
+        new.values = [cursorToken: "new"]
+
+        withDomains { oldDefaults, oldDomain, newDefaults in
+            migration(old: old, new: new, oldDefaults: oldDefaults, oldDomain: oldDomain, newDefaults: newDefaults).run()
+            #expect(newDefaults.bool(forKey: IdentifierMigration.completedKey))
+        }
+
+        #expect(old.secretReads == 0)
+        #expect(new.values == [cursorToken: "new"])
+    }
+
+    @Test func aMissingOldItemIsNeverReadEither() {
+        let old = FailingCredentialStore()
+        let new = MemoryCredentialStore()
+
+        withDomains { oldDefaults, oldDomain, newDefaults in
             migration(old: old, new: new, oldDefaults: oldDefaults, oldDomain: oldDomain, newDefaults: newDefaults).run()
         }
 
-        #expect(new.values == [cursorToken: "c"])
+        #expect(old.secretReads == 0)
+    }
+
+    @Test(arguments: [
+        KeychainCredentialStoreError.unexpectedStatus(errSecAuthFailed),
+        KeychainCredentialStoreError.unexpectedStatus(errSecUserCanceled),
+        KeychainCredentialStoreError.invalidValue,
+    ])
+    func aDeniedOrUnreadableOldItemIsNotRetried(error: KeychainCredentialStoreError) {
+        let old = FailingCredentialStore()
+        let new = MemoryCredentialStore()
+        old.base.values = [cursorToken: "c"]
+        old.secretReadError = error
+
+        withDomains { oldDefaults, oldDomain, newDefaults in
+            migration(old: old, new: new, oldDefaults: oldDefaults, oldDomain: oldDomain, newDefaults: newDefaults).run()
+            #expect(newDefaults.bool(forKey: IdentifierMigration.completedKey))
+        }
+
+        #expect(new.values.isEmpty)
+        #expect(old.base.values == [cursorToken: "c"])
+        #expect(old.secretReads == 1)
+    }
+
+    @Test func aTemporaryKeychainFailureRetriesForAFewLaunchesThenGivesUp() {
+        let old = FailingCredentialStore()
+        let new = MemoryCredentialStore()
+        old.base.values = [cursorToken: "c"]
+        old.secretReadError = KeychainCredentialStoreError.unexpectedStatus(errSecInteractionNotAllowed)
+
+        withDomains { oldDefaults, oldDomain, newDefaults in
+            let migration = migration(old: old, new: new, oldDefaults: oldDefaults, oldDomain: oldDomain, newDefaults: newDefaults)
+
+            for _ in 1..<IdentifierMigration.maxAttempts {
+                migration.run()
+                #expect(!newDefaults.bool(forKey: IdentifierMigration.completedKey))
+            }
+
+            migration.run()
+            #expect(newDefaults.bool(forKey: IdentifierMigration.completedKey))
+
+            migration.run()
+            #expect(old.secretReads == IdentifierMigration.maxAttempts)
+        }
+
+        #expect(new.values.isEmpty)
         #expect(old.base.values == [cursorToken: "c"])
     }
 
@@ -128,6 +207,7 @@ import Testing
             oldDefaults.set("1", forKey: "NSStatusItem Visible Item-0")
             oldDefaults.set("0 0 10 10", forKey: "NSWindow Frame Settings")
             oldDefaults.set(2, forKey: "AppleExampleSetting")
+            oldDefaults.set("x", forKey: "com.apple.example")
 
             migration(
                 old: MemoryCredentialStore(), new: MemoryCredentialStore(),
@@ -139,6 +219,7 @@ import Testing
             #expect(newDefaults.object(forKey: "NSStatusItem Visible Item-0") == nil)
             #expect(newDefaults.object(forKey: "NSWindow Frame Settings") == nil)
             #expect(newDefaults.object(forKey: "AppleExampleSetting") == nil)
+            #expect(newDefaults.object(forKey: "com.apple.example") == nil)
             #expect(oldDefaults.persistentDomain(forName: oldDomain)?.isEmpty ?? true)
         }
     }

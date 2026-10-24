@@ -8,8 +8,15 @@ final class FailingCredentialStore: CredentialStoring {
     var failsReads = false
     var failsWrites = false
     var failsRemovals = false
+    /// When set, only `credential(for:)` throws it, as when a Keychain prompt is denied.
+    var secretReadError: Error?
+    private(set) var secretReads = 0
 
     func credential(for key: CredentialKey) throws -> String? {
+        secretReads += 1
+        if let secretReadError {
+            throw secretReadError
+        }
         if failsReads {
             throw Failure()
         }
