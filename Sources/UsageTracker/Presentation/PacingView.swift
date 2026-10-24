@@ -7,15 +7,6 @@ struct PacingView: View {
 
     private var tint: PacingTint { PacingTint.forPacing(pacing) }
 
-    private var projectedText: String {
-        guard let projected = pacing.projectedSpend else {
-            return "—"
-        }
-
-        let lastDay = Calendar.current.date(byAdding: .day, value: -1, to: periodEnd) ?? periodEnd
-        return "\(unit.format(projected)) by \(PopoverPresentation.dayMonth(lastDay))"
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -36,15 +27,20 @@ struct PacingView: View {
                     .foregroundStyle(.secondary)
             }
 
-            HStack(spacing: 6) {
-                tile("Daily budget", unit.format(pacing.todayBudget))
-                tile("Left for today", unit.format(pacing.leftForToday))
-                tile("Projected", projectedText)
+            HStack(alignment: .top, spacing: 6) {
+                tile("Daily budget", unit.format(pacing.todayBudget), caption: nil)
+                tile("Left for today", unit.format(pacing.leftForToday), caption: nil)
+                tile(
+                    "Projected", PopoverPresentation.projectedValue(pacing, unit: unit),
+                    caption: PopoverPresentation.projectedCaption(pacing, periodEnd: periodEnd)
+                )
             }
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
-    private func tile(_ title: String, _ value: String) -> some View {
+    /// Every tile reserves the caption line so the three stay the same height.
+    private func tile(_ title: String, _ value: String, caption: String?) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(title)
                 .font(.caption)
@@ -53,10 +49,15 @@ struct PacingView: View {
                 .minimumScaleFactor(0.8)
             Text(value)
                 .font(.callout.monospacedDigit())
-                .lineLimit(2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+            Text(caption ?? "\u{00A0}")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding(10)
         .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)

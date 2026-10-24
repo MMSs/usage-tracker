@@ -119,6 +119,24 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(PopoverPresentation.headerSubtitle(cycle: nil, planName: nil, calendar: calendar) == nil)
     }
 
+    @Test func projectedTileSplitsAmountFromTheLastDay() {
+        let projected = Pacing(
+            totalDays: 30, elapsedDays: 12, remainingDays: 18,
+            spent: 120, idealSpend: 120, status: .onTrack(by: 0), todayBudget: 10, leftForToday: 5,
+            projectedSpend: Decimal(string: "0.01")!, tickFraction: 0.4, fillFraction: 0.3
+        )
+
+        #expect(PopoverPresentation.projectedValue(projected, unit: .dollars) == "$0.01")
+        #expect(PopoverPresentation.projectedCaption(projected, periodEnd: date(11, 1), calendar: calendar) == "by 31 Oct")
+    }
+
+    @Test func projectedTileWithoutAProjectionIsADashWithNoCaption() {
+        let none = pacing(status: .onTrack(by: 0))
+
+        #expect(PopoverPresentation.projectedValue(none, unit: .dollars) == "—")
+        #expect(PopoverPresentation.projectedCaption(none, periodEnd: date(11, 1), calendar: calendar) == nil)
+    }
+
     @Test func rowPacingFallsBackToRemainingTint() {
         let window = LimitWindow(id: "weekly", label: "Weekly", percentUsed: 85, resetsAt: date(10, 27), parentID: nil)
         let result = PopoverPresentation.rowPacing(window: window, now: date(10, 24))

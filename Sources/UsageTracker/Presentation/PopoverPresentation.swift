@@ -87,6 +87,21 @@ enum PopoverPresentation {
         (TimePacing.idealFraction(for: window, now: now), PacingTint.forWindow(window, now: now))
     }
 
+    /// The Projected tile's value: the amount alone, or a dash when there is no projection.
+    static func projectedValue(_ pacing: Pacing, unit: BudgetUnit) -> String {
+        pacing.projectedSpend.map(unit.format) ?? "—"
+    }
+
+    /// The Projected tile's caption, "by 31 Oct" (the end is exclusive, so it names the last day); nil with no projection.
+    static func projectedCaption(_ pacing: Pacing, periodEnd: Date, calendar: Calendar = .current) -> String? {
+        guard pacing.projectedSpend != nil else {
+            return nil
+        }
+
+        let lastDay = calendar.date(byAdding: .day, value: -1, to: periodEnd) ?? periodEnd
+        return "by " + dayMonth(lastDay, calendar: calendar)
+    }
+
     static func daysLeftText(_ pacing: Pacing) -> String {
         pacing.remainingDays == 1 ? "1 day left" : "\(pacing.remainingDays) days left"
     }
