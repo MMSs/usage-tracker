@@ -4,9 +4,17 @@ import os
 /// Unified log channels. Read them with
 /// `log stream --predicate 'subsystem == "com.mohabsam.usage-tracker"' --level debug`.
 ///
+/// Only the bundled app logs into that subsystem. A test run or an unbundled
+/// binary has no bundle identifier of its own, so it logs into a separate
+/// `.unbundled` subsystem and never mixes into the app's log.
+///
 /// Never log credentials, cookies, headers, query strings, or bodies.
 enum Log {
-    static let subsystem = AppIdentity.bundleID
+    static let subsystem = subsystem(forBundleIdentifier: Bundle.main.bundleIdentifier)
+
+    static func subsystem(forBundleIdentifier bundleIdentifier: String?) -> String {
+        bundleIdentifier == AppIdentity.bundleID ? AppIdentity.bundleID : AppIdentity.bundleID + ".unbundled"
+    }
 
     static let refresh = Logger(subsystem: subsystem, category: "refresh")
     static let http = Logger(subsystem: subsystem, category: "http")

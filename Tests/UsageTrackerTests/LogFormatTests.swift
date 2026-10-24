@@ -3,6 +3,16 @@ import Testing
 @testable import UsageTracker
 
 @Suite struct LogFormatTests {
+    @Test func onlyTheBundledAppLogsIntoItsOwnSubsystem() {
+        #expect(Log.subsystem(forBundleIdentifier: AppIdentity.bundleID) == "com.mohabsam.usage-tracker")
+        #expect(Log.subsystem(forBundleIdentifier: nil) == "com.mohabsam.usage-tracker.unbundled")
+        #expect(Log.subsystem(forBundleIdentifier: "com.apple.dt.xctest.tool") == "com.mohabsam.usage-tracker.unbundled")
+    }
+
+    @Test func testRunsLogOutsideTheAppSubsystem() {
+        #expect(Log.subsystem != AppIdentity.bundleID)
+    }
+
     @Test func endpointDropsTheQueryAndRedactsUUIDs() {
         let url = URL(string: "https://claude.ai/api/organizations/0F1E2D3C-4B5A-6978-8A9B-0C1D2E3F4A5B/usage?token=abc")!
         #expect(LogFormat.endpoint(url) == "claude.ai/api/organizations/{uuid}/usage")
