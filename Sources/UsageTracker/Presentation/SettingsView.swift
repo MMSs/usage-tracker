@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Sidebar selection shared between the window controller, which applies
-/// requests, and the view, which the user navigates.
+/// Which page is showing and whether a provider's first credential help
+/// starts open. Shared between the window controller and the pages.
 @MainActor
 final class SettingsSelection: ObservableObject {
     @Published var page: SettingsPage = .general
@@ -14,78 +14,60 @@ final class SettingsSelection: ObservableObject {
     }
 }
 
-struct SettingsView: View {
-    @ObservedObject var appModel: AppModel
-    @ObservedObject var selection: SettingsSelection
-
+enum SettingsHelp {
     /// The field whose help starts open: the requested provider's first field.
-    static func helpFieldID(for descriptor: ProviderDescriptor, helpProvider: Provider?) -> String? {
+    static func fieldID(for descriptor: ProviderDescriptor, helpProvider: Provider?) -> String? {
         guard descriptor.id == helpProvider else {
             return nil
         }
 
         return (descriptor.subscriptionFields + descriptor.apiFields).first?.id
     }
+}
 
-    /// Providers with nothing to fetch yet are left out, so no credential is stored unused.
-    private var listedProviders: [ProviderViewModel] {
-        appModel.providers.filter(\.hasAnyHalf)
-    }
+enum SettingsLayout {
+    static let pageWidth: CGFloat = 460
+    static let padding: CGFloat = 20
+}
 
-    private var pageBinding: Binding<SettingsPage?> {
-        Binding(
-            get: { selection.page },
-            set: { newValue in
-                if let newValue {
-                    selection.page = newValue
-                }
-            }
-        )
-    }
+/// A titled group of rows on a soft card, the way the popover laid out its settings.
+struct SettingsSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: () -> Content
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: pageBinding) {
-                Label("General", systemImage: "gearshape")
-                    .tag(SettingsPage.general)
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
 
-                Section("Providers") {
-                    ForEach(listedProviders) { provider in
-                        Label {
-                            Text(provider.descriptor.displayName)
-                        } icon: {
-                            ProviderGlyph(provider: provider.id)
-                                .fill(.primary)
-                                .frame(width: 14, height: 14)
-                        }
-                        .tag(SettingsPage.provider(provider.id))
-                    }
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 150, ideal: 170, max: 220)
-        } detail: {
-            switch selection.page {
-            case .general:
-                GeneralSettingsView(appModel: appModel)
-                    .navigationTitle("General")
-            case .provider(let id):
-                let provider = appModel.provider(id)
-                ProviderSettingsView(
-                    provider: provider,
-                    appModel: appModel,
-                    helpFieldID: Self.helpFieldID(for: provider.descriptor, helpProvider: selection.helpProvider)
+            VStack(alignment: .leading, spacing: 0, content: content)
+                .padding(.horizontal, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.primary.opacity(0.04))
                 )
-                .navigationTitle(provider.descriptor.displayName)
-                // Providers share field ids (admin-key, api-budget); a fresh identity per page keeps their state apart.
-                .id(id)
-            }
         }
-        .frame(minWidth: 580, minHeight: 400)
-        .onChange(of: selection.page) { _, page in
-            if case .provider(let id) = page, id == selection.helpProvider {
-                return
+    }
+}
+
+/// One labelled row inside a section; rows are separated by hairlines.
+struct SettingsRow<Control: View>: View {
+    let label: String
+    var isLast = false
+    @ViewBuilder let control: () -> Control
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(label)
+                Spacer(minLength: 12)
+                control()
             }
-            selection.helpProvider = nil
+            .frame(minHeight: 34)
+
+            if !isLast {
+                Divider()
+            }
         }
     }
 }
@@ -105,18 +87,17 @@ struct ProviderSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                ProviderStatusHeader(
-                    provider: provider.id,
-                    displayName: provider.descriptor.displayName,
-                    status: status,
-                    updatedText: provider.isConfigured ? PopoverPresentation.updatedText(provider.updatedAt) : nil
-                )
-            }
+        VStack(alignment: .leading, spacing: 16) {
+            ProviderStatusHeader(
+                provider: provider.id,
+                displayName: provider.descriptor.displayName,
+                status: status,
+                updatedText: provider.isConfigured ? PopoverPresentation.updatedText(provider.updatedAt) : nil
+            )
 
-            Section {
-                ForEach(provider.descriptor.subscriptionFields + provider.descriptor.apiFields) { field in
+            SettingsSection(title: "Credentials") {
+                let fields = provider.descriptor.subscriptionFields + provider.descriptor.apiFields
+                ForEach(fields) { field in
                     CredentialFieldView(
                         field: field,
                         key: CredentialKey(provider: provider.id, fieldID: field.id),
@@ -125,17 +106,21 @@ struct ProviderSettingsView: View {
                         opensHelp: field.id == helpFieldID,
                         onChange: { await appModel.provider(provider.id).credentialsChanged(half: field.half) }
                     )
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 12)
+
+                    if field.id != fields.last?.id {
+                        Divider()
+                    }
                 }
-            } header: {
-                Text("Credentials")
-            } footer: {
-                Text("Stored only in your login Keychain. Nothing leaves this Mac.")
             }
+
+            Text("Stored only in your login Keychain. Nothing leaves this Mac.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
-        .formStyle(.grouped)
-        // The detail toolbar region reaches about 106pt; content must start below it.
-        .contentMargins(.top, 44, for: .scrollContent)
+        .padding(SettingsLayout.padding)
+        .frame(width: SettingsLayout.pageWidth)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 
@@ -152,58 +137,74 @@ struct GeneralSettingsView: View {
     }
 
     var body: some View {
-        Form {
-            Section {
-                MenuBarPreviewStrip(item: previewItem, appearance: appearance, displayName: previewProvider?.descriptor.displayName ?? "")
-            }
+        VStack(alignment: .leading, spacing: 16) {
+            MenuBarPreviewStrip(item: previewItem, appearance: appearance, displayName: previewProvider?.descriptor.displayName ?? "")
 
-            Section {
-                Toggle("Show text", isOn: binding(\.showText) { $0.showingText($1) })
-                    .disabled(appearance.showText && !appearance.showGraph)
-                Toggle("Countdown", isOn: binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
-                Toggle("Show graph", isOn: binding(\.showGraph) { $0.showingGraph($1) })
-                    .disabled(appearance.showGraph && !appearance.showText)
-
-                Picker("Graph style", selection: binding(\.graphStyle) { var copy = $0; copy.graphStyle = $1; return copy }) {
-                    ForEach(MenuBarGraphStyle.allCases) { style in
-                        Text(style.title).tag(style)
-                    }
+            SettingsSection(title: "Menu bar") {
+                SettingsRow(label: "Show text") {
+                    switchToggle(binding(\.showText) { $0.showingText($1) })
+                        .disabled(appearance.showText && !appearance.showGraph)
                 }
-                .pickerStyle(.segmented)
-
-                Toggle("Colored", isOn: binding(\.colored) { var copy = $0; copy.colored = $1; return copy })
-            } header: {
-                Text("Menu bar")
-            } footer: {
-                Text("Colored tints the text and graph by remaining capacity or pacing.")
-            }
-
-            Section {
-                Picker("Every", selection: Binding(
-                    get: { interval },
-                    set: { newValue in
-                        interval = newValue
-                        appModel.setInterval(newValue)
-                    }
-                )) {
-                    ForEach(RefreshInterval.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
+                SettingsRow(label: "Countdown") {
+                    switchToggle(binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
                 }
-                .pickerStyle(.segmented)
-            } header: {
-                Text("Refresh")
-            } footer: {
-                Text("Refreshing pauses while the Mac is asleep or offline.")
+                SettingsRow(label: "Show graph") {
+                    switchToggle(binding(\.showGraph) { $0.showingGraph($1) })
+                        .disabled(appearance.showGraph && !appearance.showText)
+                }
+                SettingsRow(label: "Graph style") {
+                    Picker("Graph style", selection: binding(\.graphStyle) { var copy = $0; copy.graphStyle = $1; return copy }) {
+                        ForEach(MenuBarGraphStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                SettingsRow(label: "Colored", isLast: true) {
+                    switchToggle(binding(\.colored) { var copy = $0; copy.colored = $1; return copy })
+                }
             }
+
+            SettingsSection(title: "Refresh") {
+                SettingsRow(label: "Every", isLast: true) {
+                    Picker("Every", selection: Binding(
+                        get: { interval },
+                        set: { newValue in
+                            interval = newValue
+                            appModel.setInterval(newValue)
+                        }
+                    )) {
+                        ForEach(RefreshInterval.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
+                }
+            }
+
+            Text("Refreshing pauses while the Mac is asleep or offline. Colored tints the item by remaining capacity or pacing.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .formStyle(.grouped)
-        // The detail toolbar region reaches about 106pt; content must start below it.
-        .contentMargins(.top, 44, for: .scrollContent)
+        .padding(SettingsLayout.padding)
+        .frame(width: SettingsLayout.pageWidth)
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear {
             appearance = appModel.appearanceStore.appearance()
             interval = appModel.intervalStore.interval()
         }
+    }
+
+    private func switchToggle(_ isOn: Binding<Bool>) -> some View {
+        Toggle("", isOn: isOn)
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
     }
 
     /// The configured provider shown in the preview, else the first listed one.

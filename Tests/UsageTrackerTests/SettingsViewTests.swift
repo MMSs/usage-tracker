@@ -17,10 +17,10 @@ import Testing
         let cursor = ProviderRegistry.descriptor(for: .cursor)
         let anthropic = ProviderRegistry.descriptor(for: .anthropic)
 
-        #expect(SettingsView.helpFieldID(for: cursor, helpProvider: .cursor) == "session-token")
-        #expect(SettingsView.helpFieldID(for: anthropic, helpProvider: .anthropic) == "session-key")
-        #expect(SettingsView.helpFieldID(for: cursor, helpProvider: nil) == nil)
-        #expect(SettingsView.helpFieldID(for: anthropic, helpProvider: .cursor) == nil)
+        #expect(SettingsHelp.fieldID(for: cursor, helpProvider: .cursor) == "session-token")
+        #expect(SettingsHelp.fieldID(for: anthropic, helpProvider: .anthropic) == "session-key")
+        #expect(SettingsHelp.fieldID(for: cursor, helpProvider: nil) == nil)
+        #expect(SettingsHelp.fieldID(for: anthropic, helpProvider: .cursor) == nil)
     }
 
     @Test func selectionAppliesRequestsAndDropsHelpWhenLeavingThePage() {

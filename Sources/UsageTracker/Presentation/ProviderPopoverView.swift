@@ -5,6 +5,7 @@ struct ProviderPopoverView: View {
     @ObservedObject var provider: ProviderViewModel
     let appModel: AppModel
     @State private var escapeMonitor = EscapeMonitorState()
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         reportPage
@@ -312,20 +313,25 @@ struct ProviderPopoverView: View {
 
     /// Settings lives in its own window, so the popover closes to make way for it.
     private func openSettings(opensHelp: Bool) {
-        MenuBarPopover.dismiss()
+        closePopover()
         appModel.presentSettings(SettingsRequest(provider: provider.id, opensHelp: opensHelp))
+    }
+
+    /// The environment action closes a MenuBarExtra window; the status item click is the fallback.
+    private func closePopover() {
+        dismiss()
+        MenuBarPopover.dismiss()
     }
 
     /// Escape closes the popover.
     private func installEscapeMonitor() {
         removeEscapeMonitor()
         let state = escapeMonitor
+        let close = closePopover
         state.monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             guard event.window === state.window, event.keyCode == 53 else { return event }
 
-            DispatchQueue.main.async {
-                MenuBarPopover.dismiss()
-            }
+            DispatchQueue.main.async(execute: close)
             return nil
         }
     }

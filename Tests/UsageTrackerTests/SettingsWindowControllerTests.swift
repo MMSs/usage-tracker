@@ -43,7 +43,8 @@ import Testing
         #expect(window.isVisible)
         #expect(dock.visibility == [true])
         #expect(dock.activations == 1)
-        #expect(window.frame.width >= 640 && window.frame.height >= 440, "frame \(window.frame)")
+        #expect(abs(window.contentRect(forFrameRect: window.frame).width - SettingsLayout.pageWidth) < 1, "frame \(window.frame)")
+        #expect(controller.pages == [.general, .provider(.cursor)])
         #expect(controller.selection.page == .provider(.cursor))
         #expect(controller.selection.helpProvider == .cursor)
 
