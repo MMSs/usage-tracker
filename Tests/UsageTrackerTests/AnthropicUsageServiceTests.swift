@@ -94,6 +94,18 @@ struct AnthropicUsageServiceTests {
         #expect(count(client, suffix: "/usage") == 2)
     }
 
+    @Test func changingTheSessionKeyResolvesTheOrganizationAgain() async throws {
+        let client = RoutingHTTPClient(routes: try routes())
+        let service = AnthropicUsageService(client: client)
+
+        _ = try await service.fetchSubscription(sessionKey: "key-a")
+        _ = try await service.fetchSubscription(sessionKey: "key-b")
+        _ = try await service.fetchSubscription(sessionKey: "key-b")
+
+        #expect(count(client, suffix: "/organizations") == 2)
+        #expect(count(client, suffix: "/usage") == 3)
+    }
+
     @Test func staleOrganizationIsReResolvedAfter404() async throws {
         let first = """
         [{"uuid":"old-org","rate_limit_tier":"default_claude_pro"}]

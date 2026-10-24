@@ -16,6 +16,9 @@ final class AnthropicUsageService: AnthropicUsageFetching {
 
     private let client: HTTPClient
     private var organization: Organization?
+    /// The session key `organization` was resolved with; another key is
+    /// another account.
+    private var organizationSessionKey: String?
 
     init(client: HTTPClient = URLSessionHTTPClient()) {
         self.client = client
@@ -64,6 +67,10 @@ final class AnthropicUsageService: AnthropicUsageFetching {
     }
 
     private func resolveOrganization(sessionKey: String) async throws -> Organization {
+        if organizationSessionKey != sessionKey {
+            organization = nil
+        }
+
         if let organization {
             return organization
         }
@@ -81,6 +88,7 @@ final class AnthropicUsageService: AnthropicUsageFetching {
             planName: AnthropicPlanName.from(rateLimitTier: chosen.rateLimitTier, capabilities: chosen.capabilities)
         )
         organization = resolved
+        organizationSessionKey = sessionKey
 
         return resolved
     }
