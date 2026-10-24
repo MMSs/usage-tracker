@@ -30,6 +30,27 @@ enum SettingsLayout {
     static let padding: CGFloat = 20
 }
 
+/// Lays out one settings page at the fixed width and reports its laid-out
+/// height, so the window can follow it the moment content appears or goes.
+struct SettingsPageLayout<Content: View>: View {
+    let reportHeight: (CGFloat) -> Void
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        content()
+            .padding(SettingsLayout.padding)
+            .frame(width: SettingsLayout.pageWidth)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { proxy in
+                proxy.size.height
+            } action: { height in
+                reportHeight(height)
+            }
+            // Stays at the top while the window animates to the new height.
+            .frame(maxHeight: .infinity, alignment: .top)
+    }
+}
+
 /// A titled group of rows on a soft card, the way the popover laid out its settings.
 struct SettingsSection<Content: View>: View {
     let title: String
@@ -156,8 +177,8 @@ struct RefreshIntervalSlider: View {
 func previewItem(for provider: ProviderViewModel, in appModel: AppModel) -> MenuBarItem? {
     MenuBarItemBuilder.make(
         descriptor: provider.descriptor,
-        subscription: provider.subscription.map(HalfSnapshot.init),
-        api: provider.api.map(HalfSnapshot.init),
+        subscription: provider.snapshot(.subscription),
+        api: provider.snapshot(.api),
         apiBudget: appModel.budgetStore.budget(for: provider.id),
         now: Date()
     )
@@ -217,36 +238,30 @@ struct ProviderSettingsView: View {
                 sections
             }
         }
-        .padding(SettingsLayout.padding)
-        .frame(width: SettingsLayout.pageWidth)
-        .fixedSize(horizontal: false, vertical: true)
-        // Stays at the top while the window animates to the new height.
-        .frame(maxHeight: .infinity, alignment: .top)
+    }
+
+    private func halfEnabled(_ half: Half) -> Binding<Bool> {
+        Binding(
+            get: { settings.wrappedValue.isEnabled(half) },
+            set: { settings.wrappedValue.setEnabled($0, for: half) }
+        )
+    }
+
+    private static func title(for half: Half) -> String {
+        switch half {
+        case .subscription: "Subscription"
+        case .api: "API usage"
+        }
     }
 
     @ViewBuilder
     private var sections: some View {
         Group {
-            SettingsSection(title: "Credentials") {
-                let fields = provider.descriptor.subscriptionFields + provider.descriptor.apiFields
-                ForEach(fields) { field in
-                    CredentialFieldView(
-                        field: field,
-                        key: CredentialKey(provider: provider.id, fieldID: field.id),
-                        store: appModel.credentialStore,
-                        budgetStore: appModel.budgetStore,
-                        opensHelp: field.id == helpFieldID,
-                        onChange: { await appModel.provider(provider.id).credentialsChanged(half: field.half) }
-                    )
-                    .padding(.vertical, 12)
-
-                    if field.id != fields.last?.id {
-                        Divider()
-                    }
-                }
+            ForEach([Half.subscription, .api].filter { provider.half($0) != nil }, id: \.self) { half in
+                halfSection(half)
             }
 
-            Text("Stored only in your login Keychain. Nothing leaves this Mac.")
+            Text("Credentials are stored only in your login Keychain. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
@@ -280,6 +295,36 @@ struct ProviderSettingsView: View {
                  : "Follows the defaults on the General tab.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// One half's switch and, while it is on, its credential fields.
+    private func halfSection(_ half: Half) -> some View {
+        let enabled = halfEnabled(half)
+        let fields = half == .subscription ? provider.descriptor.subscriptionFields : provider.descriptor.apiFields
+
+        return SettingsSection(title: Self.title(for: half)) {
+            SettingsRow(label: "Enabled", isLast: !enabled.wrappedValue) {
+                SwitchToggle(isOn: enabled)
+            }
+
+            if enabled.wrappedValue {
+                ForEach(fields) { field in
+                    CredentialFieldView(
+                        field: field,
+                        key: CredentialKey(provider: provider.id, fieldID: field.id),
+                        store: appModel.credentialStore,
+                        budgetStore: appModel.budgetStore,
+                        opensHelp: field.id == helpFieldID,
+                        onChange: { await appModel.provider(provider.id).credentialsChanged(half: field.half) }
+                    )
+                    .padding(.vertical, 12)
+
+                    if field.id != fields.last?.id {
+                        Divider()
+                    }
+                }
+            }
         }
     }
 }
@@ -323,9 +368,5 @@ struct GeneralSettingsView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(SettingsLayout.padding)
-        .frame(width: SettingsLayout.pageWidth)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxHeight: .infinity, alignment: .top)
     }
 }

@@ -42,7 +42,7 @@ final class AppModel: ObservableObject {
         providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, providerSettingsStore.settings(for: $0.id)) })
 
         for provider in providers {
-            provider.isEnabled = providerSettings[provider.id]?.isEnabled ?? true
+            Self.apply(providerSettings[provider.id] ?? .default, to: provider)
         }
 
         // Forward provider changes so the menu bar scenes re-evaluate `insertedProviders`.
@@ -97,16 +97,28 @@ final class AppModel: ObservableObject {
     }
 
     func setSettings(_ settings: ProviderSettings, for id: Provider) {
-        let wasEnabled = provider(id).isEnabled
+        let provider = provider(id)
+        let wasOn = Self.enabledFlags(provider)
         providerSettings[id] = settings
         providerSettingsStore.setSettings(settings, for: id)
-        provider(id).isEnabled = settings.isEnabled
+        Self.apply(settings, to: provider)
         scheduler.setSchedule(settings.isEnabled ? settings.refreshInterval : nil, for: id)
 
-        // Turning a provider on should show data now, not after the next timer tick.
-        if settings.isEnabled, !wasEnabled {
+        // Turning something on should show data now, not after the next timer tick.
+        let turnedOn = zip(wasOn, Self.enabledFlags(provider)).contains { !$0 && $1 }
+        if settings.isEnabled, turnedOn {
             Task { await refresh(id, manual: false) }
         }
+    }
+
+    private static func apply(_ settings: ProviderSettings, to provider: ProviderViewModel) {
+        provider.isEnabled = settings.isEnabled
+        provider.subscription?.isEnabled = settings.isSubscriptionEnabled
+        provider.api?.isEnabled = settings.isAPIEnabled
+    }
+
+    private static func enabledFlags(_ provider: ProviderViewModel) -> [Bool] {
+        [provider.isEnabled, provider.subscription?.isEnabled ?? false, provider.api?.isEnabled ?? false]
     }
 
     func setGlobalAppearance(_ appearance: MenuBarAppearance) {
@@ -125,17 +137,17 @@ final class AppModel: ObservableObject {
 
     // MARK: Menu bar
 
-    /// Configured, enabled providers in registry order. When nothing is
-    /// configured, the first provider alone, so there is always an item to
-    /// click. When everything configured is disabled, nothing: the app is
-    /// reached by opening it.
+    /// Enabled providers with an enabled, configured half, in registry
+    /// order. When nothing is configured, the first provider alone, so there
+    /// is always an item to click. When everything configured is switched
+    /// off, nothing: the app is reached by opening it.
     var insertedProviders: [Provider] {
         let configured = providers.filter(\.isConfigured)
         guard !configured.isEmpty else {
             return [ProviderRegistry.all[0].id]
         }
 
-        return configured.filter(\.isEnabled).map(\.id)
+        return configured.filter { $0.isEnabled && $0.hasActiveHalf }.map(\.id)
     }
 
     func provider(_ id: Provider) -> ProviderViewModel {

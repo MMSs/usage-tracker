@@ -141,6 +141,25 @@ import Testing
         #expect(fetchers[.cursor]?.callCount == 1, "a change while already enabled does not refetch")
     }
 
+    @Test func aDisabledHalfIsNeitherShownNorFetched() async {
+        configureAll()
+        let model = makeModel()
+
+        model.setSettings(ProviderSettings(isSubscriptionEnabled: false), for: .cursor)
+        await model.refreshAll(manual: true)
+
+        #expect(model.provider(.cursor).snapshot(.subscription) == nil)
+        #expect(!model.provider(.cursor).hasActiveHalf)
+        #expect(model.insertedProviders == [.anthropic, .openai])
+        #expect(fetchers[.cursor]?.callCount == 0)
+
+        model.setSettings(ProviderSettings(isSubscriptionEnabled: true), for: .cursor)
+        await waitUntil { fetchers[.cursor]?.callCount == 1 }
+
+        #expect(model.provider(.cursor).snapshot(.subscription) != nil)
+        #expect(model.insertedProviders == [.cursor, .anthropic, .openai])
+    }
+
     @Test func disablingEveryConfiguredProviderLeavesTheMenuBarEmpty() {
         credentials.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "secret"
         let model = makeModel()

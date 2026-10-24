@@ -35,6 +35,24 @@ import Testing
         }
     }
 
+    @Test func halfFlagsRoundTripAndDefaultToOn() {
+        withDefaults { defaults in
+            let store = UserDefaultsProviderSettingsStore(defaults: defaults)
+            var settings = ProviderSettings()
+            settings.setEnabled(false, for: .api)
+
+            store.setSettings(settings, for: .anthropic)
+
+            let read = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic)
+            #expect(read.isSubscriptionEnabled && !read.isAPIEnabled)
+            #expect(!read.isEnabled(.api))
+
+            defaults.set(Data(#"{"isEnabled":true}"#.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .cursor))
+            let old = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .cursor)
+            #expect(old.isSubscriptionEnabled && old.isAPIEnabled)
+        }
+    }
+
     @Test func corruptDataReadsBackTheDefaults() {
         withDefaults { defaults in
             defaults.set(Data("nope".utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .cursor))

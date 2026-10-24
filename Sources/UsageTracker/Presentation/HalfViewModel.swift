@@ -13,6 +13,8 @@ final class HalfViewModel: ObservableObject {
     @Published private(set) var lastSuccess: Date?
     /// False after the first success this run.
     @Published private(set) var isStale: Bool = true
+    /// Off: nothing drawn, nothing fetched; the credential and last report are kept.
+    @Published var isEnabled = true
     private(set) var scheduledRetriesBlocked = false
 
     private let provider: Provider
@@ -62,7 +64,14 @@ final class HalfViewModel: ObservableObject {
         status = .loading
     }
 
+    /// Enabled and holding a credential: the half takes part in the item and the popover.
+    var isActive: Bool { isEnabled && isConfigured }
+
     func refresh(manual: Bool) async {
+        guard isEnabled else {
+            return
+        }
+
         if !manual, scheduledRetriesBlocked {
             return
         }

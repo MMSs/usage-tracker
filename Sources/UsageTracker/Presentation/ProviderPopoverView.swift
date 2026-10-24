@@ -31,11 +31,11 @@ struct ProviderPopoverView: View {
         return AnyView(VStack(alignment: .leading, spacing: 14) {
             header
 
-            if let half = provider.subscription, half.status != .unconfigured {
+            if let half = provider.subscription, half.isActive {
                 subscriptionSection(half, now: now)
             }
 
-            if let half = provider.api, half.status != .unconfigured {
+            if let half = provider.api, half.isActive {
                 apiSection(half, now: now)
             }
 

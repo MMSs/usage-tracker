@@ -15,6 +15,27 @@ final class ProviderViewModel: ObservableObject, Identifiable {
     /// False when no half can be fetched yet, so there is nothing to set up.
     var hasAnyHalf: Bool { subscription != nil || api != nil }
 
+    /// At least one enabled half holds a credential, so there is something to show.
+    var hasActiveHalf: Bool {
+        [subscription, api].contains { $0?.isActive == true }
+    }
+
+    func half(_ half: Half) -> HalfViewModel? {
+        switch half {
+        case .subscription: subscription
+        case .api: api
+        }
+    }
+
+    /// The half's state for the menu bar item; nil when the half is missing or switched off.
+    func snapshot(_ half: Half) -> HalfSnapshot? {
+        guard let model = self.half(half), model.isEnabled else {
+            return nil
+        }
+
+        return HalfSnapshot(model)
+    }
+
     private var halfObservers: [AnyCancellable] = []
 
     init(

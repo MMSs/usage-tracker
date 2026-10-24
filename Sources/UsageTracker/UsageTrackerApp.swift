@@ -30,8 +30,8 @@ struct ProviderMenuBarScene: Scene {
     private var item: MenuBarItem {
         return MenuBarItemBuilder.make(
             descriptor: provider.descriptor,
-            subscription: provider.subscription.map(HalfSnapshot.init),
-            api: provider.api.map(HalfSnapshot.init),
+            subscription: provider.snapshot(.subscription),
+            api: provider.snapshot(.api),
             apiBudget: model.budgetStore.budget(for: provider.id),
             now: Date(),
             forceSetUp: !provider.isConfigured

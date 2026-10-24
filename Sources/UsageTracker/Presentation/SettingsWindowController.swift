@@ -115,13 +115,19 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let item: NSTabViewItem
         switch page {
         case .general:
-            let host = SettingsPageController(rootView: AnyView(GeneralSettingsView(appModel: model)))
+            let host = SettingsPageController { report in
+                AnyView(SettingsPageLayout(reportHeight: report) { GeneralSettingsView(appModel: self.model) })
+            }
             host.title = "General"
             item = NSTabViewItem(viewController: host)
             item.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "General")
         case .provider(let id):
             let provider = model.provider(id)
-            let host = SettingsPageController(rootView: AnyView(ProviderSettingsPage(provider: provider, appModel: model, selection: selection)))
+            let host = SettingsPageController { report in
+                AnyView(SettingsPageLayout(reportHeight: report) {
+                    ProviderSettingsPage(provider: provider, appModel: self.model, selection: self.selection)
+                })
+            }
             host.title = provider.descriptor.displayName
             item = NSTabViewItem(viewController: host)
             item.image = ProviderGlyphImage.toolbarImage(for: id)
@@ -146,16 +152,38 @@ private struct ProviderSettingsPage: View {
     }
 }
 
-/// Hosts one page and reports its ideal size so the window can follow it.
+/// Hosts one page. The page reports its laid-out height, which the tab
+/// controller turns into the window height; `preferredContentSize` is the
+/// fallback before the first layout.
+@MainActor
 final class SettingsPageController: NSHostingController<AnyView> {
-    override init(rootView: AnyView) {
-        super.init(rootView: rootView)
+    private(set) var contentHeight: CGFloat = 0
+    var onHeightChange: ((CGFloat) -> Void)?
+
+    init(makeView: (@escaping (CGFloat) -> Void) -> AnyView) {
+        // A box lets the view's closure reach the controller created after it.
+        let box = HeightBox()
+        super.init(rootView: makeView { height in box.controller?.heightChanged(height) })
+        box.controller = self
         sizingOptions = [.preferredContentSize]
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         nil
+    }
+
+    private func heightChanged(_ height: CGFloat) {
+        guard height > 0, height != contentHeight else {
+            return
+        }
+
+        contentHeight = height
+        onHeightChange?(height)
+    }
+
+    private final class HeightBox {
+        weak var controller: SettingsPageController?
     }
 }
 
@@ -164,7 +192,6 @@ final class SettingsPageController: NSHostingController<AnyView> {
 final class SettingsTabViewController: NSTabViewController {
     private let pages: [SettingsPage]
     private let selection: SettingsSelection
-    private var sizeObservation: NSKeyValueObservation?
     /// True while the controller changes the tab itself, so the delegate does not treat it as the user's choice.
     private var isSelectingProgrammatically = false
 
@@ -216,6 +243,18 @@ final class SettingsTabViewController: NSTabViewController {
 
     /// Only a tab the user picked changes the selection; the initial load and
     /// programmatic changes do not.
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        for item in tabViewItems {
+            (item.viewController as? SettingsPageController)?.onHeightChange = { [weak self, weak item] _ in
+                guard let self, let item, self.tabViewItems.firstIndex(of: item) == self.selectedTabViewItemIndex else {
+                    return
+                }
+                self.fitWindow(animated: true)
+            }
+        }
+    }
+
     override func tabView(_ tabView: NSTabView, didSelect tabViewItem: NSTabViewItem?) {
         super.tabView(tabView, didSelect: tabViewItem)
 
@@ -230,7 +269,6 @@ final class SettingsTabViewController: NSTabViewController {
             }
         }
 
-        observeSize(of: tabViewItem?.viewController)
         fitWindow(animated: isUserChoice)
     }
 
@@ -240,7 +278,6 @@ final class SettingsTabViewController: NSTabViewController {
             self.pendingPage = nil
             apply(pendingPage)
         }
-        observeSize(of: tabViewItems[selectedTabViewItemIndex].viewController)
         fitWindow(animated: false)
     }
 
@@ -251,7 +288,10 @@ final class SettingsTabViewController: NSTabViewController {
             return
         }
 
-        let size = controller.preferredContentSize
+        var size = controller.preferredContentSize
+        if let page = controller as? SettingsPageController, page.contentHeight > 0 {
+            size = NSSize(width: SettingsLayout.pageWidth, height: page.contentHeight)
+        }
         guard size.width > 0, size.height > 0 else {
             return
         }
@@ -263,14 +303,6 @@ final class SettingsTabViewController: NSTabViewController {
         }
 
         window.setFrame(frame, display: true, animate: animated)
-    }
-
-    private func observeSize(of controller: NSViewController?) {
-        sizeObservation = controller?.observe(\.preferredContentSize, options: [.new]) { [weak self] _, _ in
-            Task { @MainActor in
-                self?.fitWindow(animated: true)
-            }
-        }
     }
 }
 
