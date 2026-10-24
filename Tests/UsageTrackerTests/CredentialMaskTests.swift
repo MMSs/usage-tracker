@@ -21,6 +21,14 @@ import Testing
         #expect(CredentialMask(value: "") == nil)
     }
 
+    @Test func whitespaceAndNewlinesAreSkipped() throws {
+        let mask = try #require(CredentialMask(value: "{\n  \"tokens\": {\"access_token\": \"abc\"}\n}\n"))
+
+        #expect(mask.prefix == "{\"toke")
+        #expect(mask.suffix == "c\"}}")
+        #expect(CredentialMask(value: " \n ") == nil)
+    }
+
     @Test func ellipsisCountFillsTheWidth() {
         #expect(CredentialMask.ellipsisCount(availableWidth: 70, ellipsisWidth: 7) == 10)
         #expect(CredentialMask.ellipsisCount(availableWidth: 69, ellipsisWidth: 7) == 9)

@@ -9,9 +9,10 @@ struct CredentialMask: Equatable, Sendable {
     let suffix: String
 
     /// Nil for an empty value. Long values show 6 and 4 characters, values
-    /// under 12 show 2 and 2, values under 6 show ellipses only.
+    /// under 12 show 2 and 2, values under 6 show ellipses only. Whitespace
+    /// is skipped so a pasted JSON file still yields one line of fragments.
     init?(value: String) {
-        let characters = Array(value)
+        let characters = value.filter { !$0.isWhitespace }
         guard !characters.isEmpty else { return nil }
 
         switch characters.count {

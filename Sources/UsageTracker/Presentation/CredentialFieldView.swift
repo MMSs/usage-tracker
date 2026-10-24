@@ -151,6 +151,11 @@ struct CredentialFieldView: View {
         .onAppear {
             loadSavedState()
         }
+        .onChange(of: opensHelp) { _, opens in
+            if opens {
+                showsHelp = true
+            }
+        }
         .onDisappear {
             commitTask?.cancel()
             commitTask = nil

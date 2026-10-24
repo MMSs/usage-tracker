@@ -22,8 +22,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
     }
 
+    /// Finder, Spotlight or the Dock icon: bring Settings forward without changing the page.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        model.presentSettings(.general)
+        settingsWindow.showKeepingSelection()
         return false
     }
 }

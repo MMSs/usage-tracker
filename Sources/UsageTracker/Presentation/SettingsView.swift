@@ -76,6 +76,8 @@ struct SettingsView: View {
                     helpFieldID: Self.helpFieldID(for: provider.descriptor, helpProvider: selection.helpProvider)
                 )
                 .navigationTitle(provider.descriptor.displayName)
+                // Providers share field ids (admin-key, api-budget); a fresh identity per page keeps their state apart.
+                .id(id)
             }
         }
         .frame(minWidth: 580, minHeight: 400)
