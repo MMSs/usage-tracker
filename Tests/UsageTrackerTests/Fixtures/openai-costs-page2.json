@@ -1,0 +1,26 @@
+{
+  "object": "page",
+  "data": [
+    {
+      "object": "bucket",
+      "start_time": 1790985600,
+      "end_time": 1791072000,
+      "results": [
+        {
+          "object": "organization.costs.result",
+          "amount": {
+            "value": 2.995,
+            "currency": "usd"
+          },
+          "line_item": null,
+          "project_id": null,
+          "api_key_id": null,
+          "quantity": null,
+          "quantity_unit": null
+        }
+      ]
+    }
+  ],
+  "has_more": false,
+  "next_page": null
+}

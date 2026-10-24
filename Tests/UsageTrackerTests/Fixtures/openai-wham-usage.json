@@ -1,0 +1,44 @@
+{
+  "plan_type": "plus",
+  "rate_limit": {
+    "allowed": true,
+    "limit_reached": false,
+    "primary_window": {
+      "used_percent": 41,
+      "limit_window_seconds": 18000,
+      "reset_after_seconds": 7800,
+      "reset_at": 1792890000
+    },
+    "secondary_window": {
+      "used_percent": 70,
+      "limit_window_seconds": 604800,
+      "reset_after_seconds": 259200,
+      "reset_at": 1793140000
+    }
+  },
+  "code_review_rate_limit": null,
+  "credits": {
+    "has_credits": true,
+    "unlimited": false,
+    "overage_limit_reached": false,
+    "balance": "12.50",
+    "approx_local_messages": [0, 0],
+    "approx_cloud_messages": [0, 0]
+  },
+  "additional_rate_limits": null,
+  "model_usage": {
+    "gpt-5-codex": {
+      "available": true
+    }
+  },
+  "spend_control": {
+    "reached": false,
+    "individual_limit": null
+  },
+  "rate_limit_reached_type": null,
+  "promo": null,
+  "rate_limit_reset_credits": null,
+  "user_id": "user-fake",
+  "account_id": "account-fake",
+  "email": "user@example.com"
+}
