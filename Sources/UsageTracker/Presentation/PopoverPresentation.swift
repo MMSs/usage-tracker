@@ -27,6 +27,24 @@ enum PopoverPresentation {
         return formatter.string(from: date)
     }
 
+    static func monthName(for date: Date, calendar: Calendar = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "LLLL"
+        return formatter.string(from: date)
+    }
+
+    /// A budget of zero or less is the same as no budget.
+    static func effectiveBudget(_ budget: Decimal?) -> Decimal? {
+        guard let budget, budget > 0 else {
+            return nil
+        }
+
+        return budget
+    }
+
     static func daysLeftText(_ pacing: Pacing) -> String {
         pacing.remainingDays == 1 ? "1 day left" : "\(pacing.remainingDays) days left"
     }

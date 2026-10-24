@@ -49,6 +49,17 @@ private func pacing(status: PacingStatus, remainingDays: Int = 18) -> Pacing {
         #expect(PopoverPresentation.halfErrorText(.unconfigured) == nil)
     }
 
+    @Test func monthNameIsEnglishWide() {
+        #expect(PopoverPresentation.monthName(for: date(10, 12), calendar: calendar) == "October")
+    }
+
+    @Test func effectiveBudgetIgnoresNonPositive() {
+        #expect(PopoverPresentation.effectiveBudget(nil) == nil)
+        #expect(PopoverPresentation.effectiveBudget(0) == nil)
+        #expect(PopoverPresentation.effectiveBudget(-5) == nil)
+        #expect(PopoverPresentation.effectiveBudget(100) == 100)
+    }
+
     @Test func headerSubtitle() {
         let cycle = CyclePeriod(start: date(10, 12), end: date(11, 11))
         #expect(PopoverPresentation.headerSubtitle(cycle: cycle, planName: "Pro", calendar: calendar) == "12 Oct → 10 Nov")

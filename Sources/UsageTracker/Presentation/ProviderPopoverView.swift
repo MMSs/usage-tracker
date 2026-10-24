@@ -179,9 +179,9 @@ struct ProviderPopoverView: View {
 
     private func apiSection(_ half: HalfViewModel, now: Date) -> some View {
         let spend = half.report?.spend
-        let month = spend.map { Self.monthName($0.period.start) }
+        let month = spend.map { PopoverPresentation.monthName(for: $0.period.start) }
         let label = month.map { "API · \($0)" } ?? "API"
-        let budget = appModel.budgetStore.budget(for: provider.id).flatMap { $0 > 0 ? $0 : nil }
+        let budget = PopoverPresentation.effectiveBudget(appModel.budgetStore.budget(for: provider.id))
 
         return sectionShell(label: label, half: half) {
             if let spend {
@@ -217,13 +217,6 @@ struct ProviderPopoverView: View {
                 }
             }
         }
-    }
-
-    private static func monthName(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "LLLL"
-        return formatter.string(from: date)
     }
 
     // MARK: Footer
