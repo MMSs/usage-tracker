@@ -284,14 +284,24 @@ enum MenuBarItemBuilder {
     private static let posix = Locale(identifier: "en_US_POSIX")
 
     static func spendText(_ amount: Decimal) -> String {
-        amount.formatted(.number.precision(.fractionLength(2)).grouping(.never).locale(posix))
+        amount.formatted(
+            .number
+                .precision(.fractionLength(2))
+                .rounded(rule: .toNearestOrAwayFromZero)
+                .grouping(.never)
+                .locale(posix)
+        )
     }
 
     /// Whole percent, with one decimal only below 10 where it still matters.
     static func percentText(_ percent: Decimal) -> String {
         let decimals = percent < 10 ? 0...1 : 0...0
         let text = percent.formatted(
-            .number.precision(.fractionLength(decimals)).grouping(.never).locale(posix)
+            .number
+                .precision(.fractionLength(decimals))
+                .rounded(rule: .toNearestOrAwayFromZero)
+                .grouping(.never)
+                .locale(posix)
         )
 
         return "\(text)%"

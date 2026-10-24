@@ -109,6 +109,16 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(list[0].text.hasSuffix("%"))
     }
 
+    @Test func menuBarMoneyRoundsHalfUp() {
+        #expect(MenuBarItemBuilder.spendText(Decimal(string: "2.985")!) == "2.99")
+        #expect(MenuBarItemBuilder.spendText(Decimal(string: "15.345")!) == "15.35")
+        #expect(MenuBarItemBuilder.spendText(Decimal(string: "0.005")!) == "0.01")
+        #expect(MenuBarItemBuilder.budgetText(Decimal(string: "2.5")!) == "3")
+        #expect(MenuBarItemBuilder.budgetText(Decimal(string: "3.5")!) == "4")
+        #expect(MenuBarItemBuilder.percentText(Decimal(string: "12.5")!) == "13%")
+        #expect(MenuBarItemBuilder.percentText(Decimal(string: "0.25")!) == "0.3%")
+    }
+
     @Test func cursorTeamPlanShowsDollarsAndTick() throws {
         let report = cursorReport(unit: .dollars, spent: Decimal(string: "73.5")!, limit: 200, todaySpend: Decimal(string: "4.2")!, percentUsed: 36.75)
         let list = meters(build(.cursor, subscription: ready(report))?.subscription)
