@@ -55,7 +55,10 @@ own half, and each half has its own Enabled switch on the tab.
   reset time. In the menu bar they appear as `S` and `W`. Sign in to
   [claude.ai](https://claude.ai) in Chrome, press Option-Command-I, open
   Application, Cookies, claude.ai, and copy the value. Signing out of claude.ai
-  in that browser invalidates the key.
+  in that browser invalidates the key. When the key belongs to more than one
+  organization, an Organization picker appears under it; plan usage is not
+  fetched until you choose one. Removing or replacing the key forgets the
+  choice.
 - Admin key: an `sk-ant-admin...` key from
   [console.anthropic.com](https://console.anthropic.com/settings/admin-keys)
   (Settings, Admin keys). It shows API spend and a daily cost chart, with an

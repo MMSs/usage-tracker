@@ -42,6 +42,9 @@ final class HalfViewModel: ObservableObject {
 
     var isConfigured: Bool { status != .unconfigured }
 
+    /// True when the credential sees more than one organization, so Settings offers the choice.
+    var offersOrganizationChoice: Bool { organizations.count > 1 }
+
     /// The chosen organization while it is still listed.
     var chosenOrganization: AccountOrganization? {
         organizations.first { $0.id == selectedOrganizationID }

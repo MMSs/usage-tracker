@@ -412,6 +412,55 @@ struct ProviderSettingsView: View {
                         Divider()
                     }
                 }
+
+                if let model = provider.half(half), model.offersOrganizationChoice {
+                    Divider()
+                    OrganizationPickerRow(half: model)
+                }
+            }
+        }
+    }
+}
+
+/// The Organization row under a half's credential while it sees several.
+/// Choosing one stores it and refreshes the half.
+struct OrganizationPickerRow: View {
+    @ObservedObject var half: HalfViewModel
+
+    private var selection: Binding<String?> {
+        Binding(
+            get: { half.chosenOrganization?.id },
+            set: { id in
+                guard let id else {
+                    return
+                }
+
+                Task { await half.selectOrganization(id) }
+            }
+        )
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SettingsRow(label: "Organization", isLast: true) {
+                Picker("Organization", selection: selection) {
+                    // Until one is chosen (or after the chosen one left the list).
+                    if half.chosenOrganization == nil {
+                        Text("Choose…").tag(String?.none)
+                    }
+
+                    ForEach(half.organizations) { organization in
+                        Text(organization.title).tag(Optional(organization.id))
+                    }
+                }
+                .labelsHidden()
+            }
+
+            if half.chosenOrganization == nil {
+                Text("\(half.half.displayName) is fetched once you choose an organization.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.bottom, 10)
             }
         }
     }

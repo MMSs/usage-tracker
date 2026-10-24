@@ -580,6 +580,7 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(model.lastFailure?.cause == .needsOrganization)
         #expect(model.organizations == two)
         #expect(model.chosenOrganization == nil)
+        #expect(model.offersOrganizationChoice)
         #expect(model.scheduledRetriesBlocked)
 
         await model.refresh(manual: false)
@@ -630,6 +631,7 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
 
         #expect(model.status == .ready)
         #expect(model.organizations == [two[0]])
+        #expect(!model.offersOrganizationChoice)
         #expect(fetcher.selectedOrganizationID == nil)
     }
 
@@ -666,6 +668,7 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         await model.selectOrganization("org-a")
 
         #expect(model.organizations.isEmpty)
+        #expect(!model.offersOrganizationChoice)
         #expect(model.status == .ready)
     }
 }
