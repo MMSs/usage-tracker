@@ -197,13 +197,7 @@ struct ProviderSettingsView: View {
     }
 
     private var status: ProviderStatus {
-        let halves = [provider.subscription, provider.api].compactMap { $0 }.filter(\.isEnabled)
-        return ProviderStatus.make(
-            configured: provider.isConfigured,
-            enabled: provider.isEnabled,
-            statuses: halves.map(\.status),
-            planName: halves.compactMap { $0.report?.planName }.first
-        )
+        ProviderStatus.make(for: provider, item: previewItem(for: provider, in: appModel))
     }
 
     private var usesCustomAppearance: Binding<Bool> {

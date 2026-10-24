@@ -54,7 +54,7 @@ struct MenuBarPreviewStrip: View {
     }
 }
 
-/// Provider glyph, name, and a one-line status with a coloured dot.
+/// Provider glyph, name, and status lines with coloured dots.
 struct ProviderStatusHeader: View {
     let provider: Provider
     let displayName: String
@@ -63,8 +63,8 @@ struct ProviderStatusHeader: View {
     /// Nil hides the switch (previews, unconfigured providers).
     var isEnabled: Binding<Bool>? = nil
 
-    private var dotColor: Color {
-        switch status.tone {
+    private func dotColor(_ tone: ProviderStatus.Tone) -> Color {
+        switch tone {
         case .neutral: .secondary
         case .good: .green
         case .warning: .orange
@@ -87,14 +87,19 @@ struct ProviderStatusHeader: View {
                 Text(displayName)
                     .font(.title3.weight(.semibold))
 
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(dotColor)
-                        .frame(width: 7, height: 7)
-                    Text(status.text)
-                        .foregroundStyle(.secondary)
+                ForEach(Array(status.lines.enumerated()), id: \.offset) { _, line in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Circle()
+                            .fill(dotColor(line.tone))
+                            .frame(width: 7, height: 7)
+                            // Centres the dot on the first line of wrapped text.
+                            .alignmentGuide(.firstTextBaseline) { $0[.bottom] - 1 }
+                        Text(line.text)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .font(.callout)
                 }
-                .font(.callout)
             }
 
             Spacer(minLength: 0)
@@ -138,6 +143,16 @@ struct ProviderStatusHeader: View {
     VStack(spacing: 16) {
         ProviderStatusHeader(provider: .cursor, displayName: "Cursor", status: ProviderStatus(text: "Connected · Pro", tone: .good), updatedText: "Updated 14:31", isEnabled: .constant(true))
         ProviderStatusHeader(provider: .anthropic, displayName: "Anthropic", status: ProviderStatus(text: "Not set up", tone: .neutral), updatedText: nil)
+        ProviderStatusHeader(
+            provider: .anthropic,
+            displayName: "Anthropic",
+            status: ProviderStatus(lines: [
+                .init(text: "Plan usage: claude.ai asked for a browser check. Open claude.ai in your browser, then Refresh.", tone: .warning),
+                .init(text: "API spend: Anthropic API returned an error (HTTP 429). It retries automatically.", tone: .warning),
+            ]),
+            updatedText: "Updated 14:31",
+            isEnabled: .constant(true)
+        )
     }
     .padding()
     .frame(width: 440)
