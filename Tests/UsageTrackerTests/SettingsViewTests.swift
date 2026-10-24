@@ -148,9 +148,20 @@ import Testing
     }
 
     @Test func previewItemsScaleDownTogetherOnlyWhenTheyOverflow() {
-        #expect(MenuBarPreviewStrip.scale(widths: [100, 80], spacing: 10, available: 400) == 1)
-        #expect(MenuBarPreviewStrip.scale(widths: [100, 80], spacing: 10, available: 190) == 1)
-        #expect(MenuBarPreviewStrip.scale(widths: [190, 190], spacing: 20, available: 200) == 0.5)
-        #expect(MenuBarPreviewStrip.scale(widths: [], spacing: 10, available: 100) == 1)
+        let fit = MenuBarPreviewStrip.fit
+
+        #expect(fit([100, 80], 10, 400) == .init(scale: 1, hidden: 0))
+        #expect(fit([100, 80], 10, 190) == .init(scale: 1, hidden: 0))
+        #expect(fit([90, 90], 20, 160) == .init(scale: 0.8, hidden: 0))
+        #expect(fit([], 10, 100) == .init(scale: 1, hidden: 0))
+    }
+
+    @Test func previewItemsBelowTheMinimumScaleDropFromTheLeft() {
+        let fit = MenuBarPreviewStrip.fit
+
+        // 100 + 10 + 100 + 10 + 100 = 320; at 0.7 that is 224, too wide for 200.
+        #expect(fit([100, 100, 100], 10, 200) == .init(scale: 0.7, hidden: 1))
+        // At 0.7 the last item alone is 140; nothing fits in 100.
+        #expect(fit([100, 200], 10, 100) == .init(scale: 0.7, hidden: 2))
     }
 }

@@ -2,7 +2,9 @@ import SwiftUI
 
 /// A strip styled like the menu bar, showing items at their real size next
 /// to a sample clock so appearance changes can be judged in context. Items
-/// too wide for the strip shrink together, keeping their proportions.
+/// too wide for the strip shrink together, keeping their proportions, down to
+/// `minimumScale`; past that the leftmost items are left out, as the menu bar
+/// itself drops items that run out of room.
 struct MenuBarPreviewStrip: View {
     struct Entry: Identifiable {
         let item: MenuBarItem
@@ -40,15 +42,36 @@ struct MenuBarPreviewStrip: View {
     }
 
     nonisolated static let itemSpacing: CGFloat = 12
+    /// Smaller than this the items are too small to judge.
+    nonisolated static let minimumScale: CGFloat = 0.7
 
-    /// The factor that fits items of `widths`, `spacing` apart, into `available`; never above 1.
-    nonisolated static func scale(widths: [CGFloat], spacing: CGFloat, available: CGFloat) -> CGFloat {
-        let natural = widths.reduce(0, +) + spacing * CGFloat(max(widths.count - 1, 0))
+    /// How a row of items is fitted: one factor for every item and gap, and how many are left out from the left.
+    struct Fit: Equatable {
+        let scale: CGFloat
+        let hidden: Int
+    }
+
+    /// The row's natural width: the items `spacing` apart.
+    nonisolated static func naturalWidth(_ widths: some Collection<CGFloat>, spacing: CGFloat) -> CGFloat {
+        widths.reduce(0, +) + spacing * CGFloat(max(widths.count - 1, 0))
+    }
+
+    /// Fits items of `widths`, `spacing` apart, into `available`: shrinks them
+    /// together, never above 1 nor below `minimumScale`, then leaves out
+    /// items from the left until the rest fit.
+    nonisolated static func fit(widths: [CGFloat], spacing: CGFloat, available: CGFloat) -> Fit {
+        let natural = naturalWidth(widths, spacing: spacing)
         guard natural > available, natural > 0 else {
-            return 1
+            return Fit(scale: 1, hidden: 0)
         }
 
-        return max(available, 0) / natural
+        let scale = max(minimumScale, max(available, 0) / natural)
+        var hidden = 0
+        while hidden < widths.count, naturalWidth(widths.dropFirst(hidden), spacing: spacing) * scale > available {
+            hidden += 1
+        }
+
+        return Fit(scale: scale, hidden: hidden)
     }
 
     private var isDark: Bool { colorScheme == .dark }
@@ -75,6 +98,7 @@ struct MenuBarPreviewStrip: View {
                             itemView(entry)
                         }
                     }
+                    .clipped()
                     // Takes all the width the clock leaves before the spacer gets any.
                     .layoutPriority(1)
                 }
@@ -123,32 +147,40 @@ struct MenuBarPreviewStrip: View {
     }
 }
 
-/// Lays its views out in a row at their natural size and, when the row is
-/// wider than offered, shrinks every view and gap by the same factor.
+/// Lays its views out in a row at their natural size, fitted by
+/// `MenuBarPreviewStrip.fit`: shrunk by one factor, and with the views that
+/// still do not fit left out from the left.
 private struct UniformScaleRow: Layout {
     let spacing: CGFloat
 
-    private func layout(_ subviews: Subviews, width: CGFloat?) -> (sizes: [CGSize], scale: CGFloat) {
+    private func layout(_ subviews: Subviews, width: CGFloat?) -> (sizes: [CGSize], fit: MenuBarPreviewStrip.Fit) {
         let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        let scale = width.map {
-            MenuBarPreviewStrip.scale(widths: sizes.map(\.width), spacing: spacing, available: $0)
-        } ?? 1
-        return (sizes, scale)
+        let fit = width.map {
+            MenuBarPreviewStrip.fit(widths: sizes.map(\.width), spacing: spacing, available: $0)
+        } ?? MenuBarPreviewStrip.Fit(scale: 1, hidden: 0)
+        return (sizes, fit)
     }
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
-        let (sizes, scale) = layout(subviews, width: proposal.width)
-        let width = sizes.map(\.width).reduce(0, +) + spacing * CGFloat(max(sizes.count - 1, 0))
-        return CGSize(width: width * scale, height: (sizes.map(\.height).max() ?? 0) * scale)
+        let (sizes, fit) = layout(subviews, width: proposal.width)
+        let shown = sizes.dropFirst(fit.hidden)
+        let width = MenuBarPreviewStrip.naturalWidth(shown.map(\.width), spacing: spacing)
+        return CGSize(width: width * fit.scale, height: (shown.map(\.height).max() ?? 0) * fit.scale)
     }
 
     func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
-        let (sizes, scale) = layout(subviews, width: bounds.width)
+        let (sizes, fit) = layout(subviews, width: bounds.width)
         var x = bounds.minX
-        for (subview, size) in zip(subviews, sizes) {
-            let scaled = CGSize(width: size.width * scale, height: size.height * scale)
+        for (index, (subview, size)) in zip(subviews, sizes).enumerated() {
+            guard index >= fit.hidden else {
+                // Left out: no size, and outside the clipped row.
+                subview.place(at: CGPoint(x: bounds.minX - 10_000, y: bounds.midY), proposal: .zero)
+                continue
+            }
+
+            let scaled = CGSize(width: size.width * fit.scale, height: size.height * fit.scale)
             subview.place(at: CGPoint(x: x, y: bounds.midY), anchor: .leading, proposal: ProposedViewSize(scaled))
-            x += scaled.width + spacing * scale
+            x += scaled.width + spacing * fit.scale
         }
     }
 }
