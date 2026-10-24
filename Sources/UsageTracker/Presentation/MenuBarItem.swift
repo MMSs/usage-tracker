@@ -130,7 +130,8 @@ enum MenuBarItemBuilder {
         }
 
         let errorMark = snapshot.status == .error
-        let stale = snapshot.isStale
+        // A failed refresh leaves the cached report on screen, dimmed like a stale one.
+        let stale = snapshot.isStale || errorMark
 
         switch content {
         case let .meters(meters):

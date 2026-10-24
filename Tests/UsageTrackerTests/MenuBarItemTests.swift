@@ -202,15 +202,21 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(try #require(build(.anthropic, subscription: failed)).subscription == .status(.error))
     }
 
-    @Test func errorWithCachedReportKeepsMetersWithMark() throws {
+    @Test func errorWithCachedReportKeepsMetersDimmedWithMark() throws {
         let failed = HalfSnapshot(status: .error, report: anthropicReport, isStale: false)
         guard case let .meters(list, stale, errorMark) = try #require(build(.anthropic, subscription: failed)).subscription else {
             Issue.record("expected meters")
             return
         }
         #expect(list.count == 2)
-        #expect(!stale)
+        #expect(stale)
         #expect(errorMark)
+    }
+
+    @Test func errorWithCachedAPIReportIsDimmedWithMark() throws {
+        let failed = HalfSnapshot(status: .error, report: apiReport(spent: Decimal(string: "37.84")!), isStale: false)
+        let item = try #require(build(.anthropic, subscription: nil, api: failed))
+        #expect(item.api == .money(text: "$37.84", meter: nil, stale: true, errorMark: true))
     }
 
     @Test func staleCachedReportIsFlagged() throws {
