@@ -45,6 +45,33 @@ enum PopoverPresentation {
         return budget
     }
 
+    /// A window row's right-hand text: the matching money row's dollars in place
+    /// of the percent when there is one, then days left or the reset time.
+    static func rowText(window: LimitWindow, money: MoneyRow?, resetText: String?, daysLeft: String?) -> String {
+        let value: String
+        if let money {
+            let amount = BudgetUnit.dollars.format(money.amount)
+            value = money.limit.map { "\(amount) / \(BudgetUnit.dollars.format($0))" } ?? amount
+        } else {
+            value = "\(Int(window.percentUsed.rounded()))%"
+        }
+
+        guard let suffix = daysLeft ?? resetText else {
+            return value
+        }
+
+        return value + " · " + suffix
+    }
+
+    /// A window row's bar fill; nil (no bar) when the row shows money with no limit to measure against.
+    static func rowFraction(window: LimitWindow, money: MoneyRow?) -> Double? {
+        if let money, money.limit == nil {
+            return nil
+        }
+
+        return window.percentUsed / 100
+    }
+
     static func daysLeftText(_ pacing: Pacing) -> String {
         pacing.remainingDays == 1 ? "1 day left" : "\(pacing.remainingDays) days left"
     }

@@ -30,32 +30,33 @@ struct UsageBar: View {
 }
 
 struct LimitRowView: View {
-    let window: LimitWindow
-    let resetText: String?
+    let label: String
+    /// From `PopoverPresentation.rowText`.
+    let text: String
+    /// nil draws no bar.
+    let fraction: Double?
     let indented: Bool
     let tick: Double?
     let tint: PacingTint
 
-    private var percentText: String {
-        "\(Int(window.percentUsed.rounded()))%" + (resetText.map { " · " + $0 } ?? "")
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(window.label)
+                Text(label)
                     .font(indented ? .caption : .body)
                 Spacer()
-                Text(percentText)
+                Text(text)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 
-            UsageBar(fraction: window.percentUsed / 100, tint: tint, height: indented ? 3 : 5, tick: tick)
+            if let fraction {
+                UsageBar(fraction: fraction, tint: tint, height: indented ? 3 : 5, tick: tick)
+            }
         }
         .padding(.leading, indented ? 12 : 0)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(window.label)
-        .accessibilityValue(percentText)
+        .accessibilityLabel(label)
+        .accessibilityValue(text)
     }
 }

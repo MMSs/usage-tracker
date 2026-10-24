@@ -143,10 +143,17 @@ struct ProviderPopoverView: View {
                 ForEach(report.topLevelWindows) { window in
                     limitRow(window, in: report, pacing: pacing, now: now)
                     ForEach(report.children(of: window.id)) { child in
+                        let money = report.extra(for: child.id)
                         LimitRowView(
-                            window: child,
-                            resetText: child.resetsAt == window.resetsAt
-                                ? nil : CountdownFormatter.resetText(resetsAt: child.resetsAt, now: now),
+                            label: child.label,
+                            text: PopoverPresentation.rowText(
+                                window: child,
+                                money: money,
+                                resetText: child.resetsAt == window.resetsAt
+                                    ? nil : CountdownFormatter.resetText(resetsAt: child.resetsAt, now: now),
+                                daysLeft: nil
+                            ),
+                            fraction: PopoverPresentation.rowFraction(window: child, money: money),
                             indented: true,
                             tick: nil,
                             tint: PacingTint.forRemaining(percentUsed: child.percentUsed)
@@ -154,7 +161,8 @@ struct ProviderPopoverView: View {
                     }
                 }
 
-                ForEach(report.extras) { extra in
+                // Extras that match a window are already shown in that window's row.
+                ForEach(report.standaloneExtras) { extra in
                     extraRow(extra)
                 }
 
@@ -175,10 +183,23 @@ struct ProviderPopoverView: View {
     }
 
     private func limitRow(_ window: LimitWindow, in report: ProviderReport, pacing: Pacing?, now: Date) -> some View {
-        let isPaced = pacing != nil && window.id == provider.descriptor.longWindowID
+        let isLong = window.id == provider.descriptor.longWindowID
+        let isPaced = pacing != nil && isLong
+        let money = report.extra(for: window.id)
+        // A billing cycle reads better as days left than as a reset date.
+        let daysLeft = provider.descriptor.capabilities.hasCycle && isLong
+            ? pacing.map(PopoverPresentation.daysLeftText)
+            : nil
+
         return LimitRowView(
-            window: window,
-            resetText: CountdownFormatter.resetText(resetsAt: window.resetsAt, now: now),
+            label: window.label,
+            text: PopoverPresentation.rowText(
+                window: window,
+                money: money,
+                resetText: CountdownFormatter.resetText(resetsAt: window.resetsAt, now: now),
+                daysLeft: daysLeft
+            ),
+            fraction: PopoverPresentation.rowFraction(window: window, money: money),
             indented: false,
             tick: isPaced ? pacing?.tickFraction : nil,
             tint: isPaced ? PacingTint.forPacing(pacing) : PacingTint.forRemaining(percentUsed: window.percentUsed)

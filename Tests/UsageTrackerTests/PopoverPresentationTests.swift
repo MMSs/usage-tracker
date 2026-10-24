@@ -20,6 +20,12 @@ private func pacing(status: PacingStatus, remainingDays: Int = 18) -> Pacing {
     )
 }
 
+private let cycleWindow = LimitWindow(id: "cycle", label: "Included usage", percentUsed: 53, resetsAt: nil, parentID: nil)
+
+private func cycleMoney(limit: Decimal?) -> MoneyRow {
+    MoneyRow(id: "cycle", label: "Included usage", amount: Decimal(string: "73.5")!, limit: limit)
+}
+
 @Suite struct PopoverPresentationTests {
     @Test func pillTextDollars() {
         #expect(PopoverPresentation.pillText(pacing(status: .onTrack(by: Decimal(string: "12.4")!)), unit: .dollars) == "On track by $12.40")
@@ -33,6 +39,33 @@ private func pacing(status: PacingStatus, remainingDays: Int = 18) -> Pacing {
     @Test func daysLeft() {
         #expect(PopoverPresentation.daysLeftText(pacing(status: .onTrack(by: 0), remainingDays: 18)) == "18 days left")
         #expect(PopoverPresentation.daysLeftText(pacing(status: .onTrack(by: 0), remainingDays: 1)) == "1 day left")
+    }
+
+    @Test func rowTextShowsPercent() {
+        #expect(PopoverPresentation.rowText(window: cycleWindow, money: nil, resetText: nil, daysLeft: nil) == "53%")
+    }
+
+    @Test func rowTextAppendsResetText() {
+        #expect(PopoverPresentation.rowText(window: cycleWindow, money: nil, resetText: "resets in 2h 10m", daysLeft: nil) == "53% · resets in 2h 10m")
+    }
+
+    @Test func cycleRowTextShowsDaysLeftInPlaceOfResetText() {
+        #expect(PopoverPresentation.rowText(window: cycleWindow, money: nil, resetText: "resets 11 Nov", daysLeft: "18 days left") == "53% · 18 days left")
+    }
+
+    @Test func rowTextShowsTeamSpendAgainstLimitInPlaceOfPercent() {
+        #expect(PopoverPresentation.rowText(window: cycleWindow, money: cycleMoney(limit: 200), resetText: nil, daysLeft: nil) == "$73.50 / $200.00")
+        #expect(PopoverPresentation.rowText(window: cycleWindow, money: cycleMoney(limit: 200), resetText: "resets 11 Nov", daysLeft: "18 days left") == "$73.50 / $200.00 · 18 days left")
+    }
+
+    @Test func rowTextShowsTeamSpendWithoutLimit() {
+        #expect(PopoverPresentation.rowText(window: cycleWindow, money: cycleMoney(limit: nil), resetText: "resets 11 Nov", daysLeft: nil) == "$73.50 · resets 11 Nov")
+    }
+
+    @Test func rowHasNoBarForSpendWithoutALimit() {
+        #expect(PopoverPresentation.rowFraction(window: cycleWindow, money: nil) == 0.53)
+        #expect(PopoverPresentation.rowFraction(window: cycleWindow, money: cycleMoney(limit: 200)) == 0.53)
+        #expect(PopoverPresentation.rowFraction(window: cycleWindow, money: cycleMoney(limit: nil)) == nil)
     }
 
     @Test func updatedTextUses24HourClock() {

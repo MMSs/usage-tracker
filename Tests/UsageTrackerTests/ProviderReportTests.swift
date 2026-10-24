@@ -56,6 +56,22 @@ import Testing
         #expect(report.topLevelWindows.map(\.id) == ["cycle"])
     }
 
+    @Test func extrasMatchWindowsByID() {
+        let report = ProviderReport(
+            planName: nil,
+            windows: [LimitWindow(id: "cycle", label: "Included usage", percentUsed: 37, resetsAt: nil, parentID: nil)],
+            extras: [
+                MoneyRow(id: "cycle", label: "Included usage", amount: 73.5, limit: 200),
+                MoneyRow(id: "credits", label: "Credits", amount: 12.5, limit: nil),
+            ],
+            spend: nil
+        )
+
+        #expect(report.extra(for: "cycle")?.amount == 73.5)
+        #expect(report.extra(for: "session") == nil)
+        #expect(report.standaloneExtras.map(\.id) == ["credits"])
+    }
+
     @Test func windowIsOpenOnlyWithAResetDate() {
         #expect(!LimitWindow(id: "session", label: "Session", percentUsed: 0, resetsAt: nil, parentID: nil).isOpen)
         #expect(LimitWindow(id: "session", label: "Session", percentUsed: 0, resetsAt: date(2026, 10, 24), parentID: nil).isOpen)

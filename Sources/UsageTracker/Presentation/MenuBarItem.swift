@@ -15,7 +15,7 @@ enum MenuBarStatus: Equatable {
 
 struct MenuBarMeter: Equatable {
     let letter: String
-    /// "41%", "73.50/200" or "∞"; the renderer appends the countdown when asked.
+    /// "41%", "73.50/200", "73.50/—" or "∞"; the renderer appends the countdown when asked.
     let text: String
     let countdown: String?
     /// 0...1 fill; nil when unknown.
@@ -182,20 +182,32 @@ enum MenuBarItemBuilder {
 
         let countdown = window.resetsAt.map { CountdownFormatter.compact(until: $0, now: now) }
 
-        guard let spend = report.spend, let pacing else {
-            return windowMeter(letter: letter, window: window, now: now)
+        // Team plans report dollars: the money row replaces the percent.
+        if let money = report.extra(for: window.id) {
+            guard let limit = money.limit else {
+                return MenuBarMeter(
+                    letter: letter, text: "\(spendText(money.amount))/—", countdown: countdown,
+                    fraction: nil, tick: nil, tint: .neutral
+                )
+            }
+
+            return MenuBarMeter(
+                letter: letter,
+                text: "\(spendText(money.amount))/\(budgetText(limit))",
+                countdown: countdown,
+                fraction: pacing?.fillFraction ?? min(max(window.percentUsed / 100, 0), 1),
+                tick: pacing?.tickFraction,
+                tint: pacing.map { PacingTint.forPacing($0) } ?? PacingTint.forRemaining(percentUsed: window.percentUsed)
+            )
         }
 
-        let text: String
-        if spend.unit == .dollars, let limit = spend.limit {
-            text = "\(spendText(spend.spent))/\(budgetText(limit))"
-        } else {
-            text = percentText(window.percentUsed)
+        guard let pacing else {
+            return windowMeter(letter: letter, window: window, now: now)
         }
 
         return MenuBarMeter(
             letter: letter,
-            text: text,
+            text: percentText(window.percentUsed),
             countdown: countdown,
             fraction: pacing.fillFraction,
             tick: pacing.tickFraction,

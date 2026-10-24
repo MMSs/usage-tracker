@@ -27,7 +27,8 @@ private func cursorReport(
     return ProviderReport(
         planName: nil,
         windows: percentUsed.map { [LimitWindow(id: "cycle", label: "Included usage", percentUsed: $0, resetsAt: periodEnd, parentID: nil)] } ?? [],
-        extras: [],
+        // Dollar plans carry the cycle's amounts as a money row, as the mapper does.
+        extras: unit == .dollars ? [MoneyRow(id: "cycle", label: "Included usage", amount: spent, limit: limit)] : [],
         spend: SpendPeriod(period: period, spent: spent, limit: limit, unit: unit, daily: daily)
     )
 }
@@ -107,6 +108,29 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         let tick = try #require(list[1].tick)
         #expect(abs(tick - 13.0 / 30.0) < 0.0001)
         #expect(list[1].tint == .onPace)
+    }
+
+    @Test func teamPlanTextComesFromMoneyRow() throws {
+        // A cached report from a cycle that has ended has no pacing; the text still comes from the money row.
+        let report = cursorReport(unit: .dollars, spent: Decimal(string: "73.5")!, limit: 200, todaySpend: nil, percentUsed: 36.75, periodEnd: day(10, 20))
+        let list = meters(build(.cursor, subscription: ready(report))?.subscription)
+        let cycle = try #require(list.last)
+
+        #expect(cycle.letter == "C")
+        #expect(cycle.text == "73.50/200")
+        #expect(cycle.fraction == 0.3675)
+        #expect(cycle.tick == nil)
+    }
+
+    @Test func usedWithoutLimitShowsSpendOverDash() throws {
+        let report = cursorReport(unit: .dollars, spent: Decimal(string: "73.5")!, limit: nil, todaySpend: Decimal(string: "4.2")!, percentUsed: 0)
+        let list = meters(build(.cursor, subscription: ready(report))?.subscription)
+
+        #expect(list.map(\.letter) == ["C"])
+        #expect(list[0].text == "73.50/—")
+        #expect(list[0].fraction == nil)
+        #expect(list[0].tick == nil)
+        #expect(list[0].tint == .neutral)
     }
 
     @Test func cursorUnlimitedShowsInfinity() throws {

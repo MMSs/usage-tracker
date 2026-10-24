@@ -82,4 +82,14 @@ struct ProviderReport: Codable, Equatable, Sendable {
     var topLevelWindows: [LimitWindow] {
         windows.filter { $0.parentID == nil }
     }
+
+    /// The money row carrying a window's amounts (Cursor team plans), if any.
+    func extra(for windowID: String) -> MoneyRow? {
+        extras.first { $0.id == windowID }
+    }
+
+    /// Money rows that match no window and so are shown on their own.
+    var standaloneExtras: [MoneyRow] {
+        extras.filter { extra in !windows.contains { $0.id == extra.id } }
+    }
 }
