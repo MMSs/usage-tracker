@@ -30,9 +30,29 @@ enum CountdownFormatter {
         return "\(Int(interval / day))d"
     }
 
-    /// "resets in 2h 10m" within a day, "resets Tue 09:00" within a week,
-    /// "resets 11 Nov" beyond.
-    static func resetText(resetsAt: Date?, now: Date, calendar: Calendar = .current) -> String? {
+    /// Which exact-time wording a popover reset uses.
+    enum ResetStyle {
+        /// The short window (the session): just the time, with "tomorrow" past midnight.
+        case session
+        /// Longer windows: "today", "tomorrow", a weekday within a week, else the date.
+        case long
+    }
+
+    /// Whether the system clock is set to 24-hour time.
+    static var systemUses24Hour: Bool {
+        let template = DateFormatter.dateFormat(fromTemplate: "j", options: 0, locale: .current) ?? ""
+        return !template.contains("a")
+    }
+
+    /// The countdown with the exact time after it, e.g. "resets in 2h 33m · 11:00pm"
+    /// for a session or "resets in 2d 10h · Tue 8:00am" for a longer window.
+    static func resetText(
+        resetsAt: Date?,
+        now: Date,
+        style: ResetStyle = .long,
+        calendar: Calendar = .current,
+        uses24Hour: Bool = systemUses24Hour
+    ) -> String? {
         guard let resetsAt else {
             return nil
         }
@@ -43,22 +63,61 @@ enum CountdownFormatter {
             return "resets now"
         }
 
-        if interval < day {
-            guard interval >= minute else {
-                return "resets in <1m"
-            }
+        let exact = exactTime(resetsAt, now: now, style: style, calendar: calendar, uses24Hour: uses24Hour)
+        return "resets in " + relative(interval) + " · " + exact
+    }
 
-            let hours = Int(interval / hour)
-            let minutes = Int(interval.truncatingRemainder(dividingBy: hour) / minute)
-            let parts = [hours > 0 ? "\(hours)h" : nil, minutes > 0 ? "\(minutes)m" : nil]
-            return "resets in " + parts.compactMap { $0 }.joined(separator: " ")
+    private static func relative(_ interval: TimeInterval) -> String {
+        if interval < minute {
+            return "<1m"
         }
 
+        if interval >= 7 * day {
+            return "\(Int(interval / day))d"
+        }
+
+        let days = Int(interval / day)
+        let hours = Int(interval.truncatingRemainder(dividingBy: day) / hour)
+        let minutes = Int(interval.truncatingRemainder(dividingBy: hour) / minute)
+
+        // Under a day the minutes matter; from a day up they are noise.
+        let parts = days > 0
+            ? ["\(days)d", hours > 0 ? "\(hours)h" : nil]
+            : [hours > 0 ? "\(hours)h" : nil, minutes > 0 ? "\(minutes)m" : nil]
+        return parts.compactMap { $0 }.joined(separator: " ")
+    }
+
+    private static func exactTime(
+        _ date: Date, now: Date, style: ResetStyle, calendar: Calendar, uses24Hour: Bool
+    ) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = interval < 7 * day ? "EEE HH:mm" : "d MMM"
-        return "resets " + formatter.string(from: resetsAt)
+        formatter.amSymbol = "am"
+        formatter.pmSymbol = "pm"
+
+        func string(_ format: String) -> String {
+            formatter.dateFormat = format
+            return formatter.string(from: date)
+        }
+
+        let time = string(uses24Hour ? "HH:mm" : "h:mma")
+        let dayOffset = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: date)
+        ).day ?? 0
+
+        switch (style, dayOffset) {
+        case (.session, 0):
+            return time
+        case (.session, 1), (.long, 1):
+            return "tomorrow " + time
+        case (.long, 0):
+            return "today " + time
+        case (_, 2..<7):
+            return string("EEE") + " " + time
+        default:
+            return string("d MMM") + " " + time
+        }
     }
 }

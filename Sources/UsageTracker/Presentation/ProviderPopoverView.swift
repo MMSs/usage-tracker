@@ -158,7 +158,7 @@ struct ProviderPopoverView: View {
                                 window: child,
                                 money: money,
                                 resetText: child.resetsAt == window.resetsAt
-                                    ? nil : CountdownFormatter.resetText(resetsAt: child.resetsAt, now: now),
+                                    ? nil : resetText(for: child, now: now),
                                 daysLeft: nil
                             ),
                             fraction: PopoverPresentation.rowFraction(window: child, money: money),
@@ -205,7 +205,7 @@ struct ProviderPopoverView: View {
             text: PopoverPresentation.rowText(
                 window: window,
                 money: money,
-                resetText: CountdownFormatter.resetText(resetsAt: window.resetsAt, now: now),
+                resetText: resetText(for: window, now: now),
                 daysLeft: daysLeft
             ),
             fraction: PopoverPresentation.rowFraction(window: window, money: money),
@@ -213,6 +213,12 @@ struct ProviderPopoverView: View {
             tick: isPaced ? pacing?.tickFraction : timed.tick,
             tint: isPaced ? PacingTint.forPacing(pacing) : timed.tint
         )
+    }
+
+    /// The session reads as a bare time; every other window names its day.
+    private func resetText(for window: LimitWindow, now: Date) -> String? {
+        let isShort = window.id == provider.descriptor.shortWindowID
+        return CountdownFormatter.resetText(resetsAt: window.resetsAt, now: now, style: isShort ? .session : .long)
     }
 
     private func extraRow(_ extra: MoneyRow) -> some View {
