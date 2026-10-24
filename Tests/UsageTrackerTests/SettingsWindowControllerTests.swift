@@ -11,12 +11,12 @@ import Testing
         func activate() { activations += 1 }
     }
 
-    private func makeModel() -> AppModel {
+    private func makeModel(withHalves wired: Set<Provider> = [.cursor]) -> AppModel {
         let credentials = MemoryCredentialStore()
         let providers = ProviderRegistry.all.map { descriptor in
             ProviderViewModel(
                 descriptor: descriptor,
-                subscriptionFetcher: descriptor.id == .cursor ? StubReportFetcher(result: .success(makeReport(1))) : nil,
+                subscriptionFetcher: wired.contains(descriptor.id) ? StubReportFetcher(result: .success(makeReport(1))) : nil,
                 apiFetcher: nil,
                 credentialStore: credentials, cache: MemoryReportCache()
             )
@@ -53,6 +53,14 @@ import Testing
 
         #expect(dock.visibility == [true, false])
         #expect(controller.window == nil)
+    }
+
+    @Test func toolbarTabsFollowTheMenuBarOrder() {
+        let controller = SettingsWindowController(
+            model: makeModel(withHalves: [.cursor, .anthropic]), dock: RecordingDock(), frameAutosaveName: nil
+        )
+
+        #expect(controller.pages == [.general, .provider(.anthropic), .provider(.cursor)])
     }
 
     @Test func presentingAgainReusesTheOpenWindow() throws {

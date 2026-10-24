@@ -39,8 +39,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.frameAutosaveName = frameAutosaveName
     }
 
+    /// Providers with a page, in the order of their menu bar items.
     private var listedProviders: [ProviderViewModel] {
-        model.providers.filter(\.hasAnyHalf)
+        AppModel.menuBarDisplayOrder(model.providers.filter(\.hasAnyHalf))
     }
 
     var pages: [SettingsPage] {

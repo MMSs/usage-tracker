@@ -172,6 +172,14 @@ final class AppModel: ObservableObject {
         return providers.filter { $0.isConfigured && $0.isEnabled && $0.hasActiveHalf }.map(\.id)
     }
 
+    /// Items in the order the menu bar shows them, left to right. NSStatusBar
+    /// puts each newly inserted item to the left of the others, so that is
+    /// the registry (insertion) order reversed. A Cmd-drag rearrangement
+    /// cannot be seen here.
+    static func menuBarDisplayOrder<Element>(_ elements: [Element]) -> [Element] {
+        elements.reversed()
+    }
+
     /// True while nothing is configured, so the menu bar holds only the first
     /// provider's set-up item rather than any usage.
     var showsSetUpItem: Bool {
