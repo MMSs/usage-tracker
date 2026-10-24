@@ -34,6 +34,9 @@ private let now = calendar.date(from: DateComponents(year: 2026, month: 10, day:
 
         let tuesday = calendar.date(from: DateComponents(year: 2026, month: 10, day: 27, hour: 9))!
         #expect(CountdownFormatter.resetText(resetsAt: tuesday, now: now, calendar: calendar) == "resets Tue 09:00")
+        let afternoon = calendar.date(from: DateComponents(year: 2026, month: 10, day: 27, hour: 15, minute: 5))!
+        #expect(CountdownFormatter.resetText(resetsAt: afternoon, now: now, calendar: calendar) == "resets Tue 15:05")
+        #expect(CountdownFormatter.resetText(resetsAt: now - 60, now: now, calendar: calendar) == "resets now")
         #expect(CountdownFormatter.resetText(resetsAt: nil, now: now, calendar: calendar) == nil)
     }
 }

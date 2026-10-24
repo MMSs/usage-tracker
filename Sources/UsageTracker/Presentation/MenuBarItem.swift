@@ -34,7 +34,7 @@ enum HalfDisplay: Equatable {
         case let .status(status):
             status.title
         case let .meters(meters, _, _):
-            meters.map { "\($0.letter) \($0.text)" }.joined(separator: ", ")
+            meters.filter { $0.text != "—" }.map { "\($0.letter) \($0.text)" }.joined(separator: ", ")
         case let .money(text, _, _, _):
             "API \(text)"
         }

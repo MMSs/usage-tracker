@@ -38,6 +38,10 @@ enum CountdownFormatter {
 
         let interval = resetsAt.timeIntervalSince(now)
 
+        if interval <= 0 {
+            return "resets now"
+        }
+
         if interval < day {
             guard interval >= minute else {
                 return "resets in <1m"
@@ -49,18 +53,11 @@ enum CountdownFormatter {
             return "resets in " + parts.compactMap { $0 }.joined(separator: " ")
         }
 
-        let weekday = resetsAt.formatted(style(calendar).weekday(.abbreviated))
-        let time = resetsAt.formatted(style(calendar).hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
-        return "resets \(weekday) \(time)"
-    }
-
-    private static func style(_ calendar: Calendar) -> Date.FormatStyle {
-        Date.FormatStyle(
-            date: .omitted,
-            time: .omitted,
-            locale: Locale(identifier: "en_US_POSIX"),
-            calendar: calendar,
-            timeZone: calendar.timeZone
-        )
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.dateFormat = "EEE HH:mm"
+        return "resets " + formatter.string(from: resetsAt)
     }
 }
