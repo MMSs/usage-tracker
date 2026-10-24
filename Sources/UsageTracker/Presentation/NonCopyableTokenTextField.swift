@@ -40,6 +40,35 @@ final class NonCopyableTokenTextView: NSTextView {
         }
     }
 
+    /// Drawn in the placeholder color while the view is empty, with enough
+    /// ellipses to fill the width, so a saved value reads as present.
+    var placeholderMask: CredentialMask? {
+        didSet { needsDisplay = true }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+
+        guard string.isEmpty, let placeholderMask else { return }
+
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font ?? .systemFont(ofSize: NSFont.systemFontSize),
+            .foregroundColor: NSColor.placeholderTextColor,
+        ]
+        let padding = textContainer?.lineFragmentPadding ?? 0
+        let fixedWidth = ((placeholderMask.prefix + placeholderMask.suffix) as NSString).size(withAttributes: attributes).width
+        let ellipsisWidth = (CredentialMask.ellipsis as NSString).size(withAttributes: attributes).width
+        let available = bounds.width - 2 * (textContainerInset.width + padding) - fixedWidth
+        let text = placeholderMask.text(
+            ellipsisCount: CredentialMask.ellipsisCount(availableWidth: available, ellipsisWidth: ellipsisWidth)
+        )
+
+        (text as NSString).draw(
+            at: NSPoint(x: textContainerInset.width + padding, y: textContainerInset.height),
+            withAttributes: attributes
+        )
+    }
+
     override func copy(_ sender: Any?) {}
 
     override func cut(_ sender: Any?) {}
@@ -81,6 +110,7 @@ final class NonCopyableTokenTextView: NSTextView {
 
 struct NonCopyableTokenTextField: NSViewRepresentable {
     @Binding var text: String
+    var placeholderMask: CredentialMask?
     var focusesOnAppear = false
     var allowsMultipleLines = false
     var height: CGFloat = 26
@@ -129,6 +159,8 @@ struct NonCopyableTokenTextField: NSViewRepresentable {
             delegate: context.coordinator
         )
 
+        (Self.textView(in: container) as? NonCopyableTokenTextView)?.placeholderMask = placeholderMask
+
         if focusesOnAppear, let textView = Self.textView(in: container) {
             // The view joins its window after this returns.
             DispatchQueue.main.async {
@@ -140,7 +172,13 @@ struct NonCopyableTokenTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ container: NSView, context: Context) {
-        guard let textView = Self.textView(in: container), textView.string != text else {
+        guard let textView = Self.textView(in: container) else {
+            return
+        }
+
+        (textView as? NonCopyableTokenTextView)?.placeholderMask = placeholderMask
+
+        guard textView.string != text else {
             return
         }
 

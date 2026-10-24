@@ -83,4 +83,25 @@ struct NonCopyableTokenTextViewTests {
         let hit = host.hitTest(NSPoint(x: 134, y: 48))
         #expect(hit === textView || hit?.isDescendant(of: textView) == true)
     }
+
+    private func bitmap(of view: NSView) -> [UInt8] {
+        let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds)!
+        view.cacheDisplay(in: view.bounds, to: rep)
+        let bytes = rep.bitmapData!
+        return Array(UnsafeBufferPointer(start: bytes, count: rep.bytesPerRow * rep.pixelsHigh))
+    }
+
+    @Test func placeholderMaskIsDrawnOnlyWhileEmpty() {
+        let plain = NonCopyableTokenTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 26))
+        let masked = NonCopyableTokenTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 26))
+        masked.placeholderMask = CredentialMask(value: "abcdefghijklmnop")
+
+        #expect(bitmap(of: masked) != bitmap(of: plain))
+
+        masked.string = "typed"
+        let typed = NonCopyableTokenTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 26))
+        typed.string = "typed"
+
+        #expect(bitmap(of: masked) == bitmap(of: typed))
+    }
 }

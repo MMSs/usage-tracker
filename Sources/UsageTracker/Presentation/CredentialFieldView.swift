@@ -1,26 +1,28 @@
 import AppKit
 import SwiftUI
 
-/// What the credential field knows about its Keychain item. The saved value is
-/// never held here, only whether one exists.
+/// What the credential field knows about its Keychain item: the draft being
+/// typed and, once saved, the masked ends of the stored value. The full value
+/// is never held here.
 struct CredentialFieldState: Equatable {
     var draft = ""
-    private(set) var isSaved: Bool
+    private(set) var mask: CredentialMask?
 
-    init(isSaved: Bool) {
-        self.isSaved = isSaved
+    init(mask: CredentialMask?) {
+        self.mask = mask
     }
 
+    var isSaved: Bool { mask != nil }
     var trimmedDraft: String { draft.trimmingCharacters(in: .whitespacesAndNewlines) }
     var hasSavableChange: Bool { !trimmedDraft.isEmpty }
 
-    mutating func markSaved() {
-        isSaved = true
+    mutating func markSaved(mask: CredentialMask?) {
+        self.mask = mask
         draft = ""
     }
 
     mutating func markRemoved() {
-        isSaved = false
+        mask = nil
         draft = ""
     }
 }
@@ -61,7 +63,7 @@ struct CredentialFieldView: View {
         self.budgetStore = budgetStore
         self.opensHelp = opensHelp
         self.onChange = onChange
-        _state = State(initialValue: CredentialFieldState(isSaved: false))
+        _state = State(initialValue: CredentialFieldState(mask: nil))
         _showsHelp = State(initialValue: opensHelp)
         _budget = State(initialValue: budgetStore?.budget(for: key.provider))
     }
@@ -117,7 +119,10 @@ struct CredentialFieldView: View {
                         budgetStore?.setBudget(newValue, for: key.provider)
                     }
             } else {
-                NonCopyableTokenTextField(text: $state.draft, allowsMultipleLines: field.isMultiline, height: field.isMultiline ? 96 : 26)
+                NonCopyableTokenTextField(
+                    text: $state.draft, placeholderMask: state.mask,
+                    allowsMultipleLines: field.isMultiline, height: field.isMultiline ? 96 : 26
+                )
                     .frame(height: field.isMultiline ? 96 : 26)
                     .accessibilityLabel(field.title)
                     .onChange(of: state.draft) {
@@ -213,7 +218,7 @@ struct CredentialFieldView: View {
         }
     }
 
-    /// Seeds once; asks the store only whether an item exists, never for its value.
+    /// Seeds once; reads the stored value a single time and keeps only its masked ends.
     private func loadSavedState() {
         guard !hasLoaded else {
             return
@@ -226,7 +231,7 @@ struct CredentialFieldView: View {
         }
 
         do {
-            state = CredentialFieldState(isSaved: try store.hasCredential(for: key))
+            state = CredentialFieldState(mask: try store.credential(for: key).flatMap(CredentialMask.init))
         } catch {
             readFailed = true
         }
@@ -264,7 +269,7 @@ struct CredentialFieldView: View {
         }
 
         saveFailed = false
-        state.markSaved()
+        state.markSaved(mask: CredentialMask(value: state.trimmedDraft))
         Task { await onChange() }
     }
 
