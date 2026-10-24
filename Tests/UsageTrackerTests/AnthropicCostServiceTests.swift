@@ -233,4 +233,47 @@ struct AnthropicAPIReportServiceTests {
         #expect(report == AnthropicReportMapper.api(days: days, month: month))
         #expect(report.spend?.spent == Decimal(string: "15.340678"))
     }
+
+    @Test func monthIsTheUTCMonthEvenWhenLocalTimeHasRolledOver() async throws {
+        var tokyo = Calendar(identifier: .gregorian)
+        tokyo.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        // 1 Nov 03:00 in Tokyo is 31 Oct 18:00 UTC.
+        let today = tokyo.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 3))!
+        let fetcher = StubFetcher(days: [])
+        let service = AnthropicAPIReportService(service: fetcher, calendar: tokyo)
+
+        let report = try await service.fetchReport(credentials: ["admin-key": "k"], today: today)
+
+        let october = CyclePeriod(
+            start: tokyo.date(from: DateComponents(year: 2026, month: 10, day: 1))!,
+            end: tokyo.date(from: DateComponents(year: 2026, month: 11, day: 1))!
+        )
+        #expect(fetcher.months == [october])
+        #expect(report.spend?.period == october)
+    }
+
+    @Test func requestStartsInTheUTCMonthNeverInTheFuture() async throws {
+        var tokyo = Calendar(identifier: .gregorian)
+        tokyo.timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let today = tokyo.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 3))!
+        let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: #"{"data":[],"has_more":false,"next_page":null}"#)])
+        let service = AnthropicAPIReportService(service: AnthropicCostService(client: client), calendar: tokyo)
+
+        _ = try await service.fetchReport(credentials: ["admin-key": "k"], today: today)
+
+        let url = try #require(client.requests.first?.url)
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        #expect(items.first { $0.name == "starting_at" }?.value == "2026-10-01T00:00:00Z")
+        #expect(items.first { $0.name == "ending_at" }?.value == "2026-11-01T00:00:00Z")
+    }
+
+    @Test func decemberRollsIntoNextYear() async throws {
+        let fetcher = StubFetcher(days: [])
+        let service = AnthropicAPIReportService(service: fetcher, calendar: calendar)
+        let today = calendar.date(from: DateComponents(year: 2026, month: 12, day: 15, hour: 12))!
+
+        _ = try await service.fetchReport(credentials: ["admin-key": "k"], today: today)
+
+        #expect(fetcher.months == [CyclePeriod(start: local(2026, 12, 1), end: local(2027, 1, 1))])
+    }
 }
