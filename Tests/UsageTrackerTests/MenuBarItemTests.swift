@@ -265,7 +265,9 @@ private func apiReport(spent: Decimal) -> ProviderReport {
     @Test(arguments: [false, true])
     func waitingForAnOrganizationShowsTheSetUpStatus(hasCachedReport: Bool) throws {
         let waiting = HalfSnapshot(status: .needsOrganization, report: hasCachedReport ? anthropicReport : nil, isStale: true)
-        #expect(try #require(build(.anthropic, subscription: waiting)).subscription == .status(.setUp))
+        let item = try #require(build(.anthropic, subscription: waiting))
+        #expect(item.subscription == .status(.chooseOrganization))
+        #expect(item.accessibilityText(displayName: "Anthropic") == "Anthropic, Plan usage: choose an organization")
     }
 
     @Test func errorWithoutReportIsStatus() throws {

@@ -61,7 +61,7 @@ import Testing
     }
 
     @Test func statusStatesRender() throws {
-        for status in [MenuBarStatus.setUp, .expired, .error, .loading] {
+        for status in [MenuBarStatus.setUp, .chooseOrganization, .expired, .error, .loading] {
             let item = MenuBarItem(provider: .anthropic, subscription: .status(status), api: nil)
 
             #expect(try #require(render(item)).size.width > 0)
@@ -74,6 +74,8 @@ import Testing
         let expired = MenuBarItem(provider: .cursor, subscription: .status(.expired), api: nil)
 
         #expect(MenuBarItemImage.isColored(loading, appearance: colored) == false)
+        let choose = MenuBarItem(provider: .anthropic, subscription: .status(.chooseOrganization), api: nil)
+        #expect(MenuBarItemImage.isColored(choose, appearance: colored) == false)
         #expect(MenuBarItemImage.isColored(expired, appearance: colored))
         #expect(try #require(render(loading, colored)).isTemplate)
         #expect(try #require(render(expired, colored)).isTemplate == false)

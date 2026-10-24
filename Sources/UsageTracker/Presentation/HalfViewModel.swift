@@ -45,6 +45,12 @@ final class HalfViewModel: ObservableObject {
     /// True when the credential sees more than one organization, so Settings offers the choice.
     var offersOrganizationChoice: Bool { organizations.count > 1 }
 
+    /// The report to draw: none while waiting for an organization choice,
+    /// since the kept one may be another organization's. `report` keeps it.
+    var shownReport: ProviderReport? {
+        status == .needsOrganization ? nil : report
+    }
+
     /// The chosen organization while it is still listed.
     var chosenOrganization: AccountOrganization? {
         organizations.first { $0.id == selectedOrganizationID }

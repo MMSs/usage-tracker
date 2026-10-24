@@ -148,7 +148,7 @@ private struct HalfView: View {
     private func statusView(_ status: MenuBarStatus) -> some View {
         HStack(spacing: 4) {
             switch status {
-            case .setUp:
+            case .setUp, .chooseOrganization:
                 Image(systemName: "key.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(palette.foreground)

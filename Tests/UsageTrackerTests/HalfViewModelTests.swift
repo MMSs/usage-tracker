@@ -630,6 +630,20 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(model.scheduledRetriesBlocked)
     }
 
+    @Test func aCachedReportIsNotShownWhileWaitingForAChoice() async {
+        cache.store(CachedReport(report: makeReport(), fetchedAt: now), provider: .anthropic, half: .subscription)
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        #expect(model.shownReport == makeReport())
+
+        await model.refresh(manual: false)
+
+        // Kept for later, but it may be another organization's.
+        #expect(model.report == makeReport())
+        #expect(model.shownReport == nil)
+    }
+
     @Test func choosingAnOrganizationStoresItAndRefreshesNow() async {
         store.values[key] = "sk"
         fetcher.listing = two

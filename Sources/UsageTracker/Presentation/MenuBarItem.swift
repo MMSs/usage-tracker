@@ -2,10 +2,12 @@ import Foundation
 
 enum MenuBarStatus: Equatable {
     case setUp, expired, error, loading
+    /// Drawn like `setUp`; VoiceOver says what to set up.
+    case chooseOrganization
 
     var title: String {
         switch self {
-        case .setUp: "Set up"
+        case .setUp, .chooseOrganization: "Set up"
         case .expired: "Expired"
         case .error: "Error"
         case .loading: "Loading"
@@ -38,6 +40,8 @@ enum HalfDisplay: Equatable {
             return failed
         case .status(.expired):
             return "\(half.displayName): credential expired"
+        case .status(.chooseOrganization):
+            return "\(half.displayName): choose an organization"
         case let .status(status):
             return status.title
         case let .meters(meters, _, errorMark):
@@ -132,9 +136,10 @@ enum MenuBarItemBuilder {
             return .status(.expired)
         }
 
-        // Nothing is fetched until the user chooses; an earlier report may be another organization's.
+        // Nothing is fetched until the user chooses; a kept report may be
+        // another organization's, so it is not drawn (the popover agrees).
         if snapshot.status == .needsOrganization {
-            return .status(.setUp)
+            return .status(.chooseOrganization)
         }
 
         guard let report = snapshot.report else {
