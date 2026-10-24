@@ -1,19 +1,19 @@
 import Foundation
 @testable import UsageTracker
 
-final class MemoryIntervalStore: RefreshIntervalStoring {
-    private(set) var stored: RefreshInterval
+final class MemoryProviderSettingsStore: ProviderSettingsStoring {
+    private(set) var stored: [Provider: ProviderSettings]
 
-    init(_ stored: RefreshInterval = .default) {
+    init(_ stored: [Provider: ProviderSettings] = [:]) {
         self.stored = stored
     }
 
-    func interval() -> RefreshInterval {
-        stored
+    func settings(for provider: Provider) -> ProviderSettings {
+        stored[provider] ?? .default
     }
 
-    func setInterval(_ interval: RefreshInterval) {
-        stored = interval
+    func setSettings(_ settings: ProviderSettings, for provider: Provider) {
+        stored[provider] = settings
     }
 }
 
@@ -117,6 +117,12 @@ final class RefreshRecorder {
     private var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     private(set) var callCount = 0
+    private(set) var providers: [Provider] = []
+
+    func refresh(_ provider: Provider) async {
+        providers.append(provider)
+        await refresh()
+    }
 
     func refresh() async {
         callCount += 1

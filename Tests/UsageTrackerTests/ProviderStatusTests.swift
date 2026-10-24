@@ -12,6 +12,11 @@ import Testing
         #expect(ProviderStatus.make(configured: true, statuses: [.loading, .unconfigured], planName: nil) == ProviderStatus(text: "Connecting…", tone: .neutral))
     }
 
+    @Test func disabledComesAfterNotSetUpAndBeforeTheHalves() {
+        #expect(ProviderStatus.make(configured: false, enabled: false, statuses: [], planName: nil).text == "Not set up")
+        #expect(ProviderStatus.make(configured: true, enabled: false, statuses: [.error], planName: "Pro") == ProviderStatus(text: "Disabled", tone: .neutral))
+    }
+
     @Test func connectedShowsThePlan() {
         #expect(ProviderStatus.make(configured: true, statuses: [.ready], planName: "Pro").text == "Connected · Pro")
         #expect(ProviderStatus.make(configured: true, statuses: [.ready, .unconfigured], planName: nil).text == "Connected")

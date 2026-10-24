@@ -6,6 +6,17 @@ struct MenuBarPreviewStrip: View {
     let item: MenuBarItem?
     let appearance: MenuBarAppearance
     let displayName: String
+    var caption = "How the item looks in the menu bar."
+
+    @Environment(\.colorScheme) private var colorScheme
+
+    private var isDark: Bool { colorScheme == .dark }
+
+    private var barFill: LinearGradient {
+        isDark
+            ? LinearGradient(colors: [Color(white: 0.22), Color(white: 0.14)], startPoint: .top, endPoint: .bottom)
+            : LinearGradient(colors: [Color(white: 0.97), Color(white: 0.91)], startPoint: .top, endPoint: .bottom)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -17,22 +28,25 @@ struct MenuBarPreviewStrip: View {
                 } else {
                     Text("No data yet")
                         .font(.system(size: 13))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundStyle(.secondary)
                 }
 
                 Text("Tue 09:41")
                     .font(.system(size: 13))
-                    .foregroundStyle(.white.opacity(0.9))
+                    .foregroundStyle(isDark ? Color.white.opacity(0.9) : Color.black.opacity(0.85))
             }
             .padding(.horizontal, 14)
             .frame(height: 32)
             .background(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(white: 0.22), Color(white: 0.14)], startPoint: .top, endPoint: .bottom))
+                    .fill(barFill)
             )
-            .environment(\.colorScheme, .dark)
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Color.primary.opacity(isDark ? 0.12 : 0.1), lineWidth: 1)
+            )
 
-            Text("How the item looks in the menu bar.")
+            Text(caption)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -45,6 +59,8 @@ struct ProviderStatusHeader: View {
     let displayName: String
     let status: ProviderStatus
     let updatedText: String?
+    /// Nil hides the switch (previews, unconfigured providers).
+    var isEnabled: Binding<Bool>? = nil
 
     private var dotColor: Color {
         switch status.tone {
@@ -82,13 +98,21 @@ struct ProviderStatusHeader: View {
 
             Spacer(minLength: 0)
 
-            if let updatedText {
-                Text(updatedText)
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
+            VStack(alignment: .trailing, spacing: 6) {
+                if let isEnabled {
+                    Toggle("Enabled", isOn: isEnabled)
+                        .toggleStyle(.switch)
+                        .controlSize(.small)
+                        .help("Show this provider in the menu bar and keep it refreshing")
+                }
+
+                if let updatedText {
+                    Text(updatedText)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
             }
         }
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -111,7 +135,7 @@ struct ProviderStatusHeader: View {
 
 #Preview("Status header") {
     VStack(spacing: 16) {
-        ProviderStatusHeader(provider: .cursor, displayName: "Cursor", status: ProviderStatus(text: "Connected · Pro", tone: .good), updatedText: "Updated 14:31")
+        ProviderStatusHeader(provider: .cursor, displayName: "Cursor", status: ProviderStatus(text: "Connected · Pro", tone: .good), updatedText: "Updated 14:31", isEnabled: .constant(true))
         ProviderStatusHeader(provider: .anthropic, displayName: "Anthropic", status: ProviderStatus(text: "Not set up", tone: .neutral), updatedText: nil)
     }
     .padding()

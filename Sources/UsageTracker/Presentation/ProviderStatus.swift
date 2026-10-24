@@ -9,9 +9,13 @@ struct ProviderStatus: Equatable {
     let text: String
     let tone: Tone
 
-    static func make(configured: Bool, statuses: [HalfStatus], planName: String?) -> ProviderStatus {
+    static func make(configured: Bool, enabled: Bool = true, statuses: [HalfStatus], planName: String?) -> ProviderStatus {
         guard configured else {
             return ProviderStatus(text: "Not set up", tone: .neutral)
+        }
+
+        guard enabled else {
+            return ProviderStatus(text: "Disabled", tone: .neutral)
         }
 
         if statuses.contains(.expired) {

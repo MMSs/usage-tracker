@@ -5,7 +5,7 @@ import Testing
 @Suite @MainActor struct AppModelTests {
     let credentials = MemoryCredentialStore()
     let cache = MemoryReportCache()
-    let intervalStore = MemoryIntervalStore(.default)
+    let settingsStore = MemoryProviderSettingsStore()
     let sleeper = ControllableSleeper()
     let fetchers: [Provider: StubReportFetcher] = [
         .cursor: StubReportFetcher(result: .success(makeReport(1))),
@@ -26,7 +26,7 @@ import Testing
         return AppModel(
             providers: providers,
             credentialStore: credentials,
-            intervalStore: intervalStore,
+            providerSettingsStore: settingsStore,
             appearanceStore: MemoryMenuBarAppearanceStore(),
             budgetStore: MemoryAPIBudgetStore(),
             sleepObserver: ControllableSleepObserver(),
@@ -48,7 +48,7 @@ import Testing
         return AppModel(
             providers: providers,
             credentialStore: credentials,
-            intervalStore: intervalStore,
+            providerSettingsStore: settingsStore,
             appearanceStore: MemoryMenuBarAppearanceStore(),
             budgetStore: MemoryAPIBudgetStore(),
             sleepObserver: ControllableSleepObserver(),
@@ -88,13 +88,50 @@ import Testing
         }
     }
 
-    @Test func setIntervalPersists() {
+    @Test func providerSettingsPersistAndReachTheProvider() {
         let model = makeModel()
-        let other = RefreshInterval.allCases.first { $0 != .default }!
+        let settings = ProviderSettings(isEnabled: false, refreshInterval: .oneHour, appearanceOverride: nil)
 
-        model.setInterval(other)
+        model.setSettings(settings, for: .cursor)
 
-        #expect(intervalStore.stored == other)
+        #expect(settingsStore.stored[.cursor] == settings)
+        #expect(model.settings(for: .cursor) == settings)
+        #expect(!model.provider(.cursor).isEnabled)
+    }
+
+    @Test func appearanceFallsBackToGlobalUnlessOverridden() {
+        let model = makeModel()
+        let global = MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: false)
+        let override = MenuBarAppearance(showText: true, countdown: false, showGraph: false, graphStyle: .rings, colored: true)
+
+        model.setGlobalAppearance(global)
+        #expect(model.appearance(for: .cursor) == global)
+        #expect(model.appearance(for: .anthropic) == global)
+
+        model.setSettings(ProviderSettings(appearanceOverride: override), for: .cursor)
+        #expect(model.appearance(for: .cursor) == override)
+        #expect(model.appearance(for: .anthropic) == global)
+    }
+
+    @Test func disabledProvidersAreNeitherInsertedNorRefreshed() async {
+        configureAll()
+        let model = makeModel()
+
+        model.setSettings(ProviderSettings(isEnabled: false), for: .anthropic)
+        await model.refreshAll(manual: true)
+
+        #expect(model.insertedProviders == [.cursor, .openai])
+        #expect(fetchers[.anthropic]?.callCount == 0)
+        #expect(fetchers[.cursor]?.callCount == 1)
+    }
+
+    @Test func disablingEveryConfiguredProviderLeavesTheMenuBarEmpty() {
+        credentials.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "secret"
+        let model = makeModel()
+
+        model.setSettings(ProviderSettings(isEnabled: false), for: .cursor)
+
+        #expect(model.insertedProviders == [])
     }
 
     @Test func startPerformsLaunchRefreshOnlyOnce() async {

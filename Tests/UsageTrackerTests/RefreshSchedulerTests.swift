@@ -21,7 +21,7 @@ import Testing
     }
 
     @Test func theConfiguredIntervalDrivesTheWait() async {
-        let context = SchedulerContext(interval: .oneMinute)
+        let context = SchedulerContext(schedules: [.cursor: .oneMinute])
 
         context.scheduler.start()
         await context.sleeper.waitForSleepCount(1)
@@ -141,12 +141,45 @@ import Testing
         context.scheduler.start()
         await context.sleeper.waitForSleepCount(1)
 
-        context.scheduler.setInterval(.oneHour)
+        context.scheduler.setSchedule(.oneHour, for: .cursor)
         await context.sleeper.waitForSleepCount(2)
         await settle()
 
         #expect(context.periodicRefresh.callCount == 0)
         #expect(context.sleeper.durations == [.seconds(300), .seconds(3600)])
+
+        context.tearDown()
+    }
+
+    @Test func eachProviderWaitsOnItsOwnInterval() async {
+        let context = SchedulerContext(schedules: [.cursor: .oneMinute, .anthropic: .oneHour])
+
+        context.scheduler.start()
+        await context.sleeper.waitForSleepCount(2)
+
+        #expect(Set(context.sleeper.durations) == [.seconds(60), .seconds(3600)])
+
+        context.sleeper.resume()
+        await context.periodicRefresh.waitForCallCount(2)
+
+        #expect(Set(context.periodicRefresh.providers) == [.cursor, .anthropic])
+
+        context.tearDown()
+    }
+
+    @Test func removingAScheduleStopsOnlyThatProvider() async {
+        let context = SchedulerContext(schedules: [.cursor: .oneMinute, .anthropic: .oneHour])
+
+        context.scheduler.start()
+        await context.sleeper.waitForSleepCount(2)
+
+        context.scheduler.setSchedule(nil, for: .cursor)
+        context.sleeper.resume()
+        await settle()
+
+        #expect(context.periodicRefresh.providers == [.anthropic])
+        #expect(context.sleeper.durations.count == 3)
+        #expect(context.sleeper.durations.last == .seconds(3600))
 
         context.tearDown()
     }
@@ -176,7 +209,7 @@ private struct SchedulerContext {
     let scheduler: RefreshScheduler
 
     init(
-        interval: RefreshInterval = .fiveMinutes,
+        schedules: [Provider: RefreshInterval] = [.cursor: .fiveMinutes],
         initialRefresh: RefreshScheduler.Refresh? = nil
     ) {
         let periodicRefresh = RefreshRecorder()
@@ -189,9 +222,9 @@ private struct SchedulerContext {
         self.sleepObserver = sleepObserver
         self.networkObserver = networkObserver
         scheduler = RefreshScheduler(
-            interval: interval,
+            schedules: schedules,
             initialRefresh: initialRefresh ?? {},
-            periodicRefresh: periodicRefresh.refresh,
+            periodicRefresh: periodicRefresh.refresh(_:),
             sleepObserver: sleepObserver,
             networkObserver: networkObserver,
             sleep: sleeper.sleep

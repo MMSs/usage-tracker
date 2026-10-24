@@ -278,7 +278,8 @@ enum ProviderGlyphImage {
     /// The provider mark as a template image for toolbar tabs.
     @MainActor
     static func toolbarImage(for provider: Provider) -> NSImage? {
-        let renderer = ImageRenderer(content: ProviderGlyph(provider: provider).fill(Color.black).frame(width: 22, height: 22))
+        // The mark sits in a padded canvas so it matches the SF Symbol tabs in size and label spacing.
+        let renderer = ImageRenderer(content: ProviderGlyph(provider: provider).fill(Color.black).frame(width: 17, height: 17).frame(width: 26, height: 26))
         renderer.scale = 2
         guard let image = renderer.nsImage else {
             return nil

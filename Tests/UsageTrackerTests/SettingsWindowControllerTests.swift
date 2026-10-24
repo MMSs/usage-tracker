@@ -25,7 +25,7 @@ import Testing
         return AppModel(
             providers: providers,
             credentialStore: credentials,
-            intervalStore: MemoryIntervalStore(.default),
+            providerSettingsStore: MemoryProviderSettingsStore(),
             appearanceStore: MemoryMenuBarAppearanceStore(),
             budgetStore: MemoryAPIBudgetStore(),
             sleepObserver: ControllableSleepObserver(),

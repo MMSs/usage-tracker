@@ -7,6 +7,8 @@ final class ProviderViewModel: ObservableObject, Identifiable {
     let subscription: HalfViewModel?
     let api: HalfViewModel?
     @Published private(set) var isConfigured = false
+    /// Off: no menu bar item and no fetching; credentials and the last report are kept.
+    @Published var isEnabled = true
 
     nonisolated var id: Provider { descriptor.id }
 

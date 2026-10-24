@@ -7,12 +7,16 @@ import Foundation
 final class AppModel: ObservableObject {
     let providers: [ProviderViewModel]
     let credentialStore: CredentialStoring
-    let intervalStore: RefreshIntervalStoring
+    let providerSettingsStore: ProviderSettingsStoring
     let appearanceStore: MenuBarAppearanceStoring
     let budgetStore: APIBudgetStoring
     private(set) var scheduler: RefreshScheduler!
     /// Set by the app delegate; opens the Settings window. A no-op until then.
     var presentSettings: (SettingsRequest) -> Void = { _ in }
+
+    /// The appearance every provider uses unless it overrides it.
+    @Published private(set) var globalAppearance: MenuBarAppearance
+    @Published private(set) var providerSettings: [Provider: ProviderSettings]
 
     private var isStarted = false
     private var providerObservers: [AnyCancellable] = []
@@ -20,7 +24,7 @@ final class AppModel: ObservableObject {
     init(
         providers: [ProviderViewModel],
         credentialStore: CredentialStoring,
-        intervalStore: RefreshIntervalStoring,
+        providerSettingsStore: ProviderSettingsStoring,
         appearanceStore: MenuBarAppearanceStoring,
         budgetStore: APIBudgetStoring,
         sleepObserver: SystemSleepObserving,
@@ -31,9 +35,15 @@ final class AppModel: ObservableObject {
     ) {
         self.providers = providers
         self.credentialStore = credentialStore
-        self.intervalStore = intervalStore
+        self.providerSettingsStore = providerSettingsStore
         self.appearanceStore = appearanceStore
         self.budgetStore = budgetStore
+        globalAppearance = appearanceStore.appearance()
+        providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, providerSettingsStore.settings(for: $0.id)) })
+
+        for provider in providers {
+            provider.isEnabled = providerSettings[provider.id]?.isEnabled ?? true
+        }
 
         // Forward provider changes so the menu bar scenes re-evaluate `insertedProviders`.
         providerObservers = providers.map { provider in
@@ -42,9 +52,9 @@ final class AppModel: ObservableObject {
 
         // The scheduler is owned by the model, so its closures hold the model weakly.
         scheduler = RefreshScheduler(
-            interval: intervalStore.interval(),
+            schedules: Self.schedules(providerSettings),
             initialRefresh: { [weak self] in await self?.refreshAll(manual: false) },
-            periodicRefresh: { [weak self] in await self?.refreshAll(manual: false) },
+            periodicRefresh: { [weak self] provider in await self?.refresh(provider, manual: false) },
             sleepObserver: sleepObserver,
             networkObserver: networkObserver,
             sleep: sleep
@@ -60,9 +70,10 @@ final class AppModel: ObservableObject {
         scheduler.start()
     }
 
+    /// Refreshes every enabled provider; disabled ones keep their last report untouched.
     func refreshAll(manual: Bool) async {
         await withTaskGroup(of: Void.self) { group in
-            for provider in providers {
+            for provider in providers where provider.isEnabled {
                 group.addTask {
                     await provider.refresh(manual: manual)
                 }
@@ -70,16 +81,55 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func setInterval(_ interval: RefreshInterval) {
-        intervalStore.setInterval(interval)
-        scheduler.setInterval(interval)
+    private func refresh(_ id: Provider, manual: Bool) async {
+        let provider = provider(id)
+        guard provider.isEnabled else {
+            return
+        }
+
+        await provider.refresh(manual: manual)
     }
 
-    /// Configured providers in registry order; the first provider alone when none is
-    /// configured, so there is always an item to click.
+    // MARK: Settings
+
+    func settings(for provider: Provider) -> ProviderSettings {
+        providerSettings[provider] ?? .default
+    }
+
+    func setSettings(_ settings: ProviderSettings, for id: Provider) {
+        providerSettings[id] = settings
+        providerSettingsStore.setSettings(settings, for: id)
+        provider(id).isEnabled = settings.isEnabled
+        scheduler.setSchedule(settings.isEnabled ? settings.refreshInterval : nil, for: id)
+    }
+
+    func setGlobalAppearance(_ appearance: MenuBarAppearance) {
+        globalAppearance = appearance
+        appearanceStore.setAppearance(appearance)
+    }
+
+    /// The provider's override when it has one, else the global appearance.
+    func appearance(for provider: Provider) -> MenuBarAppearance {
+        settings(for: provider).appearanceOverride ?? globalAppearance
+    }
+
+    private static func schedules(_ settings: [Provider: ProviderSettings]) -> [Provider: RefreshInterval] {
+        settings.filter { $0.value.isEnabled }.mapValues(\.refreshInterval)
+    }
+
+    // MARK: Menu bar
+
+    /// Configured, enabled providers in registry order. When nothing is
+    /// configured, the first provider alone, so there is always an item to
+    /// click. When everything configured is disabled, nothing: the app is
+    /// reached by opening it.
     var insertedProviders: [Provider] {
-        let configured = providers.filter(\.isConfigured).map(\.id)
-        return configured.isEmpty ? [ProviderRegistry.all[0].id] : configured
+        let configured = providers.filter(\.isConfigured)
+        guard !configured.isEmpty else {
+            return [ProviderRegistry.all[0].id]
+        }
+
+        return configured.filter(\.isEnabled).map(\.id)
     }
 
     func provider(_ id: Provider) -> ProviderViewModel {
@@ -105,7 +155,7 @@ final class AppModel: ObservableObject {
         return AppModel(
             providers: providers,
             credentialStore: credentialStore,
-            intervalStore: UserDefaultsRefreshIntervalStore(),
+            providerSettingsStore: UserDefaultsProviderSettingsStore(),
             appearanceStore: UserDefaultsMenuBarAppearanceStore(),
             budgetStore: UserDefaultsAPIBudgetStore(),
             sleepObserver: SystemSleepObserver(),

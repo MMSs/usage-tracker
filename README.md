@@ -51,10 +51,14 @@ by opening the app again from Finder or Spotlight. The app appears in the Dock
 while the window is open and leaves when it closes. Starting at login does not
 open it.
 
-- Refresh interval: 1, 5, 15, or 60 minutes. The default is 5. Refreshing
-  pauses while the Mac is asleep or offline and resumes when both are back.
-- Menu bar: show text, a countdown, and a graph drawn as Rings or Bars. The
-  Colored option tints the text and graph by remaining capacity or pacing.
+- General: the menu bar defaults for every provider. Show text, a countdown,
+  and a graph drawn as Rings or Bars. Colored tints the text and graph by
+  remaining capacity or pacing.
+- Each provider tab: an Enabled switch (off removes the item and stops
+  fetching, credentials stay), the refresh interval (1, 5, 15, or 60 minutes,
+  default 5), and an optional custom appearance that overrides the defaults.
+  Refreshing pauses while the Mac is asleep or offline and resumes when both
+  are back.
 
 ## Status
 

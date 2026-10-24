@@ -6,7 +6,6 @@ protocol MenuBarAppearanceStoring: AnyObject {
 }
 
 final class UserDefaultsMenuBarAppearanceStore: MenuBarAppearanceStoring {
-    /// Also read by the app's menu bar label through `@AppStorage`.
     static let showTextKey = "menuBarShowText"
     static let countdownKey = "menuBarCountdown"
     static let showGraphKey = "menuBarShowGraph"

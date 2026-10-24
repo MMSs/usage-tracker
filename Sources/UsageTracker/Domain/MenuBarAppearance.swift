@@ -1,6 +1,6 @@
 import Foundation
 
-enum MenuBarGraphStyle: String, CaseIterable, Identifiable, Sendable {
+enum MenuBarGraphStyle: String, CaseIterable, Identifiable, Codable, Sendable {
     case rings, bars
 
     var id: String { rawValue }
@@ -13,7 +13,7 @@ enum MenuBarGraphStyle: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-struct MenuBarAppearance: Equatable, Sendable {
+struct MenuBarAppearance: Equatable, Codable, Sendable {
     var showText = true
     var countdown = false
     var showGraph = true

@@ -23,20 +23,8 @@ struct ProviderMenuBarScene: Scene {
     @ObservedObject var provider: ProviderViewModel
     @ObservedObject var model: AppModel
 
-    @AppStorage(UserDefaultsMenuBarAppearanceStore.showTextKey) private var showText = MenuBarAppearance.default.showText
-    @AppStorage(UserDefaultsMenuBarAppearanceStore.countdownKey) private var countdown = MenuBarAppearance.default.countdown
-    @AppStorage(UserDefaultsMenuBarAppearanceStore.showGraphKey) private var showGraph = MenuBarAppearance.default.showGraph
-    @AppStorage(UserDefaultsMenuBarAppearanceStore.graphStyleKey) private var graphStyle = MenuBarAppearance.default.graphStyle.rawValue
-    @AppStorage(UserDefaultsMenuBarAppearanceStore.coloredKey) private var colored = MenuBarAppearance.default.colored
-
     private var appearance: MenuBarAppearance {
-        MenuBarAppearance(
-            showText: showText,
-            countdown: countdown,
-            showGraph: showGraph,
-            graphStyle: MenuBarGraphStyle(rawValue: graphStyle) ?? MenuBarAppearance.default.graphStyle,
-            colored: colored
-        )
+        model.appearance(for: provider.id)
     }
 
     private var item: MenuBarItem {

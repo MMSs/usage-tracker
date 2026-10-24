@@ -1,37 +1,39 @@
 import Foundation
 
 /// Fetching is pointless while the Mac is asleep or the network is down, so
-/// the scheduler runs its timer only while both hold and treats any entry into
-/// that state as a reason to refresh straight away.
+/// the scheduler runs its timers only while both hold and treats any entry
+/// into that state as a reason to refresh straight away. Each scheduled
+/// provider has its own timer and interval.
 @MainActor
 final class RefreshScheduler {
     typealias Refresh = @MainActor () async -> Void
+    typealias ProviderRefresh = @MainActor (Provider) async -> Void
     typealias Sleep = @MainActor (Duration) async -> Void
 
     private let initialRefresh: Refresh
-    private let periodicRefresh: Refresh
+    private let periodicRefresh: ProviderRefresh
     private let sleep: Sleep
     private let sleepObserver: SystemSleepObserving
     private let networkObserver: NetworkReachabilityObserving
 
-    private var interval: RefreshInterval
+    private var schedules: [Provider: RefreshInterval]
     private var isAwake = true
     private var isOnline = true
     private var isStarted = false
     private var initialRefreshTask: Task<Void, Never>?
-    private var periodicRefreshTask: Task<Void, Never>?
+    private var periodicTasks: [Provider: Task<Void, Never>] = [:]
 
     init(
-        interval: RefreshInterval,
+        schedules: [Provider: RefreshInterval],
         initialRefresh: @escaping Refresh,
-        periodicRefresh: @escaping Refresh,
+        periodicRefresh: @escaping ProviderRefresh,
         sleepObserver: SystemSleepObserving,
         networkObserver: NetworkReachabilityObserving,
         sleep: @escaping Sleep = { duration in
             try? await Task.sleep(for: duration)
         }
     ) {
-        self.interval = interval
+        self.schedules = schedules
         self.initialRefresh = initialRefresh
         self.periodicRefresh = periodicRefresh
         self.sleepObserver = sleepObserver
@@ -62,7 +64,7 @@ final class RefreshScheduler {
             self?.setOnline(isOnline)
         }
 
-        startPeriodicCycle(refreshingImmediately: false)
+        startAllCycles(refreshingImmediately: false)
     }
 
     func stop() {
@@ -70,22 +72,26 @@ final class RefreshScheduler {
         networkObserver.stopObserving()
         initialRefreshTask?.cancel()
         initialRefreshTask = nil
-        cancelPeriodicCycle()
+        cancelAllCycles()
         isStarted = false
     }
 
-    func setInterval(_ interval: RefreshInterval) {
-        guard interval != self.interval else {
+    /// Nil removes the provider's timer. A change restarts only that provider's countdown.
+    func setSchedule(_ interval: RefreshInterval?, for provider: Provider) {
+        guard interval != schedules[provider] else {
             return
         }
 
-        self.interval = interval
+        schedules[provider] = interval
 
         guard isStarted, isActive else {
             return
         }
 
-        startPeriodicCycle(refreshingImmediately: false)
+        cancelCycle(for: provider)
+        if let interval {
+            startCycle(for: provider, interval: interval, refreshingImmediately: false)
+        }
     }
 
     private var isActive: Bool {
@@ -118,27 +124,33 @@ final class RefreshScheduler {
         }
 
         guard isActive else {
-            cancelPeriodicCycle()
+            cancelAllCycles()
             return
         }
 
-        startPeriodicCycle(refreshingImmediately: true)
+        startAllCycles(refreshingImmediately: true)
     }
 
-    private func startPeriodicCycle(refreshingImmediately: Bool) {
-        cancelPeriodicCycle()
+    private func startAllCycles(refreshingImmediately: Bool) {
+        cancelAllCycles()
 
         guard isActive else {
             return
         }
 
+        for (provider, interval) in schedules {
+            startCycle(for: provider, interval: interval, refreshingImmediately: refreshingImmediately)
+        }
+    }
+
+    private func startCycle(for provider: Provider, interval: RefreshInterval, refreshingImmediately: Bool) {
         let duration = interval.duration
         let periodicRefresh = periodicRefresh
         let sleep = sleep
 
-        periodicRefreshTask = Task {
+        periodicTasks[provider] = Task {
             if refreshingImmediately {
-                await periodicRefresh()
+                await periodicRefresh(provider)
 
                 guard !Task.isCancelled else {
                     return
@@ -152,13 +164,18 @@ final class RefreshScheduler {
                     return
                 }
 
-                await periodicRefresh()
+                await periodicRefresh(provider)
             }
         }
     }
 
-    private func cancelPeriodicCycle() {
-        periodicRefreshTask?.cancel()
-        periodicRefreshTask = nil
+    private func cancelCycle(for provider: Provider) {
+        periodicTasks[provider]?.cancel()
+        periodicTasks[provider] = nil
+    }
+
+    private func cancelAllCycles() {
+        periodicTasks.values.forEach { $0.cancel() }
+        periodicTasks.removeAll()
     }
 }

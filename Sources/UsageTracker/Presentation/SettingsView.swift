@@ -72,17 +72,120 @@ struct SettingsRow<Control: View>: View {
     }
 }
 
+struct SwitchToggle: View {
+    @Binding var isOn: Bool
+
+    var body: some View {
+        Toggle("", isOn: $isOn)
+            .labelsHidden()
+            .toggleStyle(.switch)
+            .controlSize(.small)
+    }
+}
+
+/// The five appearance rows, used for the global defaults and for a provider's override.
+struct MenuBarAppearanceRows: View {
+    @Binding var appearance: MenuBarAppearance
+
+    var body: some View {
+        SettingsRow(label: "Show text") {
+            SwitchToggle(isOn: binding(\.showText) { $0.showingText($1) })
+                .disabled(appearance.showText && !appearance.showGraph)
+        }
+        SettingsRow(label: "Countdown") {
+            SwitchToggle(isOn: binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
+        }
+        SettingsRow(label: "Show graph") {
+            SwitchToggle(isOn: binding(\.showGraph) { $0.showingGraph($1) })
+                .disabled(appearance.showGraph && !appearance.showText)
+        }
+        SettingsRow(label: "Graph style") {
+            Picker("Graph style", selection: binding(\.graphStyle) { var copy = $0; copy.graphStyle = $1; return copy }) {
+                ForEach(MenuBarGraphStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
+        }
+        SettingsRow(label: "Colored", isLast: true) {
+            SwitchToggle(isOn: binding(\.colored) { var copy = $0; copy.colored = $1; return copy })
+        }
+    }
+
+    /// Reads one property and writes through `apply`, which may refuse a change.
+    private func binding<Value>(
+        _ keyPath: KeyPath<MenuBarAppearance, Value>,
+        apply: @escaping (MenuBarAppearance, Value) -> MenuBarAppearance
+    ) -> Binding<Value> {
+        Binding(
+            get: { appearance[keyPath: keyPath] },
+            set: { appearance = apply(appearance, $0) }
+        )
+    }
+}
+
+struct RefreshIntervalPicker: View {
+    @Binding var interval: RefreshInterval
+
+    var body: some View {
+        Picker("Every", selection: $interval) {
+            ForEach(RefreshInterval.allCases) { option in
+                Text(option.title).tag(option)
+            }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+    }
+}
+
+/// The menu bar item for `provider` as it would render with `appearance`.
+@MainActor
+func previewItem(for provider: ProviderViewModel, in appModel: AppModel) -> MenuBarItem? {
+    MenuBarItemBuilder.make(
+        descriptor: provider.descriptor,
+        subscription: provider.subscription.map(HalfSnapshot.init),
+        api: provider.api.map(HalfSnapshot.init),
+        apiBudget: appModel.budgetStore.budget(for: provider.id),
+        now: Date()
+    )
+}
+
 struct ProviderSettingsView: View {
     @ObservedObject var provider: ProviderViewModel
-    let appModel: AppModel
+    @ObservedObject var appModel: AppModel
     let helpFieldID: String?
+
+    private var settings: Binding<ProviderSettings> {
+        Binding(
+            get: { appModel.settings(for: provider.id) },
+            set: { appModel.setSettings($0, for: provider.id) }
+        )
+    }
 
     private var status: ProviderStatus {
         let halves = [provider.subscription, provider.api].compactMap { $0 }
         return ProviderStatus.make(
             configured: provider.isConfigured,
+            enabled: provider.isEnabled,
             statuses: halves.map(\.status),
             planName: halves.compactMap { $0.report?.planName }.first
+        )
+    }
+
+    private var usesCustomAppearance: Binding<Bool> {
+        Binding(
+            get: { settings.wrappedValue.appearanceOverride != nil },
+            set: { settings.wrappedValue.appearanceOverride = $0 ? appModel.globalAppearance : nil }
+        )
+    }
+
+    private var overrideAppearance: Binding<MenuBarAppearance> {
+        Binding(
+            get: { settings.wrappedValue.appearanceOverride ?? appModel.globalAppearance },
+            set: { settings.wrappedValue.appearanceOverride = $0 }
         )
     }
 
@@ -92,7 +195,8 @@ struct ProviderSettingsView: View {
                 provider: provider.id,
                 displayName: provider.descriptor.displayName,
                 status: status,
-                updatedText: provider.isConfigured ? PopoverPresentation.updatedText(provider.updatedAt) : nil
+                updatedText: provider.isConfigured ? PopoverPresentation.updatedText(provider.updatedAt) : nil,
+                isEnabled: provider.isConfigured ? settings.isEnabled : nil
             )
 
             SettingsSection(title: "Credentials") {
@@ -117,6 +221,37 @@ struct ProviderSettingsView: View {
             Text("Stored only in your login Keychain. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            SettingsSection(title: "Refresh") {
+                SettingsRow(label: "Every", isLast: true) {
+                    RefreshIntervalPicker(interval: settings.refreshInterval)
+                }
+            }
+
+            SettingsSection(title: "Menu bar") {
+                SettingsRow(label: "Custom appearance", isLast: !usesCustomAppearance.wrappedValue) {
+                    SwitchToggle(isOn: usesCustomAppearance)
+                }
+
+                if usesCustomAppearance.wrappedValue {
+                    MenuBarPreviewStrip(
+                        item: previewItem(for: provider, in: appModel),
+                        appearance: overrideAppearance.wrappedValue,
+                        displayName: provider.descriptor.displayName,
+                        caption: "This provider's item with its own settings."
+                    )
+                    .padding(.vertical, 10)
+
+                    Divider()
+                    MenuBarAppearanceRows(appearance: overrideAppearance)
+                }
+            }
+
+            Text(usesCustomAppearance.wrappedValue
+                 ? "These settings apply to this provider only."
+                 : "Follows the defaults on the General tab.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding(SettingsLayout.padding)
         .frame(width: SettingsLayout.pageWidth)
@@ -127,84 +262,11 @@ struct ProviderSettingsView: View {
 struct GeneralSettingsView: View {
     @ObservedObject var appModel: AppModel
 
-    @State private var appearance: MenuBarAppearance
-    @State private var interval: RefreshInterval
-
-    init(appModel: AppModel) {
-        self.appModel = appModel
-        _appearance = State(initialValue: appModel.appearanceStore.appearance())
-        _interval = State(initialValue: appModel.intervalStore.interval())
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            MenuBarPreviewStrip(item: previewItem, appearance: appearance, displayName: previewProvider?.descriptor.displayName ?? "")
-
-            SettingsSection(title: "Menu bar") {
-                SettingsRow(label: "Show text") {
-                    switchToggle(binding(\.showText) { $0.showingText($1) })
-                        .disabled(appearance.showText && !appearance.showGraph)
-                }
-                SettingsRow(label: "Countdown") {
-                    switchToggle(binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
-                }
-                SettingsRow(label: "Show graph") {
-                    switchToggle(binding(\.showGraph) { $0.showingGraph($1) })
-                        .disabled(appearance.showGraph && !appearance.showText)
-                }
-                SettingsRow(label: "Graph style") {
-                    Picker("Graph style", selection: binding(\.graphStyle) { var copy = $0; copy.graphStyle = $1; return copy }) {
-                        ForEach(MenuBarGraphStyle.allCases) { style in
-                            Text(style.title).tag(style)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                SettingsRow(label: "Colored", isLast: true) {
-                    switchToggle(binding(\.colored) { var copy = $0; copy.colored = $1; return copy })
-                }
-            }
-
-            SettingsSection(title: "Refresh") {
-                SettingsRow(label: "Every", isLast: true) {
-                    Picker("Every", selection: Binding(
-                        get: { interval },
-                        set: { newValue in
-                            interval = newValue
-                            appModel.setInterval(newValue)
-                        }
-                    )) {
-                        ForEach(RefreshInterval.allCases) { option in
-                            Text(option.title).tag(option)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-            }
-
-            Text("Refreshing pauses while the Mac is asleep or offline. Colored tints the item by remaining capacity or pacing.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(SettingsLayout.padding)
-        .frame(width: SettingsLayout.pageWidth)
-        .fixedSize(horizontal: false, vertical: true)
-        .onAppear {
-            appearance = appModel.appearanceStore.appearance()
-            interval = appModel.intervalStore.interval()
-        }
-    }
-
-    private func switchToggle(_ isOn: Binding<Bool>) -> some View {
-        Toggle("", isOn: isOn)
-            .labelsHidden()
-            .toggleStyle(.switch)
-            .controlSize(.small)
+    private var appearance: Binding<MenuBarAppearance> {
+        Binding(
+            get: { appModel.globalAppearance },
+            set: { appModel.setGlobalAppearance($0) }
+        )
     }
 
     /// The configured provider shown in the preview, else the first listed one.
@@ -212,29 +274,25 @@ struct GeneralSettingsView: View {
         appModel.providers.first(where: \.isConfigured) ?? appModel.providers.first(where: \.hasAnyHalf)
     }
 
-    private var previewItem: MenuBarItem? {
-        previewProvider.flatMap { provider in
-            MenuBarItemBuilder.make(
-                descriptor: provider.descriptor,
-                subscription: provider.subscription.map(HalfSnapshot.init),
-                api: provider.api.map(HalfSnapshot.init),
-                apiBudget: appModel.budgetStore.budget(for: provider.id),
-                now: Date()
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            MenuBarPreviewStrip(
+                item: previewProvider.flatMap { previewItem(for: $0, in: appModel) },
+                appearance: appearance.wrappedValue,
+                displayName: previewProvider?.descriptor.displayName ?? ""
             )
-        }
-    }
 
-    /// Reads one appearance property and writes changes through the store; `apply` may refuse a change.
-    private func binding<Value>(
-        _ keyPath: KeyPath<MenuBarAppearance, Value>,
-        apply: @escaping (MenuBarAppearance, Value) -> MenuBarAppearance
-    ) -> Binding<Value> {
-        Binding(
-            get: { appearance[keyPath: keyPath] },
-            set: { newValue in
-                appearance = apply(appearance, newValue)
-                appModel.appearanceStore.setAppearance(appearance)
+            SettingsSection(title: "Menu bar") {
+                MenuBarAppearanceRows(appearance: appearance)
             }
-        )
+
+            Text("Defaults for every provider. A provider's tab can override them and sets its own refresh rate. Colored tints the item by remaining capacity or pacing.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(SettingsLayout.padding)
+        .frame(width: SettingsLayout.pageWidth)
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
