@@ -243,6 +243,9 @@ final class SettingsTabViewController: NSTabViewController {
 
     /// Only a tab the user picked changes the selection; the initial load and
     /// programmatic changes do not.
+    /// Set while a resize is queued, so several height reports in one pass resize once.
+    private var isFitQueued = false
+
     override func viewDidLoad() {
         super.viewDidLoad()
         for item in tabViewItems {
@@ -250,8 +253,25 @@ final class SettingsTabViewController: NSTabViewController {
                 guard let self, let item, self.tabViewItems.firstIndex(of: item) == self.selectedTabViewItemIndex else {
                     return
                 }
-                self.fitWindow(animated: true)
+                self.queueFit()
             }
+        }
+    }
+
+    /// Height reports arrive inside SwiftUI's layout pass; resizing the window
+    /// there re-enters layout. Resize once, on the next turn, without animation.
+    private func queueFit() {
+        guard !isFitQueued else {
+            return
+        }
+
+        isFitQueued = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else {
+                return
+            }
+            self.isFitQueued = false
+            self.fitWindow(animated: false)
         }
     }
 
