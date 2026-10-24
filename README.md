@@ -27,15 +27,23 @@ and every later launch fails with `Launchd job spawn failed`.
 
 ## Setting up Cursor
 
-On first launch the menu bar shows one Usage Tracker item. Click it, then click
-Set up to open Settings. Once a provider is configured it gets its own menu bar
-item; unconfigured providers show nothing.
+Opening the app shows the Settings window; the menu bar gets one Usage
+Tracker item. Pick Cursor in the sidebar, or click the menu bar item and then
+Set up. Once a provider is configured it gets its own menu bar item;
+unconfigured providers show nothing.
 
 Paste the value of the `WorkosCursorSessionToken` cookie into the field. The
 help button beside the field explains where to find it in your browser. The
 value saves shortly after you stop typing, and only to the login Keychain.
+Afterwards the field shows the first and last few characters of the saved
+value so you can tell which one is in use; paste over it to replace it.
 
 ## Settings
+
+Settings is its own window. Open it from the gear in any menu bar popover, or
+by opening the app again from Finder or Spotlight. The app appears in the Dock
+while the window is open and leaves when it closes. Starting at login does not
+open it.
 
 - Refresh interval: 1, 5, 15, or 60 minutes. The default is 5. Refreshing
   pauses while the Mac is asleep or offline and resumes when both are back.

@@ -4,26 +4,10 @@ import SwiftUI
 struct ProviderPopoverView: View {
     @ObservedObject var provider: ProviderViewModel
     let appModel: AppModel
-    @State private var isSettingsPresented = false
-    /// Set when Settings is opened from Set up, so the credential help starts open.
-    @State private var opensHelp = false
     @State private var escapeMonitor = EscapeMonitorState()
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Group {
-            if isSettingsPresented {
-                SettingsView(
-                    appModel: appModel, expanded: provider.id, openHelpForExpanded: opensHelp,
-                    onBack: { isSettingsPresented = false }
-                )
-                    .transition(pageTransition(edge: .trailing))
-            } else {
-                reportPage
-                    .transition(pageTransition(edge: .leading))
-            }
-        }
-        .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: isSettingsPresented)
+        reportPage
         .frame(width: PopoverLayout.width)
         .fixedSize(horizontal: false, vertical: true)
         .background(HostingWindowReader(onWindow: { window in
@@ -65,8 +49,7 @@ struct ProviderPopoverView: View {
 
             HStack {
                 Button("Set up") {
-                    opensHelp = true
-                    isSettingsPresented = true
+                    openSettings(opensHelp: true)
                 }
                 .buttonStyle(.borderedProminent)
                 .keyboardShortcut(.defaultAction)
@@ -305,8 +288,7 @@ struct ProviderPopoverView: View {
             .accessibilityLabel("Refresh")
 
             Button {
-                opensHelp = false
-                isSettingsPresented = true
+                openSettings(opensHelp: false)
             } label: {
                 Image(systemName: "gearshape")
             }
@@ -328,11 +310,13 @@ struct ProviderPopoverView: View {
 
     // MARK: - Window behaviour
 
-    private func pageTransition(edge: Edge) -> AnyTransition {
-        reduceMotion ? .opacity : .move(edge: edge).combined(with: .opacity)
+    /// Settings lives in its own window, so the popover closes to make way for it.
+    private func openSettings(opensHelp: Bool) {
+        MenuBarPopover.dismiss()
+        appModel.presentSettings(SettingsRequest(provider: provider.id, opensHelp: opensHelp))
     }
 
-    /// Escape steps back from Settings, then closes the popover.
+    /// Escape closes the popover.
     private func installEscapeMonitor() {
         removeEscapeMonitor()
         let state = escapeMonitor
@@ -340,11 +324,7 @@ struct ProviderPopoverView: View {
             guard event.window === state.window, event.keyCode == 53 else { return event }
 
             DispatchQueue.main.async {
-                if isSettingsPresented {
-                    isSettingsPresented = false
-                } else {
-                    MenuBarPopover.dismiss()
-                }
+                MenuBarPopover.dismiss()
             }
             return nil
         }

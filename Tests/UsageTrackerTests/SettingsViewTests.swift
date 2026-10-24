@@ -2,22 +2,38 @@ import Testing
 @testable import UsageTracker
 
 @Suite @MainActor struct SettingsViewTests {
-    @Test func focusIsTheExpandedProviderWhenListed() {
-        #expect(SettingsView.focusedProvider(expanded: .anthropic, listed: [.cursor, .anthropic]) == .anthropic)
+    @Test func requestedProviderPageWhenListed() {
+        let request = SettingsRequest(provider: .anthropic)
+
+        #expect(SettingsPage.resolve(request, listed: [.cursor, .anthropic]) == .provider(.anthropic))
     }
 
-    @Test func focusFallsBackToTheFirstListedProvider() {
-        #expect(SettingsView.focusedProvider(expanded: .openai, listed: [.cursor]) == .cursor)
-        #expect(SettingsView.focusedProvider(expanded: .openai, listed: []) == nil)
+    @Test func fallsBackToGeneral() {
+        #expect(SettingsPage.resolve(SettingsRequest(provider: .openai), listed: [.cursor]) == .general)
+        #expect(SettingsPage.resolve(.general, listed: [.cursor]) == .general)
     }
 
-    @Test func setUpOpensHelpOnTheFocusedProvidersFirstField() {
+    @Test func setUpOpensHelpOnTheRequestedProvidersFirstField() {
         let cursor = ProviderRegistry.descriptor(for: .cursor)
         let anthropic = ProviderRegistry.descriptor(for: .anthropic)
 
-        #expect(SettingsView.helpFieldID(for: cursor, focused: .cursor, openHelp: true) == "session-token")
-        #expect(SettingsView.helpFieldID(for: anthropic, focused: .anthropic, openHelp: true) == "session-key")
-        #expect(SettingsView.helpFieldID(for: cursor, focused: .cursor, openHelp: false) == nil)
-        #expect(SettingsView.helpFieldID(for: anthropic, focused: .cursor, openHelp: true) == nil)
+        #expect(SettingsView.helpFieldID(for: cursor, helpProvider: .cursor) == "session-token")
+        #expect(SettingsView.helpFieldID(for: anthropic, helpProvider: .anthropic) == "session-key")
+        #expect(SettingsView.helpFieldID(for: cursor, helpProvider: nil) == nil)
+        #expect(SettingsView.helpFieldID(for: anthropic, helpProvider: .cursor) == nil)
+    }
+
+    @Test func selectionAppliesRequestsAndDropsHelpWhenLeavingThePage() {
+        let selection = SettingsSelection()
+
+        selection.apply(SettingsRequest(provider: .cursor, opensHelp: true), listed: [.cursor])
+        #expect(selection.page == .provider(.cursor))
+        #expect(selection.helpProvider == .cursor)
+
+        selection.apply(SettingsRequest(provider: .cursor, opensHelp: false), listed: [.cursor])
+        #expect(selection.helpProvider == nil)
+
+        selection.apply(SettingsRequest(provider: .openai, opensHelp: true), listed: [.cursor])
+        #expect(selection.page == .general)
     }
 }

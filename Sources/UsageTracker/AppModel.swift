@@ -11,6 +11,8 @@ final class AppModel: ObservableObject {
     let appearanceStore: MenuBarAppearanceStoring
     let budgetStore: APIBudgetStoring
     private(set) var scheduler: RefreshScheduler!
+    /// Set by the app delegate; opens the Settings window. A no-op until then.
+    var presentSettings: (SettingsRequest) -> Void = { _ in }
 
     private var isStarted = false
     private var providerObservers: [AnyCancellable] = []

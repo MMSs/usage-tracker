@@ -4,15 +4,14 @@ import SwiftUI
 struct UsageTrackerApp: App {
     nonisolated static let applicationName = "Usage Tracker"
 
-    @StateObject private var model: AppModel
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
-        _model = StateObject(wrappedValue: AppModel.live())
         UserDefaults.standard.register(defaults: ["AppleKeyboardUIMode": 2])
-        AppStartup.configure(loginItemManager: LoginItemManager())
     }
 
     var body: some Scene {
+        let model = delegate.model
         // Scenes cannot be generated with ForEach, so one per registry slot.
         ProviderMenuBarScene(provider: model.providers[0], model: model)
         ProviderMenuBarScene(provider: model.providers[1], model: model)
