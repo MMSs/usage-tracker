@@ -4,16 +4,19 @@ struct SettingsView: View {
     @ObservedObject var appModel: AppModel
     /// The provider expanded first and shown in the preview; nil when none is listed.
     let focused: Provider?
+    /// True when reached from a `Set up` item: the focused provider's first help opens.
+    let openHelpForExpanded: Bool
     let onBack: () -> Void
 
     @State private var expandedProviders: Set<Provider>
     @State private var appearance: MenuBarAppearance
     @State private var interval: RefreshInterval
 
-    init(appModel: AppModel, expanded: Provider, onBack: @escaping () -> Void) {
+    init(appModel: AppModel, expanded: Provider, openHelpForExpanded: Bool = false, onBack: @escaping () -> Void) {
         self.appModel = appModel
         let focused = Self.focusedProvider(expanded: expanded, listed: appModel.providers.filter(\.hasAnyHalf).map(\.id))
         self.focused = focused
+        self.openHelpForExpanded = openHelpForExpanded
         self.onBack = onBack
         _expandedProviders = State(initialValue: Set(focused.map { [$0] } ?? []))
         _appearance = State(initialValue: appModel.appearanceStore.appearance())
@@ -23,6 +26,15 @@ struct SettingsView: View {
     /// `expanded` when it is listed, otherwise the first listed provider.
     static func focusedProvider(expanded: Provider, listed: [Provider]) -> Provider? {
         listed.contains(expanded) ? expanded : listed.first
+    }
+
+    /// The field whose help starts open: the focused provider's first, when arriving from Set up.
+    static func helpFieldID(for descriptor: ProviderDescriptor, focused: Provider?, openHelp: Bool) -> String? {
+        guard openHelp, descriptor.id == focused else {
+            return nil
+        }
+
+        return (descriptor.subscriptionFields + descriptor.apiFields).first?.id
     }
 
     /// Providers with nothing to fetch yet are left out, so no credential is stored unused.
@@ -83,6 +95,8 @@ struct SettingsView: View {
             }
         )
 
+        let helpFieldID = Self.helpFieldID(for: provider.descriptor, focused: focused, openHelp: openHelpForExpanded)
+
         return DisclosureGroup(isExpanded: isExpanded) {
             VStack(alignment: .leading, spacing: 12) {
                 ForEach(provider.descriptor.subscriptionFields + provider.descriptor.apiFields) { field in
@@ -91,6 +105,7 @@ struct SettingsView: View {
                         key: CredentialKey(provider: provider.id, fieldID: field.id),
                         store: appModel.credentialStore,
                         budgetStore: appModel.budgetStore,
+                        opensHelp: field.id == helpFieldID,
                         onChange: { await appModel.provider(provider.id).credentialsChanged(half: field.half) }
                     )
                 }

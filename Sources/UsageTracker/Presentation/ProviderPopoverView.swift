@@ -5,13 +5,18 @@ struct ProviderPopoverView: View {
     @ObservedObject var provider: ProviderViewModel
     let appModel: AppModel
     @State private var isSettingsPresented = false
+    /// Set when Settings is opened from Set up, so the credential help starts open.
+    @State private var opensHelp = false
     @State private var escapeMonitor = EscapeMonitorState()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
             if isSettingsPresented {
-                SettingsView(appModel: appModel, expanded: provider.id, onBack: { isSettingsPresented = false })
+                SettingsView(
+                    appModel: appModel, expanded: provider.id, openHelpForExpanded: opensHelp,
+                    onBack: { isSettingsPresented = false }
+                )
                     .transition(pageTransition(edge: .trailing))
             } else {
                 reportPage
@@ -60,6 +65,7 @@ struct ProviderPopoverView: View {
 
             HStack {
                 Button("Set up") {
+                    opensHelp = true
                     isSettingsPresented = true
                 }
                 .buttonStyle(.borderedProminent)
@@ -299,6 +305,7 @@ struct ProviderPopoverView: View {
             .accessibilityLabel("Refresh")
 
             Button {
+                opensHelp = false
                 isSettingsPresented = true
             } label: {
                 Image(systemName: "gearshape")
