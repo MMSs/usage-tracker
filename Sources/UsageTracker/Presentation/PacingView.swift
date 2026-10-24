@@ -21,7 +21,7 @@ struct PacingView: View {
             HStack {
                 Label(
                     PopoverPresentation.pillText(pacing, unit: unit),
-                    systemImage: tint == .overBudget ? "exclamationmark.triangle.fill" : "checkmark.circle.fill"
+                    systemImage: PopoverPresentation.pillSymbol(tint)
                 )
                 .font(.caption.weight(.medium))
                 .foregroundStyle(tint.color)

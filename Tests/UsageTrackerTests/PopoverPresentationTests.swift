@@ -36,6 +36,12 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(PopoverPresentation.pillText(pacing(status: .onTrack(by: Decimal(string: "4.2")!)), unit: .percent) == "On track by 4.2%")
     }
 
+    @Test func pillSymbolFollowsTint() {
+        #expect(PopoverPresentation.pillSymbol(.onPace) == "checkmark.circle.fill")
+        #expect(PopoverPresentation.pillSymbol(.nearingLimit) == "exclamationmark.circle.fill")
+        #expect(PopoverPresentation.pillSymbol(.overBudget) == "exclamationmark.triangle.fill")
+    }
+
     @Test func daysLeft() {
         #expect(PopoverPresentation.daysLeftText(pacing(status: .onTrack(by: 0), remainingDays: 18)) == "18 days left")
         #expect(PopoverPresentation.daysLeftText(pacing(status: .onTrack(by: 0), remainingDays: 1)) == "1 day left")

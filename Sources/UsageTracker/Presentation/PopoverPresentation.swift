@@ -8,6 +8,15 @@ enum PopoverPresentation {
         }
     }
 
+    /// SF Symbol for the pacing pill: a check on pace, a warning that escalates with the tint.
+    static func pillSymbol(_ tint: PacingTint) -> String {
+        switch tint {
+        case .onPace, .neutral: "checkmark.circle.fill"
+        case .nearingLimit: "exclamationmark.circle.fill"
+        case .overBudget: "exclamationmark.triangle.fill"
+        }
+    }
+
     /// "12 Oct → 11 Nov" for a cycle (the end is exclusive, so it shows the last day); otherwise the plan name.
     static func headerSubtitle(cycle: CyclePeriod?, planName: String?, calendar: Calendar = .current) -> String? {
         guard let cycle else {
