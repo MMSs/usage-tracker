@@ -19,6 +19,18 @@ extension AnthropicOrganizationsResponse.Organization: Decodable {
     }
 }
 
+extension AnthropicOrganizationsResponse.Organization {
+    /// Tells same-named organizations apart: "API" for one without chat
+    /// (a Console organization), else its plan when the tier names one.
+    var detail: String? {
+        if let capabilities, !capabilities.contains("chat") {
+            return "API"
+        }
+
+        return AnthropicPlanName.from(rateLimitTier: rateLimitTier, capabilities: capabilities)
+    }
+}
+
 extension AnthropicOrganizationsResponse: Decodable {
     private enum CodingKeys: String, CodingKey {
         case organizations

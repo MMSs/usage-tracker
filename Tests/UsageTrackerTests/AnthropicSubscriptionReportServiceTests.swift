@@ -101,6 +101,19 @@ struct AnthropicSubscriptionReportServiceTests {
         ])
     }
 
+    @Test func organizationsCarryAPlanOrAPIDetail() async throws {
+        let fetcher = StubFetcher(snapshot: snapshot)
+        fetcher.listed = ["k": [
+            .init(uuid: "chat", name: "sam's Organization", rateLimitTier: "default_claude_max_20x", capabilities: ["chat", "claude_max"]),
+            .init(uuid: "console", name: "sam's Organization", capabilities: ["api"]),
+        ]]
+        let service = makeService(fetcher)
+
+        _ = try await service.fetchReport(credentials: ["session-key": "k"], today: Date())
+
+        #expect(service.organizations.map(\.detail) == ["Max 20x", "API"])
+    }
+
     @Test func choosingStoresTheChoiceAndResettingForgetsItAndTheList() async throws {
         let fetcher = StubFetcher(snapshot: snapshot)
         fetcher.listed = ["k": Self.listed]
@@ -119,6 +132,33 @@ struct AnthropicSubscriptionReportServiceTests {
 }
 
 struct AccountOrganizationTests {
+    @Test func labelsAddTheDetailAndTheIDPrefixOnlyWhenLabelsStillCollide() {
+        let organizations = [
+            AccountOrganization(id: "aaaaaaaa-1", name: "sam's Organization", detail: "Max 20x"),
+            AccountOrganization(id: "bbbbbbbb-2", name: "sam's Organization", detail: "API"),
+            AccountOrganization(id: "cccccccc-3", name: "Acme", detail: nil),
+            AccountOrganization(id: "dddddddd-4", name: "Twin", detail: "Pro"),
+            AccountOrganization(id: "eeeeeeee-5", name: "Twin", detail: "Pro"),
+        ]
+
+        #expect(AccountOrganization.labels(for: organizations) == [
+            "aaaaaaaa-1": "sam's Organization · Max 20x",
+            "bbbbbbbb-2": "sam's Organization · API",
+            "cccccccc-3": "Acme",
+            "dddddddd-4": "Twin · Pro · dddddddd",
+            "eeeeeeee-5": "Twin · Pro · eeeeeeee",
+        ])
+    }
+
+    @Test func organizationDetailNamesThePlanOrAPI() {
+        typealias Organization = AnthropicOrganizationsResponse.Organization
+        #expect(Organization(uuid: "a", capabilities: ["api"]).detail == "API")
+        #expect(Organization(uuid: "a", rateLimitTier: "default_claude_max_5x", capabilities: ["chat", "claude_max"]).detail == "Max 5x")
+        #expect(Organization(uuid: "a", rateLimitTier: "default_claude_pro").detail == "Pro")
+        #expect(Organization(uuid: "a", capabilities: ["chat"]).detail == nil)
+        #expect(Organization(uuid: "a").detail == nil)
+    }
+
     @Test func namelessOrganizationsAreTitledByTheirIDPrefix() {
         #expect(AccountOrganization(id: "3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14", name: "Team").title == "Team")
         #expect(AccountOrganization(id: "3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14", name: nil).title == "3f1c2a9e")

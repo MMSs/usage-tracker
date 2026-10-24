@@ -1,4 +1,6 @@
+import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import UsageTracker
 
@@ -670,5 +672,29 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(model.organizations.isEmpty)
         #expect(!model.offersOrganizationChoice)
         #expect(model.status == .ready)
+    }
+}
+
+@Suite @MainActor struct OrganizationPickerRowTests {
+    @Test func longOrganizationNamesStayWithinTheSettingsCard() async {
+        let store = MemoryCredentialStore()
+        store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
+        let fetcher = StubOrganizationScopedFetcher()
+        let long = String(repeating: "a very long organization name ", count: 6)
+        fetcher.listing = [
+            AccountOrganization(id: "org-a", name: long, detail: "Max 20x"),
+            AccountOrganization(id: "org-b", name: long, detail: "API"),
+        ]
+        let model = HalfViewModel(
+            provider: .anthropic, half: .subscription,
+            fields: ProviderRegistry.descriptor(for: .anthropic).subscriptionFields,
+            fetcher: fetcher, credentialStore: store, cache: MemoryReportCache()
+        )
+        await model.selectOrganization("org-a")
+
+        let width = NSHostingView(rootView: OrganizationPickerRow(half: model)).fittingSize.width
+
+        // The page minus its padding and the card's.
+        #expect(width <= SettingsLayout.pageWidth - 2 * SettingsLayout.padding - 24)
     }
 }

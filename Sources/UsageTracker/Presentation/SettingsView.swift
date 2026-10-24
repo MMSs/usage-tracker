@@ -427,6 +427,10 @@ struct ProviderSettingsView: View {
 struct OrganizationPickerRow: View {
     @ObservedObject var half: HalfViewModel
 
+    /// Wide enough for "<email>'s Organization · Max 20x"; longer labels
+    /// are cut in the middle by the pop-up button.
+    static let pickerMaxWidth: CGFloat = 250
+
     private var selection: Binding<String?> {
         Binding(
             get: { half.chosenOrganization?.id },
@@ -441,6 +445,8 @@ struct OrganizationPickerRow: View {
     }
 
     var body: some View {
+        let labels = AccountOrganization.labels(for: half.organizations)
+
         VStack(alignment: .leading, spacing: 0) {
             SettingsRow(label: "Organization", isLast: true) {
                 Picker("Organization", selection: selection) {
@@ -450,10 +456,12 @@ struct OrganizationPickerRow: View {
                     }
 
                     ForEach(half.organizations) { organization in
-                        Text(organization.title).tag(Optional(organization.id))
+                        Text(labels[organization.id] ?? organization.title).tag(Optional(organization.id))
                     }
                 }
                 .labelsHidden()
+                .truncationMode(.middle)
+                .frame(maxWidth: Self.pickerMaxWidth, alignment: .trailing)
             }
 
             if half.chosenOrganization == nil {

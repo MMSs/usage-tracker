@@ -34,7 +34,7 @@ final class AnthropicSubscriptionReportService: ReportFetching, OrganizationScop
         // Known even when the fetch fails for want of a choice: that is when the picker needs them.
         defer {
             organizations = service.organizations(sessionKey: sessionKey).map {
-                AccountOrganization(id: $0.uuid, name: $0.name)
+                AccountOrganization(id: $0.uuid, name: $0.name, detail: $0.detail)
             }
         }
 
