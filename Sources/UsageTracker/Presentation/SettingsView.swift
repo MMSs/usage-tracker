@@ -111,6 +111,8 @@ struct ProviderSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        // The title bar's scroll-edge effect blurs a pinned header within about 100pt of the top.
+        .contentMargins(.top, 40, for: .scrollContent)
     }
 }
 
@@ -163,6 +165,8 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        // The title bar's scroll-edge effect blurs a pinned header within about 100pt of the top.
+        .contentMargins(.top, 40, for: .scrollContent)
         .onAppear {
             appearance = appModel.appearanceStore.appearance()
             interval = appModel.intervalStore.interval()
@@ -211,3 +215,4 @@ struct GeneralSettingsView: View {
         )
     }
 }
+
