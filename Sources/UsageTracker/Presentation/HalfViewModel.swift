@@ -19,6 +19,10 @@ final class HalfViewModel: ObservableObject {
     /// Off: nothing drawn, nothing fetched; the credential and last report are kept.
     @Published var isEnabled = true
     private(set) var scheduledRetriesBlocked = false
+    /// The last 429's `Retry-After`: scheduled refreshes wait for it, manual
+    /// ones do not. Only a success or a newer 429 changes it; another failure
+    /// meanwhile has not said the limit lifted.
+    private(set) var rateLimitedUntil: Date?
 
     private let provider: Provider
     private let credentialFieldIDs: [String]
@@ -122,6 +126,7 @@ final class HalfViewModel: ObservableObject {
             lastSuccess = date
             isStale = false
             scheduledRetriesBlocked = false
+            rateLimitedUntil = nil
             lastFailure = nil
             status = .ready
             cache.store(CachedReport(report: fetched, fetchedAt: date), provider: provider, half: half)
@@ -155,16 +160,6 @@ final class HalfViewModel: ObservableObject {
         }
     }
 
-    /// The service's `Retry-After` from the last failure, when it was a 429
-    /// that gave one; scheduled refreshes wait for it, manual ones do not.
-    private var rateLimitedUntil: Date? {
-        guard case let .rateLimited(until)? = lastFailure?.cause else {
-            return nil
-        }
-
-        return until
-    }
-
     /// Called after Settings saved or removed a credential for this half.
     func credentialsChanged() async {
         // Invalidates any fetch still in flight for the old credentials.
@@ -176,6 +171,9 @@ final class HalfViewModel: ObservableObject {
 
     private func fail(_ cause: RefreshFailure) {
         lastFailure = RecordedFailure(cause: cause, date: now())
+        if case let .rateLimited(until) = cause {
+            rateLimitedUntil = until
+        }
         let name = logName
 
         if cause == .unauthorized {
@@ -211,6 +209,7 @@ final class HalfViewModel: ObservableObject {
         lastSuccess = nil
         lastFailure = nil
         scheduledRetriesBlocked = false
+        rateLimitedUntil = nil
         cache.clear(provider: provider, half: half)
     }
 

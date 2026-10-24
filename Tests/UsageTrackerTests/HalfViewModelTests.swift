@@ -363,6 +363,45 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(model.lastFailure == nil)
     }
 
+    /// Only a success or a newer 429 ends the wait: a manual refresh that
+    /// fails another way meanwhile has not told the app the limit lifted.
+    @Test func rateLimitedWaitOutlastsAnotherFailureAndANewer429ReplacesIt() async {
+        final class Clock { var now = Date(timeIntervalSince1970: 1_000_000) }
+        let clock = Clock()
+        store.values[key] = "tok"
+        let model = HalfViewModel(
+            provider: .cursor, half: .subscription,
+            fields: ProviderRegistry.descriptor(for: .cursor).subscriptionFields,
+            fetcher: fetcher, credentialStore: store, cache: cache, now: { clock.now }
+        )
+        let until = clock.now.addingTimeInterval(300)
+        fetcher.result = .failure(.rateLimited(until: until))
+        await model.refresh(manual: false)
+        #expect(model.rateLimitedUntil == until)
+
+        fetcher.result = .failure(.transport)
+        await model.refresh(manual: true)
+        #expect(model.lastFailure?.cause == .transport)
+        #expect(model.rateLimitedUntil == until)
+
+        clock.now = until.addingTimeInterval(-1)
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 2)
+
+        fetcher.result = .failure(.rateLimited(until: nil))
+        await model.refresh(manual: true)
+        #expect(model.rateLimitedUntil == nil)
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 4)
+
+        fetcher.result = .failure(.rateLimited(until: clock.now.addingTimeInterval(60)))
+        await model.refresh(manual: false)
+        fetcher.result = .success(makeReport())
+        await model.refresh(manual: true)
+        #expect(model.rateLimitedUntil == nil)
+        #expect(fetcher.callCount == 6)
+    }
+
     @Test func rateLimitedWithoutRetryAfterKeepsTheSchedule() async {
         store.values[key] = "tok"
         fetcher.result = .failure(.rateLimited(until: nil))
