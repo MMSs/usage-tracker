@@ -134,3 +134,8 @@ security delete-generic-password \
 
 Repeat with `-a "anthropic-session-key"` and `-a "anthropic-admin-key"` for the
 Anthropic credentials.
+
+Builds before the rename used the identifier `com.mohab.usage-tracker`. The
+first launch of a newer build moves their credentials and settings over. If a
+move failed, the old items remain under `-s "com.mohab.usage-tracker"` and can
+be deleted the same way.

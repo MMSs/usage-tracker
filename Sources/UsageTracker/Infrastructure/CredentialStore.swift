@@ -16,7 +16,7 @@ protocol CredentialStoring: AnyObject {
     func remove(_ key: CredentialKey) throws
 }
 
-private enum KeychainCredentialStoreError: Error {
+enum KeychainCredentialStoreError: Error {
     case unexpectedStatus(OSStatus)
     case invalidValue
 }

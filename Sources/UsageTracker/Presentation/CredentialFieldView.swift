@@ -30,7 +30,7 @@ struct CredentialFieldState: Equatable {
 /// A write-only credential input backed by Keychain, or a plain budget field for `api-budget`.
 struct CredentialFieldView: View {
     static let commitDelay: Duration = .milliseconds(800)
-    static let budgetFieldID = "api-budget"
+    nonisolated static let budgetFieldID = "api-budget"
 
     let field: CredentialField
     let key: CredentialKey

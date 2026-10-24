@@ -172,6 +172,9 @@ final class AppModel: ObservableObject {
     }
 
     static func live() -> AppModel {
+        // Before any store reads, so they see the migrated credentials and settings.
+        IdentifierMigration.live().run()
+
         let credentialStore = KeychainCredentialStore()
         let cache = UserDefaultsReportCache()
 

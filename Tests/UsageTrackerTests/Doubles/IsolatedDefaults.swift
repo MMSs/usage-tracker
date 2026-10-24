@@ -8,7 +8,8 @@ import Foundation
 /// deletes the directory.
 struct IsolatedDefaults {
     let defaults: UserDefaults
-    private let suiteName: String
+    /// The domain name, for APIs that take one (`persistentDomain(forName:)`).
+    let suiteName: String
     private let directory: URL
 
     init() {
