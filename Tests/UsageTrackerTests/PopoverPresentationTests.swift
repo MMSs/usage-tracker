@@ -124,6 +124,26 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
+    @Test func rateLimitedSaysWhenItRetries() {
+        let message = PopoverPresentation.halfError(
+            half: .api, status: .error, failure: .rateLimited(until: date(10, 24, hour: 21, minute: 5)),
+            service: Self.console, calendar: calendar
+        )
+        #expect(message == HalfErrorMessage(
+            text: "API spend: Anthropic API is rate limiting requests; retrying at 21:05.",
+            fix: nil,
+            severity: .warning
+        ))
+    }
+
+    @Test func rateLimitedWithoutATimeStillRetries() {
+        #expect(error(.rateLimited(until: nil), half: .api, service: Self.console) == HalfErrorMessage(
+            text: "API spend: Anthropic API is rate limiting requests.",
+            fix: "It retries automatically.",
+            severity: .warning
+        ))
+    }
+
     @Test func decodingSuggestsAnUpdate() {
         #expect(error(.decoding) == HalfErrorMessage(
             text: "Plan usage: claude.ai sent a response the app doesn't understand.",

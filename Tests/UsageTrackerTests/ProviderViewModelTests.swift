@@ -84,13 +84,13 @@ import Testing
         store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
         store.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
         subFetcher.result = .failure(.challenge)
-        apiFetcher.result = .failure(.httpStatus(429))
+        apiFetcher.result = .failure(.httpStatus(503))
         let model = makeModel(.anthropic, now: { t1 })
         await model.refresh(manual: false)
 
         #expect(ProviderStatus.make(for: model, item: nil).lines == [
             .init(text: "Plan usage: claude.ai asked for a browser check. Open claude.ai in your browser, then Refresh.", tone: .warning),
-            .init(text: "API spend: Anthropic API returned an error (HTTP 429). It retries automatically.", tone: .warning),
+            .init(text: "API spend: Anthropic API returned an error (HTTP 503). It retries automatically.", tone: .warning),
         ])
 
         model.api?.isEnabled = false

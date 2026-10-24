@@ -3,6 +3,8 @@ import Foundation
 enum FetchError: Error, Equatable {
     case unauthorized
     case httpStatus(Int)
+    /// HTTP 429; `until` is the response's `Retry-After`, when it had a readable one.
+    case rateLimited(until: Date?)
     case challenge
     case invalidResponse
     case decoding

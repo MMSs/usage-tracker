@@ -275,6 +275,8 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         (.decoding, .decoding),
         (.invalidResponse, .decoding),
         (.unauthorized, .unauthorized),
+        (.rateLimited(until: Date(timeIntervalSince1970: 1_000_120)), .rateLimited(until: Date(timeIntervalSince1970: 1_000_120))),
+        (.rateLimited(until: nil), .rateLimited(until: nil)),
     ])
     func fetchErrorsMapToACause(error: FetchError, cause: RefreshFailure) {
         #expect(RefreshFailure(error) == cause)
@@ -324,6 +326,51 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         await model.refresh(manual: true)
         #expect(model.status == .ready)
         #expect(model.lastFailure == nil)
+    }
+
+    @Test func rateLimitedKeepsTheReportAndSkipsScheduledRefreshesUntilRetryAfter() async {
+        final class Clock { var now = Date(timeIntervalSince1970: 1_000_000) }
+        let clock = Clock()
+        store.values[key] = "tok"
+        let model = HalfViewModel(
+            provider: .cursor, half: .subscription,
+            fields: ProviderRegistry.descriptor(for: .cursor).subscriptionFields,
+            fetcher: fetcher, credentialStore: store, cache: cache, now: { clock.now }
+        )
+        await model.refresh(manual: false)
+        let until = clock.now.addingTimeInterval(300)
+        fetcher.result = .failure(.rateLimited(until: until))
+        await model.refresh(manual: false)
+        #expect(model.status == .error)
+        #expect(model.report == makeReport())
+        #expect(model.lastFailure?.cause == .rateLimited(until: until))
+        #expect(fetcher.callCount == 2)
+
+        clock.now = until.addingTimeInterval(-1)
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 2)
+        #expect(model.status == .error)
+
+        // The owner can still ask now.
+        await model.refresh(manual: true)
+        #expect(fetcher.callCount == 3)
+
+        clock.now = until
+        fetcher.result = .success(makeReport(20))
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 4)
+        #expect(model.status == .ready)
+        #expect(model.lastFailure == nil)
+    }
+
+    @Test func rateLimitedWithoutRetryAfterKeepsTheSchedule() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.rateLimited(until: nil))
+        let model = makeModel()
+        await model.refresh(manual: false)
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 2)
+        #expect(model.status == .error)
     }
 
     @Test func keychainFailureAtInitIsRecorded() {

@@ -155,6 +155,17 @@ struct AnthropicCostServiceTests {
         }
     }
 
+    @Test func rateLimitedCostReportCarriesRetryAfter() async throws {
+        let client = RoutingHTTPClient(routes: [
+            "limit=31": .status(429, headers: ["Retry-After": "Sat, 24 Oct 2026 21:05:00 GMT", "Content-Type": "application/json"]),
+        ])
+        let service = AnthropicCostService(client: client)
+
+        await #expect(throws: FetchError.rateLimited(until: Date(timeIntervalSince1970: 1_792_875_900))) {
+            try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        }
+    }
+
     @Test func unparseableAmountIsADecodingError() async throws {
         let client = RoutingHTTPClient(routes: [
             "limit=31": .ok(json: page(starting: "2026-10-01T00:00:00Z", amounts: ["12,5"], hasMore: false, nextPage: nil)),

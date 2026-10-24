@@ -9,6 +9,8 @@ enum RefreshFailure: Equatable, Sendable {
     case challenge
     case unauthorized
     case httpStatus(Int)
+    /// HTTP 429; scheduled refreshes wait until `until` when the service said when.
+    case rateLimited(until: Date?)
     /// A response the app could not read: a changed shape or a non-HTTP reply.
     case decoding
     /// The credential could not be read from Keychain.
@@ -22,6 +24,7 @@ enum RefreshFailure: Equatable, Sendable {
         case .challenge: self = .challenge
         case .unauthorized: self = .unauthorized
         case let .httpStatus(code): self = .httpStatus(code)
+        case let .rateLimited(until): self = .rateLimited(until: until)
         case .decoding, .invalidResponse: self = .decoding
         case nil: self = .unexpected
         }
@@ -35,6 +38,7 @@ extension RefreshFailure: CustomStringConvertible {
         case .challenge: "challenge"
         case .unauthorized: "unauthorized"
         case let .httpStatus(code): "http \(code)"
+        case .rateLimited: "rate limited"
         case .decoding: "decoding"
         case .keychain: "keychain"
         case .unexpected: "unexpected"

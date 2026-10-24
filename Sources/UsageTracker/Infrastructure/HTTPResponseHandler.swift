@@ -52,6 +52,9 @@ enum HTTPResponseHandler {
                     throw FetchError.challenge
                 }
                 throw FetchError.unauthorized
+            case 429:
+                let header = httpResponse.value(forHTTPHeaderField: "Retry-After")
+                throw FetchError.rateLimited(until: retryAfter(header, now: Date()))
             default:
                 break
             }
@@ -60,6 +63,31 @@ enum HTTPResponseHandler {
         }
 
         return data
+    }
+
+    /// When a `Retry-After` value (delay seconds or any HTTP-date form) says
+    /// to try again; nil when it is missing or unreadable.
+    static func retryAfter(_ value: String?, now: Date) -> Date? {
+        guard let text = value?.trimmingCharacters(in: .whitespaces), !text.isEmpty else {
+            return nil
+        }
+
+        if text.allSatisfy(\.isASCII), text.allSatisfy(\.isNumber) {
+            return TimeInterval(text).map { now.addingTimeInterval($0) }
+        }
+
+        // IMF-fixdate, then the obsolete RFC 850 and asctime forms RFC 9110 still requires.
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        for format in ["EEE, dd MMM yyyy HH:mm:ss zzz", "EEEE, dd-MMM-yy HH:mm:ss zzz", "EEE MMM d HH:mm:ss yyyy"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: text) {
+                return date
+            }
+        }
+
+        return nil
     }
 
     static func decode<T: Decodable>(

@@ -148,7 +148,7 @@ struct ProviderStatusHeader: View {
             displayName: "Anthropic",
             status: ProviderStatus(lines: [
                 .init(text: "Plan usage: claude.ai asked for a browser check. Open claude.ai in your browser, then Refresh.", tone: .warning),
-                .init(text: "API spend: Anthropic API returned an error (HTTP 429). It retries automatically.", tone: .warning),
+                .init(text: "API spend: Anthropic API is rate limiting requests; retrying at 14:35.", tone: .warning),
             ]),
             updatedText: "Updated 14:31",
             isEnabled: .constant(true)

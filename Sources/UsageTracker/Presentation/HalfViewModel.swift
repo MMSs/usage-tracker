@@ -82,6 +82,11 @@ final class HalfViewModel: ObservableObject {
             return
         }
 
+        if !manual, let until = rateLimitedUntil, now() < until {
+            Log.refresh.debug("\(name, privacy: .public): skipped, rate limited until \(until.ISO8601Format(), privacy: .public)")
+            return
+        }
+
         refreshGeneration += 1
         let generation = refreshGeneration
         Log.refresh.debug("\(name, privacy: .public): refresh started (\(manual ? "manual" : "scheduled", privacy: .public))")
@@ -148,6 +153,16 @@ final class HalfViewModel: ObservableObject {
             }
             fail(cause)
         }
+    }
+
+    /// The service's `Retry-After` from the last failure, when it was a 429
+    /// that gave one; scheduled refreshes wait for it, manual ones do not.
+    private var rateLimitedUntil: Date? {
+        guard case let .rateLimited(until)? = lastFailure?.cause else {
+            return nil
+        }
+
+        return until
     }
 
     /// Called after Settings saved or removed a credential for this half.

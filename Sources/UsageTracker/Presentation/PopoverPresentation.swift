@@ -111,12 +111,17 @@ enum PopoverPresentation {
             return "Updated —"
         }
 
+        return "Updated " + clockTime(date, calendar: calendar)
+    }
+
+    /// "14:31".
+    private static func clockTime(_ date: Date, calendar: Calendar) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.calendar = calendar
         formatter.timeZone = calendar.timeZone
         formatter.dateFormat = "HH:mm"
-        return "Updated " + formatter.string(from: date)
+        return formatter.string(from: date)
     }
 
     /// "Last success 14:31", with the day when it was not today; nil with no success.
@@ -141,14 +146,15 @@ enum PopoverPresentation {
         status: HalfStatus,
         failure: RefreshFailure?,
         service: HalfService,
-        display: HalfDisplay? = nil
+        display: HalfDisplay? = nil,
+        calendar: Calendar = .current
     ) -> HalfErrorMessage? {
         let explanation: (text: String, fix: String?, severity: HalfErrorMessage.Severity)
         switch status {
         case .expired:
-            explanation = failureExplanation(.unauthorized, service: service)
+            explanation = failureExplanation(.unauthorized, service: service, calendar: calendar)
         case .error:
-            explanation = failure.map { failureExplanation($0, service: service) }
+            explanation = failure.map { failureExplanation($0, service: service, calendar: calendar) }
                 ?? ("Unable to refresh.", retries, .warning)
         case .ready where display == .status(.error), .loading where display == .status(.error):
             explanation = ("\(service.name) sent nothing the app can show.", mayHaveChanged, .warning)
@@ -179,7 +185,8 @@ enum PopoverPresentation {
 
     private static func failureExplanation(
         _ failure: RefreshFailure,
-        service: HalfService
+        service: HalfService,
+        calendar: Calendar
     ) -> (text: String, fix: String?, severity: HalfErrorMessage.Severity) {
         switch failure {
         case .transport:
@@ -188,6 +195,10 @@ enum PopoverPresentation {
             ("\(service.host) asked for a browser check.", "Open \(service.host) in your browser, then Refresh.", .warning)
         case let .httpStatus(code):
             ("\(service.name) returned an error (HTTP \(code)).", retries, .warning)
+        case let .rateLimited(until?):
+            ("\(service.name) is rate limiting requests; retrying at \(clockTime(until, calendar: calendar)).", nil, .warning)
+        case .rateLimited(nil):
+            ("\(service.name) is rate limiting requests.", retries, .warning)
         case .decoding:
             ("\(service.name) sent a response the app doesn't understand.", mayHaveChanged, .warning)
         case .unauthorized:
