@@ -91,7 +91,7 @@ struct ProviderPopoverView: View {
             }
             .accessibilityElement(children: .combine)
             Spacer()
-            if let planName = provider.subscription?.shownReport?.planName ?? provider.api?.shownReport?.planName {
+            if let planName = provider.subscription?.report?.planName ?? provider.api?.report?.planName {
                 Text(planName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -116,11 +116,11 @@ struct ProviderPopoverView: View {
             if let error = PopoverPresentation.halfError(half, descriptor: provider.descriptor, display: display, now: now) {
                 HalfErrorRow(
                     message: error,
-                    lastSuccess: half.shownReport == nil ? nil : PopoverPresentation.lastSuccessText(half.lastSuccess, now: now)
+                    lastSuccess: half.report == nil ? nil : PopoverPresentation.lastSuccessText(half.lastSuccess, now: now)
                 )
             }
 
-            if half.shownReport != nil {
+            if half.report != nil {
                 VStack(alignment: .leading, spacing: 10, content: content)
                     .opacity(half.isStale || half.status == .error || half.status == .expired ? 0.6 : 1)
             } else if half.status == .loading {
@@ -137,7 +137,7 @@ struct ProviderPopoverView: View {
     // MARK: Subscription
 
     private func subscriptionSection(_ half: HalfViewModel, display: HalfDisplay?, now: Date) -> some View {
-        let report = half.shownReport
+        let report = half.report
         let showsCycle = provider.descriptor.capabilities.hasCycle && report?.spend != nil
         let label = showsCycle
             ? "Cycle · " + (PopoverPresentation.headerSubtitle(cycle: report?.spend?.period, planName: report?.planName) ?? "")
@@ -245,7 +245,7 @@ struct ProviderPopoverView: View {
     // MARK: API
 
     private func apiSection(_ half: HalfViewModel, display: HalfDisplay?, now: Date) -> some View {
-        let spend = half.shownReport?.spend
+        let spend = half.report?.spend
         let month = spend.map { PopoverPresentation.monthName(for: $0.period.start) }
         let label = month.map { "API · \($0)" } ?? "API"
         let budget = PopoverPresentation.effectiveBudget(appModel.budget(for: provider.id))

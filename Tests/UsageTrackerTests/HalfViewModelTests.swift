@@ -685,18 +685,36 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(model.scheduledRetriesBlocked)
     }
 
-    @Test func aCachedReportIsNotShownWhileWaitingForAChoice() async {
+    @Test func waitingForAChoiceDropsTheKeptReportAndItsCache() async {
         cache.store(CachedReport(report: makeReport(), fetchedAt: now), provider: .anthropic, half: .subscription)
         store.values[key] = "sk"
         fetcher.listing = two
         let model = makeModel()
-        #expect(model.shownReport == makeReport())
+        #expect(model.report == makeReport())
 
         await model.refresh(manual: false)
 
-        // Kept for later, but it may be another organization's.
+        // It may be another organization's: not kept, not shown, not cached.
+        #expect(model.status == .needsOrganization)
+        #expect(model.report == nil)
+        #expect(model.lastSuccess == nil)
+        #expect(cache.cached(provider: .anthropic, half: .subscription) == nil)
+    }
+
+    @Test func choosingAnOrganizationAfterWaitingShowsItsReportAgain() async {
+        cache.store(CachedReport(report: makeReport(5), fetchedAt: now), provider: .anthropic, half: .subscription)
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        await model.refresh(manual: false)
+        #expect(model.report == nil)
+
+        await model.selectOrganization("org-b")
+
+        #expect(model.status == .ready)
         #expect(model.report == makeReport())
-        #expect(model.shownReport == nil)
+        #expect(model.lastSuccess == now)
+        #expect(cache.cached(provider: .anthropic, half: .subscription) == CachedReport(report: makeReport(), fetchedAt: now))
     }
 
     @Test func choosingAnOrganizationStoresItAndRefreshesNow() async {

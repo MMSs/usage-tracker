@@ -145,6 +145,30 @@ import Testing
         #expect(model.updatedAt == t1)
     }
 
+    /// The half waiting for an organization choice dropped its kept report, so
+    /// its old time must not stand in for "Updated".
+    @Test func updatedAtIgnoresAHalfWaitingForAnOrganization() async {
+        store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
+        store.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        cache.store(CachedReport(report: makeReport(), fetchedAt: t1), provider: .anthropic, half: .subscription)
+        let organizations = StubOrganizationScopedFetcher()
+        organizations.listing = [AccountOrganization(id: "a", name: "Personal"), AccountOrganization(id: "b", name: "Team")]
+        let model = ProviderViewModel(
+            descriptor: ProviderRegistry.descriptor(for: .anthropic),
+            subscriptionFetcher: organizations, apiFetcher: apiFetcher,
+            credentialStore: store, cache: cache, now: { t2 }
+        )
+        #expect(model.updatedAt == nil)
+
+        await model.refresh(manual: true)
+        #expect(model.subscription?.status == .needsOrganization)
+        #expect(model.api?.status == .ready)
+        #expect(model.updatedAt == t2)
+
+        await model.subscription?.selectOrganization("b")
+        #expect(model.updatedAt == t2)
+    }
+
     @Test func credentialsChangedRefreshesOnlyThatHalfAndUpdatesConfigured() async {
         let model = makeModel(.anthropic, now: { t1 })
         #expect(!model.isConfigured)

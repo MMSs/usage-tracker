@@ -136,8 +136,7 @@ enum MenuBarItemBuilder {
             return .status(.expired)
         }
 
-        // Nothing is fetched until the user chooses; a kept report may be
-        // another organization's, so it is not drawn (the popover agrees).
+        // Nothing is fetched until the user chooses.
         if snapshot.status == .needsOrganization {
             return .status(.chooseOrganization)
         }

@@ -90,8 +90,9 @@ final class ProviderViewModel: ObservableObject, Identifiable {
     }
 
     /// The older of the configured halves' last success; nil if any configured half never succeeded.
+    /// A half waiting for an organization choice has nothing to report yet and is left out.
     var updatedAt: Date? {
-        let configured = [subscription, api].compactMap { $0 }.filter(\.isConfigured)
+        let configured = [subscription, api].compactMap { $0 }.filter { $0.isConfigured && $0.status != .needsOrganization }
         let dates = configured.compactMap(\.lastSuccess)
         guard !configured.isEmpty, dates.count == configured.count else {
             return nil

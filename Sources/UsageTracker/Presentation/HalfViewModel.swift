@@ -45,12 +45,6 @@ final class HalfViewModel: ObservableObject {
     /// True when the credential sees more than one organization, so Settings offers the choice.
     var offersOrganizationChoice: Bool { organizations.count > 1 }
 
-    /// The report to draw: none while waiting for an organization choice,
-    /// since the kept one may be another organization's. `report` keeps it.
-    var shownReport: ProviderReport? {
-        status == .needsOrganization ? nil : report
-    }
-
     /// The chosen organization while it is still listed.
     var chosenOrganization: AccountOrganization? {
         organizations.first { $0.id == selectedOrganizationID }
@@ -245,6 +239,10 @@ final class HalfViewModel: ObservableObject {
         case .needsOrganization:
             // Nothing changes until the user chooses, so the timer would only list them again.
             scheduledRetriesBlocked = true
+            // What is kept may be another organization's: drop it, in memory and cached.
+            report = nil
+            lastSuccess = nil
+            cache.clear(provider: provider, half: half)
             Log.refresh.notice("\(name, privacy: .public): several organizations, none chosen; scheduled refreshes wait for a choice")
         default:
             // This failure replaces a block (an expired credential, a wait for
