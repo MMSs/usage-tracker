@@ -1,16 +1,9 @@
 import Foundation
 import os
 
-struct AnthropicCostDay: Equatable {
-    /// Local midnight of the bucket's UTC calendar date.
-    let day: Date
-    /// Full precision; formatting rounds later.
-    let dollars: Decimal
-}
-
 @MainActor
 protocol AnthropicCostFetching {
-    func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [AnthropicCostDay]
+    func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [CostDay]
 }
 
 final class AnthropicCostService: AnthropicCostFetching {
@@ -25,10 +18,7 @@ final class AnthropicCostService: AnthropicCostFetching {
         self.client = client
     }
 
-    func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [AnthropicCostDay] {
-        var utc = Calendar(identifier: .gregorian)
-        utc.timeZone = TimeZone(identifier: "UTC")!
-
+    func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [CostDay] {
         let baseQuery = [
             ("starting_at", Self.utcMidnight(of: month.start, in: calendar)),
             ("ending_at", Self.utcMidnight(of: month.end, in: calendar)),
@@ -53,7 +43,7 @@ final class AnthropicCostService: AnthropicCostFetching {
                     continue
                 }
 
-                let day = try Self.localDay(of: bucket.startingAt, utc: utc, calendar: calendar)
+                let day = try CostDay.localDay(ofUTC: bucket.startingAt, calendar: calendar)
                 let cents = try amounts.reduce(Decimal(0)) { try $0 + Self.cents($1) }
                 totals[day, default: 0] += cents / 100
             }
@@ -70,7 +60,7 @@ final class AnthropicCostService: AnthropicCostFetching {
         }
 
         return totals
-            .map { AnthropicCostDay(day: $0.key, dollars: $0.value) }
+            .map { CostDay(day: $0.key, dollars: $0.value) }
             .sorted { $0.day < $1.day }
     }
 
@@ -101,16 +91,6 @@ final class AnthropicCostService: AnthropicCostFetching {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
 
         return String(format: "%04d-%02d-%02dT00:00:00Z", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
-    }
-
-    /// The bucket's UTC calendar date, as local midnight.
-    private static func localDay(of date: Date, utc: Calendar, calendar: Calendar) throws -> Date {
-        let parts = utc.dateComponents([.year, .month, .day], from: date)
-        guard let day = calendar.date(from: parts) else {
-            throw FetchError.decoding
-        }
-
-        return day
     }
 
     private func request(query: [(name: String, value: String)], adminKey: String) -> URLRequest {

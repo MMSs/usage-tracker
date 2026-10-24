@@ -74,8 +74,8 @@ struct AnthropicCostServiceTests {
         let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
 
         #expect(days == [
-            AnthropicCostDay(day: local(2026, 10, 1), dollars: Decimal(string: "1.505")!),
-            AnthropicCostDay(day: local(2026, 10, 2), dollars: 20),
+            CostDay(day: local(2026, 10, 1), dollars: Decimal(string: "1.505")!),
+            CostDay(day: local(2026, 10, 2), dollars: 20),
         ])
         #expect(client.requests.count == 2)
         let second = try #require(client.requests.last)
@@ -90,8 +90,8 @@ struct AnthropicCostServiceTests {
         let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
 
         #expect(days == [
-            AnthropicCostDay(day: local(2026, 10, 1), dollars: Decimal(string: "12.345678")!),
-            AnthropicCostDay(day: local(2026, 10, 3), dollars: Decimal(string: "2.995")!),
+            CostDay(day: local(2026, 10, 1), dollars: Decimal(string: "12.345678")!),
+            CostDay(day: local(2026, 10, 3), dollars: Decimal(string: "2.995")!),
         ])
     }
 
@@ -104,7 +104,7 @@ struct AnthropicCostServiceTests {
 
         let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
 
-        #expect(days == [AnthropicCostDay(day: local(2026, 10, 5), dollars: Decimal(string: "3.5")!)])
+        #expect(days == [CostDay(day: local(2026, 10, 5), dollars: Decimal(string: "3.5")!)])
     }
 
     @Test func bucketDatesMapToLocalCalendarDays() async throws {
@@ -128,7 +128,7 @@ struct AnthropicCostServiceTests {
 
         let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
 
-        #expect(days == [AnthropicCostDay(day: local(2026, 10, 3), dollars: 1)])
+        #expect(days == [CostDay(day: local(2026, 10, 3), dollars: 1)])
     }
 
     @Test(arguments: ["null", "\"p1\""])
@@ -192,7 +192,7 @@ struct AnthropicCostServiceTests {
 
         let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
 
-        #expect(days == [AnthropicCostDay(day: local(2026, 10, 1), dollars: Decimal(string: "2.2345")!)])
+        #expect(days == [CostDay(day: local(2026, 10, 1), dollars: Decimal(string: "2.2345")!)])
     }
 
     @Test func amountOfAnotherTypeIsADecodingError() async throws {
@@ -231,15 +231,15 @@ struct AnthropicCostServiceTests {
 @MainActor
 struct AnthropicAPIReportServiceTests {
     private final class StubFetcher: AnthropicCostFetching {
-        let days: [AnthropicCostDay]
+        let days: [CostDay]
         private(set) var adminKeys: [String] = []
         private(set) var months: [CyclePeriod] = []
 
-        init(days: [AnthropicCostDay]) {
+        init(days: [CostDay]) {
             self.days = days
         }
 
-        func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [AnthropicCostDay] {
+        func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [CostDay] {
             adminKeys.append(adminKey)
             months.append(month)
 
@@ -270,8 +270,8 @@ struct AnthropicAPIReportServiceTests {
 
     @Test func apiReportSumsTheMonth() async throws {
         let days = [
-            AnthropicCostDay(day: local(2026, 10, 1), dollars: Decimal(string: "12.345678")!),
-            AnthropicCostDay(day: local(2026, 10, 3), dollars: Decimal(string: "2.995")!),
+            CostDay(day: local(2026, 10, 1), dollars: Decimal(string: "12.345678")!),
+            CostDay(day: local(2026, 10, 3), dollars: Decimal(string: "2.995")!),
         ]
         let fetcher = StubFetcher(days: days)
         let service = AnthropicAPIReportService(service: fetcher, calendar: calendar)
@@ -282,7 +282,7 @@ struct AnthropicAPIReportServiceTests {
         let month = CyclePeriod(start: local(2026, 10, 1), end: local(2026, 11, 1))
         #expect(fetcher.adminKeys == ["sk-ant-admin-test"])
         #expect(fetcher.months == [month])
-        #expect(report == AnthropicReportMapper.api(days: days, month: month, today: today, calendar: calendar))
+        #expect(report == APISpend.report(days: days, month: month, today: today, calendar: calendar))
         #expect(report.spend?.spent == Decimal(string: "15.340678"))
     }
 
@@ -332,8 +332,8 @@ struct AnthropicAPIReportServiceTests {
     @Test func reportFoldsFutureLocalBucketsIntoToday() async throws {
         let today = calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 20))!
         let fetcher = StubFetcher(days: [
-            AnthropicCostDay(day: local(2026, 10, 24), dollars: 2),
-            AnthropicCostDay(day: local(2026, 10, 25), dollars: 3),
+            CostDay(day: local(2026, 10, 24), dollars: 2),
+            CostDay(day: local(2026, 10, 25), dollars: 3),
         ])
         let service = AnthropicAPIReportService(service: fetcher, calendar: calendar)
 
