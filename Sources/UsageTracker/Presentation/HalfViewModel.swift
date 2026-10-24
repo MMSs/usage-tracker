@@ -229,7 +229,6 @@ final class HalfViewModel: ObservableObject {
     }
 
     private func fail(_ cause: RefreshFailure) {
-        let previous = lastFailure?.cause
         lastFailure = RecordedFailure(cause: cause, date: now())
         if case let .rateLimited(until) = cause {
             rateLimitedUntil = until
@@ -246,11 +245,10 @@ final class HalfViewModel: ObservableObject {
             scheduledRetriesBlocked = true
             Log.refresh.notice("\(name, privacy: .public): several organizations, none chosen; scheduled refreshes wait for a choice")
         default:
-            // This failure replaces the wait for a choice, and its row says it
-            // retries: let the schedule list the organizations again.
-            if previous == .needsOrganization {
-                scheduledRetriesBlocked = false
-            }
+            // This failure replaces a block (an expired credential, a wait for
+            // a choice), and its row says it retries: let the schedule ask
+            // again. It succeeds, or hits the same wall and blocks again.
+            scheduledRetriesBlocked = false
             Log.refresh.error("\(name, privacy: .public): failed (\(cause.description, privacy: .public))")
         }
     }

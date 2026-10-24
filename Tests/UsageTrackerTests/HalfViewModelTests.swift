@@ -239,6 +239,44 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(fetcher.callCount == 2)
     }
 
+    @Test(arguments: [FetchError.transport, .httpStatus(503), .rateLimited(until: nil)])
+    func aFailureReplacingExpiredRetriesOnSchedule(error: FetchError) async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.unauthorized)
+        let model = makeModel()
+        await model.refresh(manual: false)
+        #expect(model.scheduledRetriesBlocked)
+
+        // Its row says it retries automatically, so the schedule must.
+        fetcher.result = .failure(error)
+        await model.refresh(manual: true)
+        #expect(model.status == .error)
+        #expect(!model.scheduledRetriesBlocked)
+
+        fetcher.result = .success(makeReport())
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 3)
+        #expect(model.status == .ready)
+    }
+
+    @Test func expiredAgainAfterAFailureBlocksScheduledRefreshesAgain() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.unauthorized)
+        let model = makeModel()
+        await model.refresh(manual: false)
+
+        fetcher.result = .failure(.transport)
+        await model.refresh(manual: true)
+
+        fetcher.result = .failure(.unauthorized)
+        await model.refresh(manual: false)
+        #expect(model.status == .expired)
+        #expect(model.scheduledRetriesBlocked)
+
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 3)
+    }
+
     @Test func budgetFieldIsNotACredential() async {
         let descriptor = ProviderRegistry.descriptor(for: .anthropic)
         let apiStore = store
