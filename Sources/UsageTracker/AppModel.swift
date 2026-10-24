@@ -97,10 +97,16 @@ final class AppModel: ObservableObject {
     }
 
     func setSettings(_ settings: ProviderSettings, for id: Provider) {
+        let wasEnabled = provider(id).isEnabled
         providerSettings[id] = settings
         providerSettingsStore.setSettings(settings, for: id)
         provider(id).isEnabled = settings.isEnabled
         scheduler.setSchedule(settings.isEnabled ? settings.refreshInterval : nil, for: id)
+
+        // Turning a provider on should show data now, not after the next timer tick.
+        if settings.isEnabled, !wasEnabled {
+            Task { await refresh(id, manual: false) }
+        }
     }
 
     func setGlobalAppearance(_ appearance: MenuBarAppearance) {

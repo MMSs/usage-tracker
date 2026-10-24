@@ -125,6 +125,22 @@ import Testing
         #expect(fetchers[.cursor]?.callCount == 1)
     }
 
+    @Test func enablingAProviderRefreshesItAtOnce() async {
+        configureAll()
+        let model = makeModel()
+        model.setSettings(ProviderSettings(isEnabled: false), for: .cursor)
+
+        model.setSettings(ProviderSettings(isEnabled: true), for: .cursor)
+        await waitUntil { fetchers[.cursor]?.callCount == 1 }
+
+        #expect(fetchers[.cursor]?.callCount == 1)
+
+        model.setSettings(ProviderSettings(isEnabled: true, refreshInterval: .oneHour), for: .cursor)
+        await settle()
+
+        #expect(fetchers[.cursor]?.callCount == 1, "a change while already enabled does not refetch")
+    }
+
     @Test func disablingEveryConfiguredProviderLeavesTheMenuBarEmpty() {
         credentials.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "secret"
         let model = makeModel()
