@@ -277,6 +277,23 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(fetcher.callCount == 3)
     }
 
+    @Test func replacingTheCredentialEndsARateLimitWaitEarnedByTheOldOne() async {
+        store.values[key] = "old"
+        let until = now.addingTimeInterval(300)
+        fetcher.result = .failure(.rateLimited(until: until))
+        let model = makeModel()
+        await model.refresh(manual: false)
+        #expect(model.rateLimitedUntil == until)
+
+        // The new key has not been limited: its scheduled refreshes must run.
+        store.values[key] = "new"
+        fetcher.result = .failure(.transport)
+        await model.credentialsChanged()
+        #expect(model.rateLimitedUntil == nil)
+        await model.refresh(manual: false)
+        #expect(fetcher.callCount == 3)
+    }
+
     @Test func budgetFieldIsNotACredential() async {
         let descriptor = ProviderRegistry.descriptor(for: .anthropic)
         let apiStore = store

@@ -195,6 +195,8 @@ final class HalfViewModel: ObservableObject {
         Log.refresh.debug("\(self.logName, privacy: .public): credential changed")
         refreshGeneration += 1
         scheduledRetriesBlocked = false
+        // A 429 wait was earned by the old credential or organization.
+        rateLimitedUntil = nil
         if let scope = organizationScope {
             // The choice belonged to the old credential's account.
             scope.resetOrganizations()
