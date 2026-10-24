@@ -32,7 +32,7 @@ final class URLSessionHTTPClient: HTTPClient {
         // Responses are small JSON. A refresh cycle waits for its fetches, so
         // a trickling response must not hold it (and the provider's other
         // half) for the default seven days; a minute is under the default
-        // two-minute interval.
+        // five-minute interval (`RefreshInterval.default`).
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 60
         session = URLSession(configuration: configuration)
