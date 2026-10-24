@@ -124,14 +124,33 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
-    @Test func rateLimitedSaysWhenItRetries() {
-        let message = PopoverPresentation.halfError(
-            half: .api, status: .error, failure: .rateLimited(until: date(10, 24, hour: 21, minute: 5)),
-            service: Self.console, calendar: calendar
+    private func rateLimited(until: Date, now: Date) -> HalfErrorMessage? {
+        PopoverPresentation.halfError(
+            half: .api, status: .error, failure: .rateLimited(until: until),
+            service: Self.console, now: now, calendar: calendar
         )
-        #expect(message == HalfErrorMessage(
+    }
+
+    @Test func rateLimitedSaysWhenItRetries() {
+        #expect(rateLimited(until: date(10, 24, hour: 21, minute: 5), now: date(10, 24, hour: 20, minute: 55)) == HalfErrorMessage(
             text: "API spend: Anthropic API is rate limiting requests; retrying at 21:05.",
             fix: nil,
+            severity: .warning
+        ))
+    }
+
+    @Test func rateLimitedPastMidnightNamesTheDay() {
+        #expect(rateLimited(until: date(10, 25, hour: 0, minute: 30), now: date(10, 24, hour: 23, minute: 50))?.text
+            == "API spend: Anthropic API is rate limiting requests; retrying at 25 Oct, 00:30.")
+    }
+
+    /// A wait already over gives no time: "retrying at <past time>" would be wrong.
+    @Test(arguments: [0.0, -60, -3600])
+    func rateLimitedWithAPastTimeGivesNoTime(offset: TimeInterval) {
+        let now = date(10, 24, hour: 20, minute: 55)
+        #expect(rateLimited(until: now.addingTimeInterval(offset), now: now) == HalfErrorMessage(
+            text: "API spend: Anthropic API is rate limiting requests.",
+            fix: "It retries automatically.",
             severity: .warning
         ))
     }

@@ -67,15 +67,24 @@ enum HTTPResponseHandler {
         return data
     }
 
+    /// The longest `Retry-After` honoured. The providers' rate limits run
+    /// per minute, so a genuine one is seconds to minutes; an hour caps what
+    /// a bad header (or clock skew on an HTTP-date) can cost at one hour of
+    /// scheduled refreshes, and Refresh still asks at any time.
+    static let longestRetryAfter: TimeInterval = 3600
+
     /// When a `Retry-After` value (delay seconds or any HTTP-date form) says
-    /// to try again; nil when it is missing or unreadable.
+    /// to try again, at most `longestRetryAfter` from `now`; nil when it is
+    /// missing or unreadable. A past date is returned as is: retry now.
     static func retryAfter(_ value: String?, now: Date) -> Date? {
         guard let text = value?.trimmingCharacters(in: .whitespaces), !text.isEmpty else {
             return nil
         }
 
+        let latest = now.addingTimeInterval(longestRetryAfter)
         if text.allSatisfy(\.isASCII), text.allSatisfy(\.isNumber) {
-            return TimeInterval(text).map { now.addingTimeInterval($0) }
+            // Enough digits parse as a huge number or infinity; the cap comes first.
+            return TimeInterval(text).map { now.addingTimeInterval(min($0, longestRetryAfter)) }
         }
 
         // IMF-fixdate, then the obsolete RFC 850 and asctime forms RFC 9110 still requires.
@@ -85,7 +94,7 @@ enum HTTPResponseHandler {
         for format in ["EEE, dd MMM yyyy HH:mm:ss zzz", "EEEE, dd-MMM-yy HH:mm:ss zzz", "EEE MMM d HH:mm:ss yyyy"] {
             formatter.dateFormat = format
             if let date = formatter.date(from: text) {
-                return date
+                return min(date, latest)
             }
         }
 

@@ -157,13 +157,21 @@ struct AnthropicCostServiceTests {
 
     @Test func rateLimitedCostReportCarriesRetryAfter() async throws {
         let client = RoutingHTTPClient(routes: [
-            "limit=31": .status(429, headers: ["Retry-After": "Sat, 24 Oct 2026 21:05:00 GMT", "Content-Type": "application/json"]),
+            "limit=31": .status(429, headers: ["Retry-After": "120", "Content-Type": "application/json"]),
         ])
         let service = AnthropicCostService(client: client)
+        let before = Date()
 
-        await #expect(throws: FetchError.rateLimited(until: Date(timeIntervalSince1970: 1_792_875_900))) {
+        let error = await #expect(throws: FetchError.self) {
             try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
         }
+
+        guard case let .rateLimited(until?)? = error else {
+            Issue.record("expected rateLimited with a date, got \(String(describing: error))")
+            return
+        }
+        #expect(until >= before.addingTimeInterval(120))
+        #expect(until <= Date().addingTimeInterval(120))
     }
 
     /// The API documents `amount` as a decimal string; a number, a null, or

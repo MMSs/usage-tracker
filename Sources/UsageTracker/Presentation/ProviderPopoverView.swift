@@ -113,7 +113,7 @@ struct ProviderPopoverView: View {
             sectionLabel(label)
 
             // Shown with or without a report, so the menu bar's error mark always has an explanation.
-            if let error = PopoverPresentation.halfError(half, descriptor: provider.descriptor, display: display) {
+            if let error = PopoverPresentation.halfError(half, descriptor: provider.descriptor, display: display, now: now) {
                 HalfErrorRow(
                     message: error,
                     lastSuccess: half.report == nil ? nil : PopoverPresentation.lastSuccessText(half.lastSuccess, now: now)

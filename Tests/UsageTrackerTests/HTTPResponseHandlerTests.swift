@@ -86,11 +86,21 @@ struct HTTPResponseHandlerTests {
     }
 
     @Test func tooManyRequestsHonoursAnHTTPDate() async {
-        let client = RecordingHTTPClient(response: .status(429, headers: ["Retry-After": "Sat, 24 Oct 2026 21:05:00 GMT"]))
+        // Whole seconds, as an HTTP-date carries, ten minutes out so the cap does not apply.
+        let until = Date(timeIntervalSince1970: (Date().timeIntervalSince1970 + 600).rounded(.down))
+        let client = RecordingHTTPClient(response: .status(429, headers: ["Retry-After": httpDate(until)]))
 
-        await #expect(throws: FetchError.rateLimited(until: Date(timeIntervalSince1970: 1_792_875_900))) {
+        await #expect(throws: FetchError.rateLimited(until: until)) {
             try await HTTPResponseHandler.data(for: request, client: client)
         }
+    }
+
+    private func httpDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "GMT")
+        formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss 'GMT'"
+        return formatter.string(from: date)
     }
 
     @Test(arguments: [
@@ -109,8 +119,35 @@ struct HTTPResponseHandlerTests {
         "Sat Oct 24 21:05:00 2026",
     ])
     func retryAfterAcceptsEveryHTTPDateForm(value: String) {
-        let now = Date(timeIntervalSince1970: 1_000_000)
+        // 20:55Z, ten minutes before the header's 21:05Z.
+        let now = Date(timeIntervalSince1970: 1_792_875_300)
         #expect(HTTPResponseHandler.retryAfter(value, now: now) == Date(timeIntervalSince1970: 1_792_875_900))
+    }
+
+    /// A bad or hostile header must not stop scheduled refreshes for days,
+    /// or overflow into a date the popover cannot print.
+    @Test(arguments: [
+        "3601",
+        "7200",
+        "99999999999999999999999",
+        String(repeating: "9", count: 400),
+        "Sat, 24 Oct 2026 23:05:00 GMT",
+        "Fri, 31 Dec 9999 23:59:59 GMT",
+    ])
+    func retryAfterIsCappedAtAnHour(value: String) {
+        let now = Date(timeIntervalSince1970: 1_792_875_300)
+        #expect(HTTPResponseHandler.retryAfter(value, now: now) == now.addingTimeInterval(3600))
+    }
+
+    @Test func retryAfterOfExactlyAnHourIsKept() {
+        let now = Date(timeIntervalSince1970: 1_792_875_300)
+        #expect(HTTPResponseHandler.retryAfter("3600", now: now) == now.addingTimeInterval(3600))
+    }
+
+    /// A date already past means "now"; the half does not wait and the popover gives no time.
+    @Test func pastRetryAfterDateIsKeptAsIs() {
+        let now = Date(timeIntervalSince1970: 1_792_875_300)
+        #expect(HTTPResponseHandler.retryAfter("Sat, 24 Oct 2026 20:00:00 GMT", now: now) == Date(timeIntervalSince1970: 1_792_872_000))
     }
 
     @Test(arguments: [nil, "", "soon", "-5", "1.5", "12abc"])
