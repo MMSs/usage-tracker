@@ -52,7 +52,8 @@ final class LoginItemModel: ObservableObject {
 
         status = manager.status
         Log.loginItem.info("first launch, status \(self.status.rawValue, privacy: .public)")
-        if status == .enabled {
+        if holdsItem {
+            // Registered already (possibly awaiting approval): adopt it, registering again would throw.
             remember(true)
             return
         }
@@ -95,23 +96,37 @@ final class LoginItemModel: ObservableObject {
         }
     }
 
+    /// Whether macOS already has the item, enabled or waiting for approval.
+    private var holdsItem: Bool {
+        status == .enabled || status == .requiresApproval
+    }
+
     private func attempt(register: Bool) {
+        let verb = register ? "register" : "unregister"
         do {
             if register {
-                if status != .enabled {
+                if !holdsItem {
                     try manager.register()
                 }
-            } else {
+            } else if status != .notRegistered, status != .notFound {
                 try manager.unregister()
             }
 
-            failure = nil
             status = manager.status
-            Log.loginItem.info("\(register ? "registered" : "unregistered", privacy: .public), status \(self.status.rawValue, privacy: .public)")
+            Log.loginItem.info("\(verb, privacy: .public) done, status \(self.status.rawValue, privacy: .public)")
+
+            // A register that returned without the item appearing is a failure, not a preference.
+            if register, !holdsItem {
+                failure = "Couldn't turn on Open at login: macOS did not register the app (\(status.rawValue))."
+                Log.loginItem.error("register returned but status is \(self.status.rawValue, privacy: .public)")
+                return
+            }
+
+            failure = nil
             remember(register)
         } catch {
             let error = error as NSError
-            Log.loginItem.error("\(register ? "register" : "unregister", privacy: .public) failed, \(error.domain, privacy: .public) \(error.code, privacy: .public): \(error.localizedDescription, privacy: .public)")
+            Log.loginItem.error("\(verb, privacy: .public) failed, \(error.domain, privacy: .public) \(error.code, privacy: .public): \(error.localizedDescription, privacy: .public)")
             status = manager.status
             failure = "Couldn't turn \(register ? "on" : "off") Open at login: \(error.localizedDescription)"
         }

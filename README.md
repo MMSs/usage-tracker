@@ -94,7 +94,9 @@ under "Allow in the Background", because the app has no helper or agent.
 
 Turning it off sticks, in either place: switch it off in Settings, or remove
 it in System Settings, and the app does not register itself again on later
-launches. Turn the Settings switch back on to restore it. If registration
+launches. Turn the Settings switch back on to restore it. Reinstalling or
+moving the app can reset macOS's record of the item; the app then reads that
+as "off", so turn the switch back on in Settings. If registration
 fails, the error shows under the switch and in the log
 (`log show --last 1h --predicate 'subsystem == "com.mohabsam.usage-tracker" AND category == "login-item"'`).
 

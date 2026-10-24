@@ -10,6 +10,8 @@ final class FakeLoginItemManager: LoginItemManaging {
     var status: LoginItemStatus
     var registerError: (any Error)?
     var unregisterError: (any Error)?
+    /// What `register()` leaves the status at; `nil` means enabled.
+    var statusAfterRegister: LoginItemStatus?
     private(set) var registerCallCount = 0
     private(set) var unregisterCallCount = 0
     private(set) var openSettingsCallCount = 0
@@ -23,7 +25,7 @@ final class FakeLoginItemManager: LoginItemManaging {
         if let registerError {
             throw registerError
         }
-        status = .enabled
+        status = statusAfterRegister ?? .enabled
     }
 
     func unregister() throws {

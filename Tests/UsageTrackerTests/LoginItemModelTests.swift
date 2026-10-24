@@ -121,6 +121,32 @@ import Testing
         }
     }
 
+    @Test func theFirstLaunchAdoptsAnItemAwaitingApprovalWithoutRegistering() {
+        withIsolatedDefaults { defaults in
+            let (model, manager, store) = makeModel(status: .requiresApproval, defaults: defaults)
+
+            model.reconcileAtLaunch()
+
+            #expect(manager.registerCallCount == 0)
+            #expect(store.preference() == true)
+            #expect(model.failure == nil)
+            #expect(model.needsApproval)
+        }
+    }
+
+    @Test func theFirstLaunchWithNothingFoundSurfacesAndKeepsTheStoreUnset() {
+        withIsolatedDefaults { defaults in
+            let (model, manager, store) = makeModel(status: .notFound, defaults: defaults)
+            manager.statusAfterRegister = .notFound
+
+            model.reconcileAtLaunch()
+
+            #expect(store.preference() == nil)
+            #expect(!model.isOn)
+            #expect(model.failure != nil)
+        }
+    }
+
     // MARK: Refresh
 
     @Test func refreshPicksUpAnItemRemovedWhileTheAppRuns() {
@@ -178,6 +204,59 @@ import Testing
             #expect(store.preference() == true)
             #expect(model.isOn)
             #expect(model.status == .enabled)
+        }
+    }
+
+    @Test func turningTheSwitchOnForAnItemAwaitingApprovalDoesNotRegisterAgain() {
+        withIsolatedDefaults { defaults in
+            let (model, manager, store) = makeModel(status: .requiresApproval, stored: false, defaults: defaults)
+
+            model.setOn(true)
+
+            #expect(manager.registerCallCount == 0)
+            #expect(store.preference() == true)
+            #expect(model.isOn)
+            #expect(model.failure == nil)
+            #expect(model.needsApproval)
+        }
+    }
+
+    @Test func turningTheSwitchOnForAnEnabledItemDoesNotRegisterAgain() {
+        withIsolatedDefaults { defaults in
+            let (model, manager, store) = makeModel(status: .enabled, stored: true, defaults: defaults)
+
+            model.setOn(true)
+
+            #expect(manager.registerCallCount == 0)
+            #expect(store.preference() == true)
+            #expect(model.failure == nil)
+        }
+    }
+
+    @Test func aRegistrationThatLeavesTheItemMissingIsAFailureNotAPreference() {
+        withIsolatedDefaults { defaults in
+            let (model, manager, store) = makeModel(status: .notRegistered, stored: false, defaults: defaults)
+            manager.statusAfterRegister = .notRegistered
+
+            model.setOn(true)
+
+            #expect(manager.registerCallCount == 1)
+            #expect(store.preference() == false)
+            #expect(!model.isOn)
+            #expect(model.failure != nil)
+        }
+    }
+
+    @Test func turningTheSwitchOffWhenNothingIsRegisteredJustStoresIt() {
+        withIsolatedDefaults { defaults in
+            let (model, manager, store) = makeModel(status: .notRegistered, stored: true, defaults: defaults)
+
+            model.setOn(false)
+
+            #expect(manager.unregisterCallCount == 0)
+            #expect(store.preference() == false)
+            #expect(!model.isOn)
+            #expect(model.failure == nil)
         }
     }
 
