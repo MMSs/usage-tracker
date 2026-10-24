@@ -240,4 +240,33 @@ import Testing
 
         #expect(budgets.budget(for: .anthropic) == 35)
     }
+
+    @Test(arguments: [Decimal(0), Decimal(-5)])
+    func aBudgetTheStoreRejectsReadsBackAsNone(budget: Decimal) {
+        withIsolatedDefaults { defaults in
+            let model = AppModel(
+                providers: ProviderRegistry.all.map { descriptor in
+                    ProviderViewModel(
+                        descriptor: descriptor,
+                        subscriptionFetcher: nil,
+                        apiFetcher: nil,
+                        credentialStore: credentials, cache: cache
+                    )
+                },
+                credentialStore: credentials,
+                providerSettingsStore: settingsStore,
+                appearanceStore: MemoryMenuBarAppearanceStore(),
+                budgetStore: UserDefaultsAPIBudgetStore(defaults: defaults),
+                loginItem: .stub(),
+                sleepObserver: ControllableSleepObserver(),
+                networkObserver: ControllableNetworkObserver()
+            )
+            model.setBudget(40, for: .anthropic)
+            #expect(model.budget(for: .anthropic) == 40)
+
+            model.setBudget(budget, for: .anthropic)
+
+            #expect(model.budget(for: .anthropic) == nil)
+        }
+    }
 }

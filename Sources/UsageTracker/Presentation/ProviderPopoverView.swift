@@ -3,7 +3,7 @@ import SwiftUI
 
 struct ProviderPopoverView: View {
     @ObservedObject var provider: ProviderViewModel
-    let appModel: AppModel
+    @ObservedObject var appModel: AppModel
     @State private var escapeMonitor = EscapeMonitorState()
     @Environment(\.dismiss) private var dismiss
 
