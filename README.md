@@ -44,6 +44,29 @@ value saves shortly after you stop typing, and only to the login Keychain.
 Afterwards the field shows the first and last few characters of the saved
 value so you can tell which one is in use; paste over it to replace it.
 
+## Setting up Anthropic
+
+The Anthropic tab takes two independent credentials. Each one switches on its
+own half, and each half has its own Enabled switch on the tab.
+
+- Session key: the value of the `sessionKey` cookie from claude.ai (it starts
+  with `sk-ant-sid01-`). It shows your subscription meters: the 5-hour
+  Session and the Weekly window, plus the per-model weekly rows, each with its
+  reset time. In the menu bar they appear as `S` and `W`. Sign in to
+  [claude.ai](https://claude.ai) in Chrome, press Option-Command-I, open
+  Application, Cookies, claude.ai, and copy the value. Signing out of claude.ai
+  in that browser invalidates the key.
+- Admin key: an `sk-ant-admin...` key from
+  [console.anthropic.com](https://console.anthropic.com/settings/admin-keys)
+  (Settings, Admin keys). It shows API spend and a daily cost chart, with an
+  optional monthly API budget that drives the ring and pacing. Only
+  organization admins can create one; it reads cost data and cannot call
+  models.
+
+Without an Admin key, or with API usage switched off, only the subscription
+meters appear. Both values save shortly after you stop typing, and only to the
+login Keychain.
+
 ## Settings
 
 Settings is its own window. Open it from the gear in any menu bar popover, or
@@ -62,14 +85,15 @@ window is open and leaves when it closes.
 
 ## Status
 
-Early development. Cursor works. Anthropic and OpenAI follow in later releases.
+Early development. Cursor and Anthropic work. OpenAI follows in a later release.
 
 ## Trademarks
 
 Cursor, Anthropic, Claude and OpenAI are trademarks of their respective owners.
 Usage Tracker uses the names and marks only to identify which service a menu
 bar item reports on. It is not affiliated with or endorsed by any of them. The
-Cursor cube is drawn from the asset pack at <https://cursor.com/brand>.
+Cursor cube is drawn from the asset pack at <https://cursor.com/brand>. The
+Anthropic mark is an original "A\" drawing, not Anthropic's or Claude's logo.
 
 ## Removal
 
@@ -77,10 +101,13 @@ Cursor cube is drawn from the asset pack at <https://cursor.com/brand>.
 2. In **System Settings > General > Login Items & Extensions**, remove Usage
    Tracker from the login items list.
 3. Delete `/Applications/Usage Tracker.app`.
-4. Delete the stored Cursor session token from the login Keychain:
+4. Delete the stored credentials from the login Keychain:
 
 ```zsh
 security delete-generic-password \
   -s "com.mohab.usage-tracker" \
   -a "cursor-session-token"
 ```
+
+Repeat with `-a "anthropic-session-key"` and `-a "anthropic-admin-key"` for the
+Anthropic credentials.

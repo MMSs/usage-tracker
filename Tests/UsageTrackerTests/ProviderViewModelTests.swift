@@ -42,6 +42,12 @@ import Testing
         #expect(!unfetched.hasAnyHalf)
     }
 
+    @Test func aProviderWithBothFetchersHasTwoHalves() {
+        let model = makeModel(.anthropic, now: { t1 })
+        #expect(model.hasAnyHalf)
+        #expect([model.subscription, model.api].compactMap { $0 }.count == 2)
+    }
+
     @Test func isConfiguredWhenAnyHalfIs() async {
         store.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
         let model = makeModel(.anthropic, now: { t1 })

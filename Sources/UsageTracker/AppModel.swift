@@ -154,17 +154,31 @@ final class AppModel: ObservableObject {
         providers.first { $0.id == id }!
     }
 
+    /// The report services behind each provider's halves. OpenAI has none yet.
+    private static func fetchers(for provider: Provider) -> (subscription: ReportFetching?, api: ReportFetching?) {
+        switch provider {
+        case .cursor:
+            (CursorReportService(service: CursorUsageService()), nil)
+        case .anthropic:
+            (
+                AnthropicSubscriptionReportService(service: AnthropicUsageService()),
+                AnthropicAPIReportService(service: AnthropicCostService())
+            )
+        case .openai:
+            (nil, nil)
+        }
+    }
+
     static func live() -> AppModel {
         let credentialStore = KeychainCredentialStore()
         let cache = UserDefaultsReportCache()
 
         let providers = ProviderRegistry.all.map { descriptor in
-            ProviderViewModel(
+            let fetchers = fetchers(for: descriptor.id)
+            return ProviderViewModel(
                 descriptor: descriptor,
-                subscriptionFetcher: descriptor.id == .cursor
-                    ? CursorReportService(service: CursorUsageService())
-                    : nil,
-                apiFetcher: nil,
+                subscriptionFetcher: fetchers.subscription,
+                apiFetcher: fetchers.api,
                 credentialStore: credentialStore,
                 cache: cache
             )

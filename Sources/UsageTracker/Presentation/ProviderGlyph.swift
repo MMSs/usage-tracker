@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// The provider's mark, filled in the item's foreground colour. Cursor uses
-/// its official 2D cube; Anthropic and OpenAI are placeholder letters until
-/// their providers land.
+/// its official 2D cube; Anthropic uses an original "A\" drawing, not its
+/// trademarked logo; OpenAI is a placeholder letter until its provider lands.
 struct ProviderGlyph: Shape {
     let provider: Provider
 
@@ -11,7 +11,7 @@ struct ProviderGlyph: Shape {
         case .cursor:
             cube(in: rect)
         case .anthropic:
-            letterA(in: rect)
+            anthropicMark(in: rect)
         case .openai:
             letterO(in: rect)
         }
@@ -33,22 +33,20 @@ struct ProviderGlyph: Shape {
         SVGPath.fit(Self.cursorCube, viewBox: Self.cursorCubeViewBox, in: rect)
     }
 
-    private func letterA(in rect: CGRect) -> Path {
-        let lineWidth: CGFloat = 2.2
-        let inset = lineWidth / 2
-        let left = CGPoint(x: rect.minX + inset, y: rect.maxY - inset)
-        let apex = CGPoint(x: rect.midX, y: rect.minY + inset)
-        let right = CGPoint(x: rect.maxX - inset, y: rect.maxY - inset)
-        let barY = rect.minY + rect.height * 0.68
+    /// An original "A\" drawing in the spirit of the Anthropic logotype: a bold
+    /// geometric A (flat apex, crossbar at 40% of the cap height, stroke 22% of
+    /// it) and a backslash of the same stroke leaning 20 degrees, half a stroke
+    /// away. Hand-written polygons in a 100 x 100 box, no font involved. It is
+    /// not Anthropic's trademarked logo.
+    private static let anthropicViewBox = CGSize(width: 100, height: 100)
+    private static let anthropicMark = SVGPath.path(
+        "M3,88L29,12L43,12L69,88L51.3,88L43.8,66L28.2,66L20.7,88Z"
+            + "M36,43.2L33.9,49.2L38.1,49.2Z"
+            + "M51.4,12L69.2,12L96.8,88L79,88Z"
+    )
 
-        var strokes = Path()
-        strokes.move(to: left)
-        strokes.addLine(to: apex)
-        strokes.addLine(to: right)
-        strokes.move(to: CGPoint(x: rect.minX + rect.width * 0.25, y: barY))
-        strokes.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.25, y: barY))
-
-        return strokes.strokedPath(StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+    private func anthropicMark(in rect: CGRect) -> Path {
+        SVGPath.fit(Self.anthropicMark, viewBox: Self.anthropicViewBox, in: rect)
     }
 
     private func letterO(in rect: CGRect) -> Path {

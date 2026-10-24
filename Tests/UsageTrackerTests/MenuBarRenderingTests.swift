@@ -91,4 +91,13 @@ import Testing
             #expect(!ProviderGlyph(provider: provider).path(in: CGRect(x: 0, y: 0, width: 14, height: 14)).isEmpty)
         }
     }
+
+    @Test func anthropicGlyphFillsTheBoxWidth() {
+        let box = CGRect(x: 0, y: 0, width: 14, height: 14)
+        let bounds = ProviderGlyph(provider: .anthropic).path(in: box).boundingRect
+
+        #expect(bounds.width >= box.width * 0.9)
+        #expect(bounds.minX >= box.minX && bounds.maxX <= box.maxX)
+        #expect(bounds.minY >= box.minY && bounds.maxY <= box.maxY)
+    }
 }
