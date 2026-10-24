@@ -63,6 +63,14 @@ import Testing
         #expect(controller.pages == [.general, .provider(.anthropic), .provider(.cursor)])
     }
 
+    @Test func toolbarTabsListOpenAIBetweenAnthropicAndCursor() {
+        let controller = SettingsWindowController(
+            model: makeModel(withHalves: [.cursor, .anthropic, .openai]), dock: RecordingDock(), frameAutosaveName: nil
+        )
+
+        #expect(controller.pages == [.general, .provider(.anthropic), .provider(.openai), .provider(.cursor)])
+    }
+
     @Test func presentingAgainReusesTheOpenWindow() throws {
         let dock = RecordingDock()
         let controller = SettingsWindowController(model: makeModel(), dock: dock, frameAutosaveName: nil)

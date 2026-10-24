@@ -29,7 +29,7 @@ import Testing
     }
 
     @Test func registryListsCursorAnthropicOpenAIInOrder() {
-        #expect(ProviderRegistry.all.map(\.id) == [.cursor, .anthropic, .openai])
+        #expect(ProviderRegistry.all.map(\.id) == [.cursor, .openai, .anthropic])
     }
 
     @Test func cursorDescriptor() {

@@ -1,7 +1,10 @@
 import Foundation
 
+/// Case order is the menu bar insertion order, so the first case is rightmost
+/// on screen. The display order, left to right, is the reverse
+/// (`AppModel.menuBarDisplayOrder`).
 enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
-    case cursor, anthropic, openai
+    case cursor, openai, anthropic
 
     var id: String { rawValue }
 }
