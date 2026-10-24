@@ -90,16 +90,16 @@ says which half failed (Plan usage or API spend), why, and how to fix it. The
 last successful report stays on screen, dimmed.
 
 The app writes refreshes, HTTP responses, and scheduling to the system log
-under the subsystem `com.mohab.usage-tracker`. Watch it live:
+under the subsystem `com.mohabsam.usage-tracker`. Watch it live:
 
 ```zsh
-log stream --predicate 'subsystem == "com.mohab.usage-tracker"' --level debug
+log stream --predicate 'subsystem == "com.mohabsam.usage-tracker"' --level debug
 ```
 
 Failures are kept, so they can be read afterwards:
 
 ```zsh
-log show --last 1h --predicate 'subsystem == "com.mohab.usage-tracker"'
+log show --last 1h --predicate 'subsystem == "com.mohabsam.usage-tracker"'
 ```
 
 The log never contains credentials, cookies, headers, query strings, or
@@ -128,7 +128,7 @@ Anthropic mark is an original "A\" drawing, not Anthropic's or Claude's logo.
 
 ```zsh
 security delete-generic-password \
-  -s "com.mohab.usage-tracker" \
+  -s "com.mohabsam.usage-tracker" \
   -a "cursor-session-token"
 ```
 

@@ -5,7 +5,7 @@
   <key>CFBundleExecutable</key><string>UsageTracker</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleIconName</key><string>AppIcon</string>
-  <key>CFBundleIdentifier</key><string>com.mohab.usage-tracker</string>
+  <key>CFBundleIdentifier</key><string>com.mohabsam.usage-tracker</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>26.0</string>
   <key>LSUIElement</key><true/>

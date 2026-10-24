@@ -10,7 +10,7 @@ protocol NetworkReachabilityObserving {
 @MainActor
 final class NetworkReachabilityObserver: NetworkReachabilityObserving {
     private let monitor = NWPathMonitor()
-    private let queue = DispatchQueue(label: "com.mohab.usage-tracker.reachability")
+    private let queue = DispatchQueue(label: "\(AppIdentity.bundleID).reachability")
     private var isObserving = false
     private var lastReport: Bool?
 

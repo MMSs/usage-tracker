@@ -22,7 +22,11 @@ private enum KeychainCredentialStoreError: Error {
 }
 
 final class KeychainCredentialStore: CredentialStoring {
-    private static let service = "com.mohab.usage-tracker"
+    private let service: String
+
+    init(service: String = AppIdentity.bundleID) {
+        self.service = service
+    }
 
     func credential(for key: CredentialKey) throws -> String? {
         var query = baseQuery(for: key)
@@ -93,7 +97,7 @@ final class KeychainCredentialStore: CredentialStoring {
     private func baseQuery(for key: CredentialKey) -> [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: Self.service,
+            kSecAttrService as String: service,
             kSecAttrAccount as String: key.account,
         ]
     }

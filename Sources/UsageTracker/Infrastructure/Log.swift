@@ -2,11 +2,11 @@ import Foundation
 import os
 
 /// Unified log channels. Read them with
-/// `log stream --predicate 'subsystem == "com.mohab.usage-tracker"' --level debug`.
+/// `log stream --predicate 'subsystem == "com.mohabsam.usage-tracker"' --level debug`.
 ///
 /// Never log credentials, cookies, headers, query strings, or bodies.
 enum Log {
-    static let subsystem = "com.mohab.usage-tracker"
+    static let subsystem = AppIdentity.bundleID
 
     static let refresh = Logger(subsystem: subsystem, category: "refresh")
     static let http = Logger(subsystem: subsystem, category: "http")
