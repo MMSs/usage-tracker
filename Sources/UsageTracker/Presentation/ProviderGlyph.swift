@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The provider's mark, filled in the item's foreground colour. Cursor draws
-/// its hexagon cube; Anthropic and OpenAI are placeholder letters until their
-/// providers land.
+/// The provider's mark, filled in the item's foreground colour. Cursor uses
+/// its official 2D cube; Anthropic and OpenAI are placeholder letters until
+/// their providers land.
 struct ProviderGlyph: Shape {
     let provider: Provider
 
@@ -17,27 +17,20 @@ struct ProviderGlyph: Shape {
         }
     }
 
-    /// A regular hexagon with the three inner edges from the centre to alternating vertices.
+    /// Cursor's monochrome 2D cube, path data from the CUBE_2D asset in the
+    /// brand pack at https://cursor.com/brand. The mark is Cursor's trademark
+    /// and identifies the service only.
+    private static let cursorCubeViewBox = CGSize(width: 466.73, height: 532.09)
+    private static let cursorCube = SVGPath.path(
+        "M457.43,125.94L244.42,2.96c-6.84-3.95-15.28-3.95-22.12,0L9.3,125.94c-5.75,3.32-9.3,9.46-9.3,16.11v247.99"
+            + "c0,6.65,3.55,12.79,9.3,16.11l213.01,122.98c6.84,3.95,15.28,3.95,22.12,0l213.01-122.98"
+            + "c5.75-3.32,9.3-9.46,9.3-16.11v-247.99c0-6.65-3.55-12.79-9.3-16.11h-.01Z"
+            + "M444.05,151.99l-205.63,356.16c-1.39,2.4-5.06,1.42-5.06-1.36v-233.21c0-4.66-2.49-8.97-6.53-11.31"
+            + "L24.87,145.67c-2.4-1.39-1.42-5.06,1.36-5.06h411.26c5.84,0,9.49,6.33,6.57,11.39h-.01Z"
+    )
+
     private func cube(in rect: CGRect) -> Path {
-        let lineWidth: CGFloat = 1.5
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2 - lineWidth / 2
-        let vertices = (0 ..< 6).map { index -> CGPoint in
-            let angle = (-90 + 60 * Double(index)) * .pi / 180
-            return CGPoint(x: center.x + radius * cos(angle), y: center.y + radius * sin(angle))
-        }
-
-        var outline = Path()
-        outline.move(to: vertices[0])
-        vertices.dropFirst().forEach { outline.addLine(to: $0) }
-        outline.closeSubpath()
-
-        for index in [1, 3, 5] {
-            outline.move(to: center)
-            outline.addLine(to: vertices[index])
-        }
-
-        return outline.strokedPath(StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+        SVGPath.fit(Self.cursorCube, viewBox: Self.cursorCubeViewBox, in: rect)
     }
 
     private func letterA(in rect: CGRect) -> Path {

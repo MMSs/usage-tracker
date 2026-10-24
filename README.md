@@ -46,6 +46,13 @@ value saves shortly after you stop typing, and only to the login Keychain.
 
 Early development. Cursor works. Anthropic and OpenAI follow in later releases.
 
+## Trademarks
+
+Cursor, Anthropic, Claude and OpenAI are trademarks of their respective owners.
+Usage Tracker uses the names and marks only to identify which service a menu
+bar item reports on. It is not affiliated with or endorsed by any of them. The
+Cursor cube is drawn from the asset pack at <https://cursor.com/brand>.
+
 ## Removal
 
 1. Quit Usage Tracker.
