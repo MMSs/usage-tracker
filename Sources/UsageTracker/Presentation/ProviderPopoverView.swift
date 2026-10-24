@@ -8,8 +8,6 @@ struct ProviderPopoverView: View {
     @State private var escapeMonitor = EscapeMonitorState()
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    static let width: CGFloat = 300
-
     var body: some View {
         Group {
             if isSettingsPresented {
@@ -21,6 +19,7 @@ struct ProviderPopoverView: View {
             }
         }
         .animation(reduceMotion ? nil : .snappy(duration: 0.3), value: isSettingsPresented)
+        .frame(width: PopoverLayout.width)
         .fixedSize(horizontal: false, vertical: true)
         .background(HostingWindowReader(onWindow: { window in
             escapeMonitor.window = window
@@ -48,7 +47,6 @@ struct ProviderPopoverView: View {
 
             footer
         }
-        .frame(width: Self.width)
         .padding(16)
     }
 
@@ -181,9 +179,9 @@ struct ProviderPopoverView: View {
 
     private func apiSection(_ half: HalfViewModel, now: Date) -> some View {
         let spend = half.report?.spend
-        let month = spend.map { $0.period.start.formatted(Date.FormatStyle().month(.wide)) }
+        let month = spend.map { Self.monthName($0.period.start) }
         let label = month.map { "API · \($0)" } ?? "API"
-        let budget = appModel.budgetStore.budget(for: provider.id)
+        let budget = appModel.budgetStore.budget(for: provider.id).flatMap { $0 > 0 ? $0 : nil }
 
         return sectionShell(label: label, half: half) {
             if let spend {
@@ -213,12 +211,19 @@ struct ProviderPopoverView: View {
 
                 if provider.descriptor.capabilities.hasDailyChart, !spend.daily.isEmpty {
                     DailySpendChartView(
-                        title: label + " daily", subtitleRow: nil,
+                        title: label, subtitleRow: nil,
                         days: spend.daily, period: spend.period, today: now, unit: .dollars
                     )
                 }
             }
         }
+    }
+
+    private static func monthName(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "LLLL"
+        return formatter.string(from: date)
     }
 
     // MARK: Footer

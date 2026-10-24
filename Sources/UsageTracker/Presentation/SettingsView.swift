@@ -1,8 +1,6 @@
 import SwiftUI
 
 struct SettingsView: View {
-    static let width: CGFloat = 300
-
     @ObservedObject var appModel: AppModel
     let expanded: Provider
     let onBack: () -> Void
@@ -37,7 +35,7 @@ struct SettingsView: View {
             }
             .padding(16)
         }
-        .frame(width: Self.width)
+        .frame(width: PopoverLayout.width)
         .frame(maxHeight: 600)
         .onAppear {
             appearance = appModel.appearanceStore.appearance()

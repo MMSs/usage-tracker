@@ -30,6 +30,11 @@ struct HostingWindowReader: NSViewRepresentable {
     }
 }
 
+enum PopoverLayout {
+    /// Total width of every popover page, padding included.
+    static let width: CGFloat = 300
+}
+
 /// Reference-typed so the event monitor closure and the view share one copy.
 final class EscapeMonitorState {
     var monitor: Any?
@@ -45,7 +50,7 @@ enum MenuBarPopover {
         let buttons = NSApp.windows
             .filter { $0.className == "NSStatusBarWindow" && $0.isVisible }
             .compactMap { button(in: $0.contentView) }
-        (buttons.first { $0.isHighlighted } ?? buttons.first)?.performClick(nil)
+        buttons.first { $0.isHighlighted }?.performClick(nil)
     }
 
     @MainActor
