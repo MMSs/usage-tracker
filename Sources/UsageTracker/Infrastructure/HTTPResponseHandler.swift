@@ -14,8 +14,10 @@ enum HTTPResponseHandler {
         do {
             (data, response) = try await client.data(for: request)
         } catch {
-            // A cancelled request is not a failure; let callers tell the difference.
-            if error is CancellationError || (error as? URLError)?.code == .cancelled {
+            // A cancelled request is not a failure; let callers tell the
+            // difference. A session that cancels while the task is still
+            // wanted is one, or the half would keep its old report unexplained.
+            if error is CancellationError || ((error as? URLError)?.code == .cancelled && Task.isCancelled) {
                 Log.http.debug("\(method, privacy: .public) \(endpoint, privacy: .public) cancelled")
                 throw CancellationError()
             }

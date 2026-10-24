@@ -8,8 +8,22 @@ struct HTTPResponseHandlerTests {
 
     @Test func cancelledURLErrorBecomesCancellationError() async {
         let client = ThrowingHTTPClient(error: URLError(.cancelled))
+        let request = request
+        // Main-actor work cannot start before this test suspends, so the cancel lands first.
+        let task = Task { try await HTTPResponseHandler.data(for: request, client: client) }
+        task.cancel()
 
         await #expect(throws: CancellationError.self) {
+            try await task.value
+        }
+    }
+
+    /// Only a cancelled task is "not a failure"; a session that cancels on
+    /// its own must not leave the half silently showing its old report.
+    @Test func cancelledURLErrorWithoutTaskCancellationIsTransport() async {
+        let client = ThrowingHTTPClient(error: URLError(.cancelled))
+
+        await #expect(throws: FetchError.transport) {
             try await HTTPResponseHandler.data(for: request, client: client)
         }
     }

@@ -74,9 +74,12 @@ struct CursorUsageServiceTests {
     @Test func cancelledRequestIsCancellationNotTransport() async {
         for error: any Error in [URLError(.cancelled), CancellationError()] {
             let service = CursorUsageService(client: ThrowingHTTPClient(error: error))
+            // URLSession reports a cancelled task as URLError.cancelled.
+            let task = Task { try await service.fetchUsage(token: "session-token") }
+            task.cancel()
 
             await #expect(throws: CancellationError.self) {
-                try await service.fetchUsage(token: "session-token")
+                try await task.value
             }
         }
     }
