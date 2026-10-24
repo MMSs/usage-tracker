@@ -60,7 +60,7 @@ struct DailySpendChartView: View {
             HStack(alignment: .bottom, spacing: Self.barSpacing) {
                 ForEach(items) { bar in
                     column(for: bar)
-                        .frame(width: width, height: Self.barHeight)
+                        .frame(width: width, height: Self.barHeight, alignment: .bottom)
                         .contentShape(Rectangle())
                         .onHover { inside in
                             if inside {
