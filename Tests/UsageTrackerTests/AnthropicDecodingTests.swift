@@ -241,6 +241,28 @@ import Testing
         #expect(empty.organizations.isEmpty)
     }
 
+    @Test func organizationsSkipMalformedElementsInBothShapes() throws {
+        let elements = #"[{"name":"no uuid"},"garbage",{"uuid":"a"},{"uuid":3},{"uuid":"b"}]"#
+        let fromArray = try JSONDecoder().decode(AnthropicOrganizationsResponse.self, from: Data(elements.utf8))
+        let fromObject = try JSONDecoder().decode(
+            AnthropicOrganizationsResponse.self,
+            from: Data(#"{"organizations":\#(elements)}"#.utf8)
+        )
+
+        #expect(fromArray.organizations.map(\.uuid) == ["a", "b"])
+        #expect(fromObject.organizations.map(\.uuid) == ["a", "b"])
+    }
+
+    @Test func primaryOrganizationPrefersChat() {
+        typealias Organization = AnthropicOrganizationsResponse.Organization
+        let api = Organization(uuid: "api", capabilities: ["api"])
+        let chat = Organization(uuid: "chat", capabilities: ["api", "chat"])
+
+        #expect(AnthropicOrganizationsResponse(organizations: [api, chat]).primary == chat)
+        #expect(AnthropicOrganizationsResponse(organizations: [api, Organization(uuid: "bare")]).primary == api)
+        #expect(AnthropicOrganizationsResponse(organizations: []).primary == nil)
+    }
+
     @Test func planNameFromTier() {
         #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_5x", capabilities: nil) == "Max 5x")
         #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_20x", capabilities: nil) == "Max 20x")

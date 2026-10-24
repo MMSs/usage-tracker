@@ -233,6 +233,50 @@ struct AnthropicUsageServiceTests {
         #expect(count(client, suffix: "/organizations") == 1)
     }
 
+    @Test func chatOrganizationIsChosenOverAnEarlierAPIOrganization() async throws {
+        var routes = try routes(overage: false)
+        routes["/organizations"] = .ok(json: """
+        [{"uuid":"api-org","capabilities":["api"],"rate_limit_tier":"default_claude_pro"},
+         {"uuid":"chat-org","capabilities":["chat","claude_max"],"rate_limit_tier":"default_claude_max_20x"}]
+        """)
+        routes["/chat-org/usage"] = .ok(json: try fixture("anthropic-usage"))
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        let snapshot = try await service.fetchSubscription(sessionKey: "k")
+
+        #expect(count(client, suffix: "/chat-org/usage") == 1)
+        #expect(count(client, suffix: "/api-org/usage") == 0)
+        #expect(snapshot.planName == "Max 20x")
+    }
+
+    @Test func firstOrganizationIsUsedWhenNoneHasChat() async throws {
+        var routes = try routes(overage: false)
+        routes["/organizations"] = .ok(json: #"[{"uuid":"one","capabilities":["api"]},{"uuid":"two"}]"#)
+        routes["/one/usage"] = .ok(json: try fixture("anthropic-usage"))
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        _ = try await service.fetchSubscription(sessionKey: "k")
+
+        #expect(count(client, suffix: "/one/usage") == 1)
+    }
+
+    @Test func malformedOrganizationElementsAreSkipped() async throws {
+        var routes = try routes(overage: false)
+        routes["/organizations"] = .ok(json: """
+        [{"name":"no uuid","capabilities":["chat"]}, "garbage", {"uuid":7},
+         {"uuid":"good-org","capabilities":["chat"]}]
+        """)
+        routes["/good-org/usage"] = .ok(json: try fixture("anthropic-usage"))
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        _ = try await service.fetchSubscription(sessionKey: "k")
+
+        #expect(count(client, suffix: "/good-org/usage") == 1)
+    }
+
     @Test func emptyOrganizationListIsAFailure() async throws {
         var routes = try routes()
         routes["/organizations"] = .ok(json: "[]")

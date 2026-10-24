@@ -72,13 +72,13 @@ final class AnthropicUsageService: AnthropicUsageFetching {
         let response = try HTTPResponseHandler.decode(AnthropicOrganizationsResponse.self, from: data)
 
         // A session with no organization has nothing to report.
-        guard let first = response.organizations.first else {
+        guard let chosen = response.primary else {
             throw FetchError.decoding
         }
 
         let resolved = Organization(
-            uuid: first.uuid,
-            planName: AnthropicPlanName.from(rateLimitTier: first.rateLimitTier, capabilities: first.capabilities)
+            uuid: chosen.uuid,
+            planName: AnthropicPlanName.from(rateLimitTier: chosen.rateLimitTier, capabilities: chosen.capabilities)
         )
         organization = resolved
 

@@ -19,20 +19,40 @@ extension AnthropicOrganizationsResponse.Organization: Decodable {
     }
 }
 
+extension AnthropicOrganizationsResponse {
+    /// The organization that carries the chat subscription: the first one
+    /// with the "chat" capability, else the first one listed. API-only
+    /// organizations can come first.
+    var primary: Organization? {
+        organizations.first { $0.capabilities?.contains("chat") == true } ?? organizations.first
+    }
+}
+
 extension AnthropicOrganizationsResponse: Decodable {
     private enum CodingKeys: String, CodingKey {
         case organizations
     }
 
+    /// An element that fails to decode is skipped instead of failing the list.
+    private struct LossyOrganization: Decodable {
+        let organization: Organization?
+
+        init(from decoder: Decoder) throws {
+            organization = try? Organization(from: decoder)
+        }
+    }
+
     /// The endpoint returns a bare array; an `{ "organizations": [...] }`
     /// envelope is accepted too.
     init(from decoder: Decoder) throws {
-        if let array = try? decoder.singleValueContainer().decode([Organization].self) {
-            organizations = array
+        let elements: [LossyOrganization]
+        if let array = try? decoder.singleValueContainer().decode([LossyOrganization].self) {
+            elements = array
         } else {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            organizations = try container.decode([Organization].self, forKey: .organizations)
+            elements = try container.decode([LossyOrganization].self, forKey: .organizations)
         }
+        organizations = elements.compactMap(\.organization)
     }
 }
 
