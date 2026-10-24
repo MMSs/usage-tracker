@@ -77,3 +77,30 @@ private func chartDay(_ year: Int, _ month: Int, _ day: Int, hour: Int = 0) -> D
         #expect(result[4].day == chartDay(2026, 10, 5))
     }
 }
+
+@MainActor
+@Suite struct DailySpendChartCaptionTests {
+    // Noon keeps the calendar day stable under any machine time zone.
+    private let bar = ChartBar(
+        day: chartDay(2026, 10, 24, hour: 12),
+        amount: Decimal(string: "4.2")!,
+        heightFraction: 1,
+        isToday: true,
+        isFuture: false
+    )
+
+    @Test func dollarCaptionShowsDayAndTwoDecimalAmount() {
+        #expect(DailySpendChartView.caption(for: bar, unit: .dollars) == "24 Oct · $4.20")
+    }
+
+    @Test func percentCaptionShowsOneDecimalShare() {
+        let share = ChartBar(
+            day: bar.day,
+            amount: Decimal(string: "0.4")!,
+            heightFraction: 0.1,
+            isToday: true,
+            isFuture: false
+        )
+        #expect(DailySpendChartView.caption(for: share, unit: .percent) == "24 Oct · 0.4%")
+    }
+}

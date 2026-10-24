@@ -9,7 +9,7 @@ struct DailySpendChartView: View {
     let days: [DaySpend]
     let period: CyclePeriod
     let today: Date
-    var unit: BudgetUnit = .dollars
+    let unit: BudgetUnit
 
     private static let barHeight: CGFloat = 38
     private static let barSpacing: CGFloat = 2
@@ -89,7 +89,7 @@ struct DailySpendChartView: View {
     }
 
     static func caption(for bar: ChartBar, unit: BudgetUnit) -> String {
-        let date = bar.day.formatted(.dateTime.day().month(.abbreviated).locale(locale))
+        let date = bar.day.formatted(.verbatim("\(day: .defaultDigits) \(month: .abbreviated)", locale: locale, timeZone: .current, calendar: .current))
         return "\(date) · \(unit.format(bar.amount))"
     }
 }

@@ -27,7 +27,7 @@ enum ChartLayout {
         }
 
         var day = calendar.startOfDay(for: period.start)
-        let end = period.end
+        let end = calendar.startOfDay(for: period.end)
         let startOfToday = calendar.startOfDay(for: today)
         while day < end {
             amounts.append((day, amountByDay[day] ?? 0))
