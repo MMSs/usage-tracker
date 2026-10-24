@@ -32,14 +32,8 @@ final class CursorUsageService: UsageFetching, DailySpendFetching {
         )
 
         let data = try await send(request)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
 
-        do {
-            return try decoder.decode(CursorUsageResponse.self, from: data)
-        } catch {
-            throw FetchError.decoding
-        }
+        return try HTTPResponseHandler.decode(CursorUsageResponse.self, from: data, dates: .iso8601)
     }
 
     func membershipStart(token: String) async throws -> Date? {
@@ -124,50 +118,12 @@ final class CursorUsageService: UsageFetching, DailySpendFetching {
         return request
     }
 
-    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
-        do {
-            return try JSONDecoder().decode(type, from: data)
-        } catch {
-            throw FetchError.decoding
-        }
+    private func send(_ request: URLRequest) async throws -> Data {
+        try await HTTPResponseHandler.data(for: request, client: client)
     }
 
-    private func send(_ request: URLRequest) async throws -> Data {
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await client.data(for: request)
-        } catch {
-            // A cancelled request is not a failure; let callers tell the difference.
-            if error is CancellationError || (error as? URLError)?.code == .cancelled {
-                throw CancellationError()
-            }
-            throw FetchError.transport
-        }
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw FetchError.invalidResponse
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            switch httpResponse.statusCode {
-            case 401:
-                throw FetchError.unauthorized
-            case 403:
-                // An HTML 403 is a bot-protection challenge, not an expired session.
-                let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type")?.lowercased() ?? ""
-                if contentType.hasPrefix("text/html") {
-                    throw FetchError.challenge
-                }
-                throw FetchError.unauthorized
-            default:
-                break
-            }
-
-            throw FetchError.httpStatus(httpResponse.statusCode)
-        }
-
-        return data
+    private func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
+        try HTTPResponseHandler.decode(type, from: data)
     }
 }
 
