@@ -1,16 +1,76 @@
 import SwiftUI
 
-/// Which page is showing and whether a provider's first credential help
-/// starts open. Shared between the window controller and the pages.
+/// Which page is showing, each provider page's tab, and whether a provider's
+/// first credential help starts open. Shared between the window controller
+/// and the pages.
 @MainActor
 final class SettingsSelection: ObservableObject {
     @Published var page: SettingsPage = .general
-    /// The provider whose first credential help starts open, until the user leaves its page.
+    /// The provider whose first credential help starts open, until the user leaves its page or tab.
     @Published var helpProvider: Provider?
+    /// The tab each provider page shows; absent means its first tab. Kept for one window.
+    @Published var tabs: [Provider: ProviderSettingsTab] = [:]
 
     func apply(_ request: SettingsRequest, listed: [Provider]) {
         page = SettingsPage.resolve(request, listed: listed)
         helpProvider = request.opensHelp ? request.provider : nil
+
+        // The help opens on a field, so show the tab that holds it.
+        if request.opensHelp, let provider = request.provider, page == .provider(provider) {
+            let descriptor = ProviderRegistry.descriptor(for: provider)
+            if let fieldID = SettingsHelp.fieldID(for: descriptor, helpProvider: provider),
+               let tab = ProviderSettingsTab.holding(fieldID: fieldID, in: descriptor) {
+                tabs[provider] = tab
+            }
+        }
+    }
+
+    /// The user picked a tab; the help requested for that page stays closed from here on.
+    func selectTab(_ tab: ProviderSettingsTab, for provider: Provider) {
+        tabs[provider] = tab
+        if helpProvider == provider {
+            helpProvider = nil
+        }
+    }
+}
+
+/// The segments under a provider page's status header.
+enum ProviderSettingsTab: Hashable {
+    case subscription, api, menuBar
+
+    init(_ half: Half) {
+        switch half {
+        case .subscription: self = .subscription
+        case .api: self = .api
+        }
+    }
+
+    var title: String {
+        switch self {
+        case .subscription: "Subscription"
+        case .api: "API usage"
+        case .menuBar: "Menu bar"
+        }
+    }
+
+    /// One tab per half the provider has, then Menu bar.
+    @MainActor
+    static func tabs(for provider: ProviderViewModel) -> [ProviderSettingsTab] {
+        [Half.subscription, .api].filter { provider.half($0) != nil }.map(ProviderSettingsTab.init) + [.menuBar]
+    }
+
+    /// The tab that shows the field: its half's.
+    static func holding(fieldID: String, in descriptor: ProviderDescriptor) -> ProviderSettingsTab? {
+        descriptor.fields.first { $0.id == fieldID }.map { ProviderSettingsTab($0.half) }
+    }
+
+    /// The chosen tab when the page has it, else the page's first.
+    static func resolve(_ tab: ProviderSettingsTab?, in tabs: [ProviderSettingsTab]) -> ProviderSettingsTab {
+        if let tab, tabs.contains(tab) {
+            return tab
+        }
+
+        return tabs.first ?? .menuBar
     }
 }
 
@@ -53,13 +113,16 @@ struct SettingsPageLayout<Content: View>: View {
 
 /// A titled group of rows on a soft card, the way the popover laid out its settings.
 struct SettingsSection<Content: View>: View {
-    let title: String
+    /// Nil leaves the card untitled, under a tab that already names it.
+    let title: String?
     @ViewBuilder let content: () -> Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
+            if let title {
+                Text(title)
+                    .font(.headline)
+            }
 
             VStack(alignment: .leading, spacing: 0, content: content)
                 .padding(.horizontal, 12)
@@ -188,6 +251,8 @@ struct ProviderSettingsView: View {
     @ObservedObject var provider: ProviderViewModel
     @ObservedObject var appModel: AppModel
     let helpFieldID: String?
+    /// The chosen tab; nil, or one the page lacks, shows the first.
+    @Binding var tab: ProviderSettingsTab?
 
     private var settings: Binding<ProviderSettings> {
         Binding(
@@ -241,63 +306,89 @@ struct ProviderSettingsView: View {
         )
     }
 
-    private static func title(for half: Half) -> String {
-        switch half {
-        case .subscription: "Subscription"
-        case .api: "API usage"
-        }
+    private var tabs: [ProviderSettingsTab] {
+        ProviderSettingsTab.tabs(for: provider)
+    }
+
+    private var selectedTab: Binding<ProviderSettingsTab> {
+        Binding(
+            get: { ProviderSettingsTab.resolve(tab, in: tabs) },
+            set: { tab = $0 }
+        )
     }
 
     @ViewBuilder
     private var sections: some View {
-        Group {
-            ForEach([Half.subscription, .api].filter { provider.half($0) != nil }, id: \.self) { half in
-                halfSection(half)
+        Picker("Section", selection: selectedTab) {
+            ForEach(tabs, id: \.self) { tab in
+                Text(tab.title).tag(tab)
             }
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: .infinity)
+
+        switch selectedTab.wrappedValue {
+        case .subscription:
+            credentialTab(.subscription)
+        case .api:
+            credentialTab(.api)
+        case .menuBar:
+            menuBarTab
+        }
+    }
+
+    /// A half's section with the Keychain note under it.
+    private func credentialTab(_ half: Half) -> some View {
+        Group {
+            halfSection(half)
 
             Text("Credentials are stored only in your login Keychain. Nothing leaves this Mac.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            SettingsSection(title: "Refresh") {
-                SettingsRow(label: "Every", isLast: true) {
-                    RefreshIntervalSlider(interval: settings.refreshInterval)
-                }
-            }
-
-            SettingsSection(title: "Menu bar") {
-                SettingsRow(label: "Custom appearance", isLast: !usesCustomAppearance.wrappedValue) {
-                    SwitchToggle(isOn: usesCustomAppearance)
-                }
-
-                if usesCustomAppearance.wrappedValue {
-                    MenuBarPreviewStrip(
-                        item: previewItem(for: provider, in: appModel),
-                        appearance: overrideAppearance.wrappedValue,
-                        displayName: provider.descriptor.displayName,
-                        caption: "This provider's item with its own settings."
-                    )
-                    .padding(.vertical, 10)
-
-                    Divider()
-                    MenuBarAppearanceRows(appearance: overrideAppearance)
-                }
-            }
-
-            Text(usesCustomAppearance.wrappedValue
-                 ? "These settings apply to this provider only."
-                 : "Follows the defaults on the General tab.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
     }
 
-    /// One half's switch and, while it is on, its credential fields.
+    @ViewBuilder
+    private var menuBarTab: some View {
+        SettingsSection(title: "Refresh") {
+            SettingsRow(label: "Every", isLast: true) {
+                RefreshIntervalSlider(interval: settings.refreshInterval)
+            }
+        }
+
+        SettingsSection(title: "Menu bar") {
+            SettingsRow(label: "Custom appearance", isLast: !usesCustomAppearance.wrappedValue) {
+                SwitchToggle(isOn: usesCustomAppearance)
+            }
+
+            if usesCustomAppearance.wrappedValue {
+                MenuBarPreviewStrip(
+                    item: previewItem(for: provider, in: appModel),
+                    appearance: overrideAppearance.wrappedValue,
+                    displayName: provider.descriptor.displayName,
+                    caption: "This provider's item with its own settings."
+                )
+                .padding(.vertical, 10)
+
+                Divider()
+                MenuBarAppearanceRows(appearance: overrideAppearance)
+            }
+        }
+
+        Text(usesCustomAppearance.wrappedValue
+             ? "These settings apply to this provider only."
+             : "Follows the defaults on the General tab.")
+            .font(.caption)
+            .foregroundStyle(.secondary)
+    }
+
+    /// One half's switch and, while it is on, its credential fields. Untitled: the tab names it.
     private func halfSection(_ half: Half) -> some View {
         let enabled = halfEnabled(half)
         let fields = half == .subscription ? provider.descriptor.subscriptionFields : provider.descriptor.apiFields
 
-        return SettingsSection(title: Self.title(for: half)) {
+        return SettingsSection(title: nil) {
             SettingsRow(label: "Enabled", isLast: !enabled.wrappedValue) {
                 SwitchToggle(isOn: enabled)
             }

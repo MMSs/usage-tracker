@@ -68,6 +68,35 @@ import Testing
         first.close()
     }
 
+    @Test func closingTheWindowForgetsTheTabs() throws {
+        let controller = SettingsWindowController(model: makeModel(), dock: RecordingDock(), frameAutosaveName: nil)
+
+        controller.present(SettingsRequest(provider: .cursor))
+        controller.selection.selectTab(.menuBar, for: .cursor)
+        try #require(controller.window).close()
+
+        #expect(controller.selection.tabs.isEmpty)
+    }
+
+    @Test func switchingTabsFitsTheWindowToTheTab() throws {
+        let controller = SettingsWindowController(model: makeModel(), dock: RecordingDock(), frameAutosaveName: nil)
+        controller.present(SettingsRequest(provider: .cursor))
+        let window = try #require(controller.window)
+        func contentHeight() -> CGFloat {
+            RunLoop.main.run(until: Date().addingTimeInterval(0.2))
+            return window.contentRect(forFrameRect: window.frame).height
+        }
+
+        let subscriptionHeight = contentHeight()
+        controller.selection.selectTab(.menuBar, for: .cursor)
+        let menuBarHeight = contentHeight()
+        controller.selection.selectTab(.subscription, for: .cursor)
+
+        #expect(menuBarHeight != subscriptionHeight)
+        #expect(contentHeight() == subscriptionHeight)
+        window.close()
+    }
+
     @Test func reopenKeepsThePageWhenOpenAndStartsOnGeneralOtherwise() throws {
         let dock = RecordingDock()
         let controller = SettingsWindowController(model: makeModel(), dock: dock, frameAutosaveName: nil)

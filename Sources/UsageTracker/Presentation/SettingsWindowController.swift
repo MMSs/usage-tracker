@@ -79,6 +79,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window?.delegate = nil
         window = nil
         tabs = nil
+        // A provider page's tab lasts as long as its window.
+        selection.tabs = [:]
         dock.setVisible(false)
     }
 
@@ -137,7 +139,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
     }
 }
 
-/// Wraps a provider page so the help request is read live from the selection.
+/// Wraps a provider page so the help request and the tab are read live from the selection.
 private struct ProviderSettingsPage: View {
     @ObservedObject var provider: ProviderViewModel
     let appModel: AppModel
@@ -147,7 +149,15 @@ private struct ProviderSettingsPage: View {
         ProviderSettingsView(
             provider: provider,
             appModel: appModel,
-            helpFieldID: SettingsHelp.fieldID(for: provider.descriptor, helpProvider: selection.helpProvider)
+            helpFieldID: SettingsHelp.fieldID(for: provider.descriptor, helpProvider: selection.helpProvider),
+            tab: Binding(
+                get: { selection.tabs[provider.id] },
+                set: { tab in
+                    if let tab {
+                        selection.selectTab(tab, for: provider.id)
+                    }
+                }
+            )
         )
     }
 }
