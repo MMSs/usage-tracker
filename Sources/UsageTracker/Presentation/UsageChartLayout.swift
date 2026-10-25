@@ -70,8 +70,12 @@ enum UsageChartLayout {
         guard let resetsAt = window.resetsAt else { return [:] }
 
         let length = window.windowLength ?? assumedLength
-        let start = resetsAt.addingTimeInterval(-length)
         let count = max(1, Int((length / day).rounded(.up)))
+        // Whole days step by the calendar, so a clock change cannot shift the
+        // start across midnight.
+        let start = length.truncatingRemainder(dividingBy: day) == 0
+            ? calendar.date(byAdding: .day, value: -count, to: resetsAt) ?? resetsAt.addingTimeInterval(-length)
+            : resetsAt.addingTimeInterval(-length)
         let firstDay = calendar.startOfDay(for: start)
 
         let inWindow = samples
@@ -166,7 +170,7 @@ enum UsageChartLayout {
     static func spendValues(
         _ days: [DaySpend],
         period: CyclePeriod,
-        today: Date = .now,
+        today: Date,
         calendar: Calendar
     ) -> [Date: Double?] {
         var amounts: [Date: Double] = [:]

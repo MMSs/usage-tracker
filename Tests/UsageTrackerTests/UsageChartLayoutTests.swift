@@ -209,4 +209,61 @@ private func window(resetsAt: Date, length: TimeInterval? = 7 * 86_400) -> Limit
         #expect(values[at(tuesday + 2, 0)] == .some(0))
         #expect(values[at(tuesday + 3, 0)] == .some(nil))
     }
+
+    @Test func aWeekAcrossTheAutumnClockChangeHasSevenLocalDays() {
+        // Sunday 25 October 2026 has 25 hours; the window ends Tuesday 27th.
+        let samples = [
+            sample(at(23, 12, month: 10), 8), sample(at(24, 12, month: 10), 10),
+            sample(at(25, 12, month: 10), 15), sample(at(25, 23, 30, month: 10), 20),
+            sample(at(26, 20, month: 10), 26),
+        ]
+
+        let days = UsageChartLayout.weekDays(
+            samples: samples, window: window(resetsAt: at(27, 9, month: 10)),
+            assumedLength: 7 * 86_400, now: at(26, 20, 30, month: 10), calendar: layoutCalendar
+        )
+
+        #expect(Set(days.keys) == Set((20...26).map { at($0, 0, month: 10) }))
+        #expect(days[at(24, 0, month: 10)] == .some(2))
+        #expect(days[at(25, 0, month: 10)] == .some(10))
+        #expect(days[at(26, 0, month: 10)] == .some(6))
+    }
+
+    @Test func aWeekAcrossTheSpringClockChangeHasSevenLocalDays() {
+        // Sunday 29 March 2026 has 23 hours; the window ends Tuesday 31st.
+        let samples = [
+            sample(at(28, 12, month: 3), 10), sample(at(29, 12, month: 3), 16),
+            sample(at(30, 12, month: 3), 20),
+        ]
+
+        let days = UsageChartLayout.weekDays(
+            samples: samples, window: window(resetsAt: at(31, 9, month: 3)),
+            assumedLength: 7 * 86_400, now: at(30, 13, month: 3), calendar: layoutCalendar
+        )
+
+        #expect(Set(days.keys) == Set((24...30).map { at($0, 0, month: 3) }))
+        #expect(days[at(29, 0, month: 3)] == .some(6))
+        #expect(days[at(30, 0, month: 3)] == .some(4))
+    }
+
+    @Test func aResetJustAfterMidnightStillStartsSevenDaysBack() {
+        // 7 days before Monday 30 March 00:30 BST is 23 March by the calendar,
+        // but 22 March 23:30 by seconds.
+        let days = UsageChartLayout.weekDays(
+            samples: [], window: window(resetsAt: at(30, 0, 30, month: 3)),
+            assumedLength: 7 * 86_400, now: at(25, 12, month: 3), calendar: layoutCalendar
+        )
+
+        #expect(Set(days.keys) == Set((23...29).map { at($0, 0, month: 3) }))
+    }
+
+    @Test func weekDaysWithoutAResetAreEmpty() {
+        let noReset = LimitWindow(id: "week", label: "Week", percentUsed: 0, resetsAt: nil, parentID: nil)
+
+        let days = UsageChartLayout.weekDays(
+            samples: [], window: noReset, assumedLength: 7 * 86_400, now: at(5, 12), calendar: layoutCalendar
+        )
+
+        #expect(days.isEmpty)
+    }
 }
