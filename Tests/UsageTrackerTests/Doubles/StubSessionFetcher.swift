@@ -10,6 +10,8 @@ final class StubSessionFetcher: ReportFetching, SessionStarting {
     var startResults: [Result<Void, any Error>] = []
     /// Held mid-start until resumed, when set.
     var startGate: SuspendedGate?
+    /// Runs when a start succeeds, before the refresh that follows it.
+    var afterStart: (@MainActor () -> Void)?
     private(set) var fetchCount = 0
     private(set) var startCount = 0
     private(set) var startCredentials: [[String: String]] = []
@@ -33,5 +35,7 @@ final class StubSessionFetcher: ReportFetching, SessionStarting {
         if !startResults.isEmpty {
             try startResults.removeFirst().get()
         }
+
+        afterStart?()
     }
 }

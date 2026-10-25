@@ -68,6 +68,18 @@ enum AlertPolicy {
         )
     }
 
+    /// One alert per ended session, keyed by the reset it ended at.
+    static func sessionAlert(displayName: String, endedAt: Date, newSessionStarted: Bool, provider: Provider) -> UsageAlert {
+        // Minutes absorb the sub-second jitter providers add to a reset.
+        let minutes = Int((endedAt.timeIntervalSince1970 / 60).rounded())
+
+        return UsageAlert(
+            key: "\(provider.rawValue).session.\(minutes)",
+            title: "\(displayName) session reset",
+            body: newSessionStarted ? "New session started." : "You're back to 0%."
+        )
+    }
+
     private static func windowMeasure(
         _ window: LimitWindow,
         descriptor: ProviderDescriptor,
@@ -115,5 +127,29 @@ enum AlertPolicy {
             subject: "\(descriptor.displayName) API spend",
             detail: "\(BudgetUnit.dollars.format(spend.spent)) of \(BudgetUnit.dollars.format(budget)) budget this month."
         )
+    }
+}
+
+enum SessionEnd {
+    /// Resets that move by less than this are jitter, not a new session.
+    private static let jitter: TimeInterval = 60
+
+    /// `previousResetsAt` when the session last seen open with that reset has
+    /// ended: its reset has passed, or the current window resets later than
+    /// the jitter allows. Nil when there is no previous session.
+    static func ended(previousResetsAt: Date?, current: LimitWindow?, now: Date) -> Date? {
+        guard let previousResetsAt else {
+            return nil
+        }
+
+        if now >= previousResetsAt {
+            return previousResetsAt
+        }
+
+        if let reset = current?.resetsAt, reset.timeIntervalSince(previousResetsAt) > jitter {
+            return previousResetsAt
+        }
+
+        return nil
     }
 }

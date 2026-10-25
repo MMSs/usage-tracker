@@ -34,7 +34,7 @@ final class ProviderViewModel: ObservableObject, Identifiable {
     }
 
     /// The short window when a start could be judged from it; see `sessionIsClosed`.
-    private var sessionWindow: LimitWindow? {
+    var sessionWindow: LimitWindow? {
         guard isEnabled, descriptor.capabilities.canStartSession,
               let shortID = descriptor.shortWindowID,
               let subscription, subscription.isEnabled, subscription.canStartSession, subscription.status == .ready

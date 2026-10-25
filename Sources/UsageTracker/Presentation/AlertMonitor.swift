@@ -29,6 +29,19 @@ final class AlertMonitor {
         notifier.requestAuthorization()
     }
 
+    /// Marks the alert's key delivered, and delivers it when `delivers`.
+    /// Nothing happens when the key was delivered before.
+    func deliverOnce(_ alert: UsageAlert, delivers: Bool) {
+        guard !store.hasDelivered(alert.key) else {
+            return
+        }
+
+        store.markDelivered(alert.key)
+        if delivers {
+            notifier.deliver(alert)
+        }
+    }
+
     /// Always records crossings, even when `delivers` is false, so turning
     /// alerts on does not flood with everything already over a threshold.
     func evaluate(_ measures: [AlertMeasure], delivers: Bool) {

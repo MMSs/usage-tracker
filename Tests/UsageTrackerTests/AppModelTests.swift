@@ -653,6 +653,99 @@ import Testing
         }
     }
 
+    // MARK: Session reset alert
+
+    private var sessionAlerts: [UsageAlert] {
+        notifier.delivered.filter { $0.key.contains(".session.") }
+    }
+
+    /// A model that has seen an open Anthropic session, then the clock passes its
+    /// reset and the fetcher reports the session closed.
+    private func makeEndedSessionModel(
+        autoStart: Bool = false, clock: Clock
+    ) async -> (model: AppModel, starter: StubSessionFetcher) {
+        configureAll()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: true, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock, autoStart: autoStart)
+        await model.refreshAll(manual: false)
+        clock.date.addTimeInterval(3601)
+        starter.fetchResult = .success(sessionReport(open: false, at: clock.date))
+
+        return (model, starter)
+    }
+
+    @Test func aSessionResetAlertsOnce() async {
+        let clock = Clock()
+        let (model, _) = await makeEndedSessionModel(clock: clock)
+
+        await model.refreshAll(manual: false)
+        await model.refreshAll(manual: false)
+
+        #expect(sessionAlerts.map(\.title) == ["Anthropic session reset"])
+        #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
+    }
+
+    @Test func autoStartMakesItOneCombinedAlert() async {
+        let clock = Clock()
+        let (model, starter) = await makeEndedSessionModel(autoStart: true, clock: clock)
+        starter.afterStart = { [clock] in
+            starter.fetchResult = .success(self.sessionReport(open: true, at: clock.date))
+        }
+
+        await model.refreshAll(manual: false)
+
+        #expect(starter.startCount == 1)
+        #expect(sessionAlerts.map(\.body) == ["New session started."])
+    }
+
+    @Test func aFailedAutoStartKeepsThePlainAlert() async {
+        let clock = Clock()
+        let (model, starter) = await makeEndedSessionModel(autoStart: true, clock: clock)
+
+        await model.refreshAll(manual: false)
+
+        #expect(starter.startCount == 1)
+        #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
+    }
+
+    @Test func aManualRefreshPostsThePlainAlert() async {
+        let clock = Clock()
+        let (model, starter) = await makeEndedSessionModel(autoStart: true, clock: clock)
+
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .subscription), manual: true)
+
+        #expect(starter.startCount == 0)
+        #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
+    }
+
+    @Test func theSessionKindGatesIt() async {
+        let clock = Clock()
+        let (model, _) = await makeEndedSessionModel(clock: clock)
+        model.setAlertKind(.session, enabled: false)
+
+        await model.refreshAll(manual: false)
+        model.setAlertKind(.session, enabled: true)
+        await model.refreshAll(manual: false)
+
+        #expect(sessionAlerts.isEmpty)
+    }
+
+    @Test func cursorNeverPostsASessionAlert() async {
+        configureAll()
+        let clock = Clock()
+        fetchers[.cursor]?.result = .success(sessionReport(open: true, at: clock.date))
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: true, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+        await model.refreshAll(manual: false)
+        clock.date.addTimeInterval(3601)
+        fetchers[.cursor]?.result = .success(sessionReport(open: false, at: clock.date))
+        starter.fetchResult = .success(sessionReport(open: true, at: clock.date))
+
+        await model.refreshAll(manual: false)
+
+        #expect(sessionAlerts.filter { $0.title.hasPrefix("Cursor") }.isEmpty)
+    }
+
     @Test func aRefreshEvaluatesAlertsForReadyHalves() async {
         configureAll()
         useHotReport()

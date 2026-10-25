@@ -132,4 +132,53 @@ struct AlertPolicyTests {
 
         #expect(alert == UsageAlert(key: "anthropic.weekly:fable.123.95", title: "Anthropic weekly · Fable at 96%", body: "Resets soon."))
     }
+
+    // MARK: Session end
+
+    private func window(resetsAt: Date?) -> LimitWindow {
+        LimitWindow(id: "session", label: "Session", percentUsed: 10, resetsAt: resetsAt, parentID: nil)
+    }
+
+    @Test func aSessionPastItsResetHasEnded() {
+        let reset = now.addingTimeInterval(-30)
+
+        #expect(SessionEnd.ended(previousResetsAt: reset, current: window(resetsAt: nil), now: now) == reset)
+        #expect(SessionEnd.ended(previousResetsAt: reset, current: nil, now: now) == reset)
+    }
+
+    @Test func aNewWindowFiveHoursLaterMeansTheSessionEnded() {
+        let reset = now.addingTimeInterval(600)
+        let current = window(resetsAt: reset.addingTimeInterval(5 * 3600))
+
+        #expect(SessionEnd.ended(previousResetsAt: reset, current: current, now: now) == reset)
+    }
+
+    @Test func theSameWindowHasNotEnded() {
+        let reset = now.addingTimeInterval(600)
+
+        #expect(SessionEnd.ended(previousResetsAt: reset, current: window(resetsAt: reset), now: now) == nil)
+    }
+
+    @Test func noPreviousSessionNeverEnds() {
+        #expect(SessionEnd.ended(previousResetsAt: nil, current: window(resetsAt: now.addingTimeInterval(3600)), now: now) == nil)
+        #expect(SessionEnd.ended(previousResetsAt: nil, current: nil, now: now) == nil)
+    }
+
+    @Test func resetJitterUnderAMinuteIsTheSameSession() {
+        let reset = now.addingTimeInterval(600)
+        let current = window(resetsAt: reset.addingTimeInterval(59))
+
+        #expect(SessionEnd.ended(previousResetsAt: reset, current: current, now: now) == nil)
+    }
+
+    @Test func theSessionAlertSaysBackToZeroOrNewSession() {
+        let endedAt = iso("2026-10-27T08:00:00Z")
+        let minutes = Int((endedAt.timeIntervalSince1970 / 60).rounded())
+
+        let plain = AlertPolicy.sessionAlert(displayName: "Anthropic", endedAt: endedAt, newSessionStarted: false, provider: .anthropic)
+        let started = AlertPolicy.sessionAlert(displayName: "Anthropic", endedAt: endedAt, newSessionStarted: true, provider: .anthropic)
+
+        #expect(plain == UsageAlert(key: "anthropic.session.\(minutes)", title: "Anthropic session reset", body: "You're back to 0%."))
+        #expect(started == UsageAlert(key: "anthropic.session.\(minutes)", title: "Anthropic session reset", body: "New session started."))
+    }
 }

@@ -39,6 +39,8 @@ final class AppModel: ObservableObject {
     private var unopenedAutoStarts: [Provider: Int] = [:]
     /// Providers whose last automatic start has not been checked yet.
     private var autoStartsAwaitingCheck: Set<Provider> = []
+    /// The reset of each provider's session as last seen open.
+    private var lastOpenSessionReset: [Provider: Date] = [:]
     private var providerObservers: [AnyCancellable] = []
 
     init(
@@ -115,18 +117,17 @@ final class AppModel: ObservableObject {
             }
         }
 
+        var ended: [Provider: Date] = [:]
         for provider in providers where provider.isEnabled {
             evaluateAlerts(for: provider)
             noteOpenSession(provider)
-        }
-
-        // A manual refresh only looks; it never starts a session.
-        guard !manual else {
-            return
+            ended[provider.id] = endedSession(of: provider)
         }
 
         for provider in providers where provider.isEnabled {
-            await autoStartIfNeeded(provider)
+            // A manual refresh only looks; it never starts a session.
+            let started = manual ? false : await autoStartIfNeeded(provider)
+            finishSession(of: provider, endedAt: ended[provider.id], autoStartRan: started)
         }
     }
 
@@ -146,9 +147,9 @@ final class AppModel: ObservableObject {
         }
 
         noteOpenSession(provider)
-        if !manual {
-            await autoStartIfNeeded(provider)
-        }
+        let ended = endedSession(of: provider)
+        let started = manual ? false : await autoStartIfNeeded(provider)
+        finishSession(of: provider, endedAt: ended, autoStartRan: started)
     }
 
     // MARK: Session start
@@ -159,13 +160,15 @@ final class AppModel: ObservableObject {
     /// a switched-on, up-to-date subscription half, so a switched-off, expired
     /// or errored one is skipped. After `autoStartPauseAfter` starts in a row
     /// that each left the session closed, it waits for the session to open.
-    private func autoStartIfNeeded(_ provider: ProviderViewModel) async {
+    /// Returns whether it attempted a start.
+    @discardableResult
+    private func autoStartIfNeeded(_ provider: ProviderViewModel) async -> Bool {
         let id = provider.id
         guard settings(for: id).autoStartSessions,
               provider.sessionIsClosed,
               let subscription = provider.subscription
         else {
-            return
+            return false
         }
 
         if autoStartsAwaitingCheck.remove(id) != nil {
@@ -177,15 +180,16 @@ final class AppModel: ObservableObject {
         }
 
         guard unopenedAutoStarts[id, default: 0] < Self.autoStartPauseAfter else {
-            return
+            return false
         }
 
         if let last = subscription.lastSessionStartAttempt, now().timeIntervalSince(last) < Self.autoStartInterval {
-            return
+            return false
         }
 
         autoStartsAwaitingCheck.insert(id)
         await subscription.startSession()
+        return true
     }
 
     /// A running session shows starts can open it (or it was used): any
@@ -197,6 +201,37 @@ final class AppModel: ObservableObject {
 
         unopenedAutoStarts[provider.id] = nil
         autoStartsAwaitingCheck.remove(provider.id)
+    }
+
+    // MARK: Session reset alert
+
+    /// The reset of the session that has just ended, if one has. Taken before
+    /// auto-start, which replaces the window.
+    private func endedSession(of provider: ProviderViewModel) -> Date? {
+        SessionEnd.ended(previousResetsAt: lastOpenSessionReset[provider.id], current: provider.sessionWindow, now: now())
+    }
+
+    /// One alert per ended session; it says so when auto-start opened the
+    /// next one. Then remembers the open session's reset, forgetting it once
+    /// the session is seen closed.
+    private func finishSession(of provider: ProviderViewModel, endedAt: Date?, autoStartRan: Bool) {
+        let id = provider.id
+        if let endedAt, let alertMonitor {
+            let delivers = alertsEnabled && alertKinds.contains(.session) && settings(for: id).alertsEnabled
+            let alert = AlertPolicy.sessionAlert(
+                displayName: provider.descriptor.displayName,
+                endedAt: endedAt,
+                newSessionStarted: autoStartRan && provider.sessionIsOpen,
+                provider: id
+            )
+            alertMonitor.deliverOnce(alert, delivers: delivers)
+        }
+
+        if let reset = provider.sessionWindow?.resetsAt {
+            lastOpenSessionReset[id] = reset
+        } else if provider.sessionIsClosed {
+            lastOpenSessionReset[id] = nil
+        }
     }
 
     // MARK: Alerts
