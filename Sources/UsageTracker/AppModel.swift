@@ -130,8 +130,10 @@ final class AppModel: ObservableObject {
 
         for provider in providers where provider.isEnabled {
             // A manual refresh only looks; it never starts a session.
-            let started = manual ? false : await autoStartIfNeeded(provider)
-            finishSession(of: provider, endedAt: ended[provider.id], autoStartRan: started)
+            if !manual {
+                await autoStartIfNeeded(provider)
+            }
+            finishSession(of: provider, endedAt: ended[provider.id])
         }
     }
 
@@ -154,8 +156,10 @@ final class AppModel: ObservableObject {
 
         noteOpenSession(provider)
         let ended = endedSession(of: provider)
-        let started = manual ? false : await autoStartIfNeeded(provider)
-        finishSession(of: provider, endedAt: ended, autoStartRan: started)
+        if !manual {
+            await autoStartIfNeeded(provider)
+        }
+        finishSession(of: provider, endedAt: ended)
     }
 
     /// Refreshes each switched-on half of one provider together, as the
@@ -178,15 +182,13 @@ final class AppModel: ObservableObject {
     /// a switched-on, up-to-date subscription half, so a switched-off, expired
     /// or errored one is skipped. After `autoStartPauseAfter` starts in a row
     /// that each left the session closed, it waits for the session to open.
-    /// Returns whether it attempted a start.
-    @discardableResult
-    private func autoStartIfNeeded(_ provider: ProviderViewModel) async -> Bool {
+    private func autoStartIfNeeded(_ provider: ProviderViewModel) async {
         let id = provider.id
         guard settings(for: id).autoStartSessions,
               provider.sessionIsClosed,
               let subscription = provider.subscription
         else {
-            return false
+            return
         }
 
         if autoStartsAwaitingCheck.remove(id) != nil {
@@ -198,16 +200,15 @@ final class AppModel: ObservableObject {
         }
 
         guard unopenedAutoStarts[id, default: 0] < Self.autoStartPauseAfter else {
-            return false
+            return
         }
 
         if let last = subscription.lastSessionStartAttempt, now().timeIntervalSince(last) < Self.autoStartInterval {
-            return false
+            return
         }
 
         autoStartsAwaitingCheck.insert(id)
         await subscription.startSession()
-        return true
     }
 
     /// A running session shows starts can open it (or it was used): any
@@ -229,17 +230,17 @@ final class AppModel: ObservableObject {
         SessionEnd.ended(previousResetsAt: lastOpenSessionReset[provider.id], current: provider.sessionWindow, now: now())
     }
 
-    /// One alert per ended session; it says so when auto-start opened the
-    /// next one. Then remembers the open session's reset, forgetting it once
-    /// the session is seen closed.
-    private func finishSession(of provider: ProviderViewModel, endedAt: Date?, autoStartRan: Bool) {
+    /// One alert per ended session; it says so when a newer session is
+    /// already open (auto-start opened it, or it was used). Then remembers
+    /// the open session's reset, forgetting it once the session is seen closed.
+    private func finishSession(of provider: ProviderViewModel, endedAt: Date?) {
         let id = provider.id
         if let endedAt, let alertMonitor {
             let delivers = alertsEnabled && alertKinds.contains(.session) && settings(for: id).alertsEnabled
             let alert = AlertPolicy.sessionAlert(
                 displayName: provider.descriptor.displayName,
                 endedAt: endedAt,
-                newSessionStarted: autoStartRan && provider.sessionIsOpen,
+                sessionIsOpen: provider.sessionIsOpen,
                 provider: id
             )
             alertMonitor.deliverOnce(alert, delivers: delivers)
@@ -348,6 +349,7 @@ final class AppModel: ObservableObject {
         // Turning something on should show data now, not after the next timer tick.
         // The provider coming on brings back each half that is on; otherwise only the half that came on.
         let isOn = Self.enabledFlags(provider)
+        forgetSwitchedOff(id, isOn: isOn)
         let halves = [Half.subscription, .api].filter { half in
             wasOn.provider ? !wasOn.isOn(half) && isOn.isOn(half) : isOn.isOn(half)
         }
@@ -359,6 +361,17 @@ final class AppModel: ObservableObject {
                         group.addTask { await self.refresh(RefreshTarget(provider: id, half: half), manual: false) }
                     }
                 }
+            }
+        }
+    }
+
+    /// A switched-off half starts afresh when it comes back: a session that
+    /// ended meanwhile does not alert, and a failure begins a new streak.
+    private func forgetSwitchedOff(_ id: Provider, isOn: EnabledFlags) {
+        for half in [Half.subscription, .api] where !isOn.provider || !isOn.isOn(half) {
+            failingTargets.remove(RefreshTarget(provider: id, half: half))
+            if half == .subscription {
+                lastOpenSessionReset[id] = nil
             }
         }
     }

@@ -111,7 +111,7 @@ final class HalfViewModel: ObservableObject {
         status = .loading
     }
 
-    /// The last 24 hours of samples keyed by window id; empty without a store.
+    /// The last 8 days of samples keyed by window id; empty without a store.
     func usageHistory(now: Date) -> [String: [UsageSample]] {
         history?.samples(provider: provider, now: now) ?? [:]
     }

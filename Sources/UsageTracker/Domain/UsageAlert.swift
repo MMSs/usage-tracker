@@ -69,14 +69,14 @@ enum AlertPolicy {
     }
 
     /// One alert per ended session, keyed by the reset it ended at.
-    static func sessionAlert(displayName: String, endedAt: Date, newSessionStarted: Bool, provider: Provider) -> UsageAlert {
+    static func sessionAlert(displayName: String, endedAt: Date, sessionIsOpen: Bool, provider: Provider) -> UsageAlert {
         // Minutes absorb the sub-second jitter providers add to a reset.
         let minutes = Int((endedAt.timeIntervalSince1970 / 60).rounded())
 
         return UsageAlert(
             key: "\(provider.rawValue).session.\(minutes)",
             title: "\(displayName) session reset",
-            body: newSessionStarted ? "New session started." : "You're back to 0%."
+            body: sessionIsOpen ? "New session started." : "You're back to 0%."
         )
     }
 

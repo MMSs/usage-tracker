@@ -1,7 +1,7 @@
 import Foundation
 
 /// One reading of a window's percent used, kept to whole seconds and whole
-/// percents so a day of history stays small.
+/// percents so a week of history stays small.
 struct UsageSample: Equatable, Sendable {
     let date: Date
     let percent: UInt8

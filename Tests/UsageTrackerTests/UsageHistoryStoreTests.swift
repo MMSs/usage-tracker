@@ -178,6 +178,31 @@ struct UsageHistoryStoreTests {
         }
     }
 
+    /// Eight days of a sample a minute, most of it stored as-is (recording
+    /// every minute through the store takes about a minute in a debug build),
+    /// then a last stretch recorded: the window keeps a day of minutes and an
+    /// hour each before that.
+    @Test func eightDaysOfPerMinuteRecordsStayBounded() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsUsageHistoryStore(defaults: defaults)
+            let minutes = 8 * 24 * 60
+            let recorded = 10
+            let stored = (0..<(minutes - recorded)).map { minute in
+                UsageSample(date: start.addingTimeInterval(Double(minute) * 60), percent: UInt8(minute % 100))
+            }
+            defaults.set(["session": UsageSampleCoding.encode(stored)], forKey: "history.anthropic")
+
+            for minute in (minutes - recorded)..<minutes {
+                store.record(report([("session", Double(minute % 100))]), provider: .anthropic, at: start.addingTimeInterval(Double(minute) * 60))
+            }
+
+            let now = start.addingTimeInterval(Double(minutes - 1) * 60)
+            let samples = store.samples(provider: .anthropic, now: now)["session"] ?? []
+            #expect(samples.count > 24 * 60)
+            #expect(samples.count <= 24 * 60 + 8 * 24 + 2)
+        }
+    }
+
     @Test func aClockSetBackDropsSamplesFromTheFuture() {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsUsageHistoryStore(defaults: defaults)

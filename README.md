@@ -114,7 +114,8 @@ top of that bar:
   budget bar sits under them; without one they are plain and scaled to the
   largest day.
 - Cursor's billing cycle: one bar per day of the cycle over the Included usage
-  bar, coloured against the cycle's even daily share.
+  bar, coloured against the cycle's even daily share. A cycle with no limit
+  draws plain bars scaled to the largest day, with no bar under them.
 
 Hover a day's bar to see its date and amount. Per-model rows, Extra usage and
 Credits keep their plain bars.
@@ -124,7 +125,9 @@ Credits keep their plain bars.
 Settings is its own window. Open it from the gear in any menu bar popover, or
 by opening the app again from Applications or Spotlight while it is running.
 Launching the app never opens it. The app appears in the Dock while the
-window is open and leaves when it closes.
+window is open and leaves when it closes. Each page folds its titled sections
+like an accordion: click a section's header to open it, and the one that was
+open closes.
 
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings, Bars, Battery, Gauge, Segments, Columns or
@@ -155,6 +158,12 @@ Alerts are on by default, and macOS asks for notification permission when the
 app launches. Turn them all off with General, Alerts, or pick the kinds
 (Usage thresholds, Session, Refresh failures; the last is off by default) in
 the rows below it. One provider can be turned off with its Options tab, Alerts.
+
+Session posts once when a running session resets, saying you are back to 0%,
+or, when Auto-start (or your own use) has already opened the next one, that a
+new session started, in that same one alert. Refresh failures posts once when a
+half starts failing, naming the cause, and not again until a refresh succeeds;
+it never posts while the Mac is offline.
 
 ## Session start
 

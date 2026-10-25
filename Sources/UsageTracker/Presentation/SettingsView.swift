@@ -170,27 +170,33 @@ struct SettingsSection<Content: View>: View {
         .animation(.easeInOut(duration: 0.2), value: accordion?.wrappedValue)
     }
 
+    /// A button that opens the section when it folds; otherwise a plain heading.
+    @ViewBuilder
     private func header(_ title: String) -> some View {
-        Button {
-            if isCollapsible {
+        if isCollapsible {
+            Button {
                 accordion?.wrappedValue.open(title)
-            }
-        } label: {
-            HStack {
-                Text(title)
-                    .font(.headline)
-                Spacer(minLength: 12)
-                if isCollapsible {
+            } label: {
+                HStack {
+                    Text(title)
+                        .font(.headline)
+                    Spacer(minLength: 12)
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isOpen ? 90 : 0))
+                        .accessibilityHidden(true)
                 }
+                .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityAddTraits(.isHeader)
+            .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
+        } else {
+            Text(title)
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -485,6 +491,7 @@ struct ProviderSettingsView: View {
             SettingsSection(title: title) {
                 SettingsRow(label: "Every", isLast: true) {
                     RefreshIntervalSlider(interval: refreshInterval(half))
+                        .disabled(!settings.wrappedValue.isEnabled(half))
                 }
             }
         case ("Alerts", _):
@@ -742,7 +749,10 @@ struct GeneralSettingsView: View {
                 placeholder: placeholder
             )
 
-            SettingsSection(title: "Menu bar") {
+            SettingsSection(
+                title: "Menu bar",
+                footer: "Defaults for every provider. A provider's tab can override them and sets its own refresh rates. Colored tints the item by remaining capacity or pacing. Show plan usage and Show API spend hide a half from the item; the popover still lists it."
+            ) {
                 MenuBarAppearanceRows(appearance: appearance, meterNames: nil, showsHalfSwitches: true)
             }
 
@@ -765,11 +775,6 @@ struct GeneralSettingsView: View {
             SettingsSection(title: "Startup") {
                 OpenAtLoginRows(loginItem: appModel.loginItem)
             }
-
-            Text("Defaults for every provider. A provider's tab can override them and sets its own refresh rates. Colored tints the item by remaining capacity or pacing. Show plan usage and Show API spend hide a half from the item; the popover still lists it.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .environment(\.settingsAccordion, $accordion)
     }

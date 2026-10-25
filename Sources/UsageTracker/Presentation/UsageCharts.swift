@@ -153,6 +153,8 @@ struct DailyBarsChart: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .chartLabelStyle()
+        // The rows under the chart already give each day's label and value.
+        .accessibilityHidden(true)
     }
 
     private var hoveredBar: DayBar? {

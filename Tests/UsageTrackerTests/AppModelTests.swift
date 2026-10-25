@@ -730,6 +730,43 @@ import Testing
         #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
     }
 
+    @Test func aNewerWindowSaysANewSessionStarted() async {
+        let clock = Clock()
+        let (model, starter) = await makeEndedSessionModel(clock: clock)
+        // Used elsewhere since: a newer session is already running.
+        starter.fetchResult = .success(sessionReport(open: true, at: clock.date))
+
+        await model.refresh(scheduledSubscription, manual: false)
+        await model.refresh(scheduledSubscription, manual: false)
+
+        #expect(starter.startCount == 0)
+        #expect(sessionAlerts.map(\.body) == ["New session started."])
+    }
+
+    @Test(arguments: [true, false])
+    func aSessionThatEndedWhileOffDoesNotAlertWhenBackOn(wholeProvider: Bool) async {
+        let clock = Clock()
+        let (model, starter) = await makeEndedSessionModel(clock: clock)
+        var settings = model.settings(for: .anthropic)
+
+        if wholeProvider {
+            settings.isEnabled = false
+        } else {
+            settings.isSubscriptionEnabled = false
+        }
+        model.setSettings(settings, for: .anthropic)
+        if wholeProvider {
+            settings.isEnabled = true
+        } else {
+            settings.isSubscriptionEnabled = true
+        }
+        model.setSettings(settings, for: .anthropic)
+        await waitUntil { starter.fetchCount == 2 }
+        await model.refresh(scheduledSubscription, manual: false)
+
+        #expect(sessionAlerts.isEmpty)
+    }
+
     @Test func theSessionKindGatesIt() async {
         let clock = Clock()
         let (model, _) = await makeEndedSessionModel(clock: clock)
@@ -937,6 +974,33 @@ import Testing
 
         #expect(Set(failureAlerts.map(\.key)) == ["anthropic.subscription.failure", "anthropic.api.failure"])
         #expect(fetchers[.cursor]?.callCount == 0)
+    }
+
+    @Test(arguments: [true, false])
+    func aStreakEndsWhenTheHalfIsSwitchedOff(wholeProvider: Bool) async {
+        configureAll()
+        let model = makeModel()
+        model.setAlertKind(.failures, enabled: true)
+        let target = RefreshTarget(provider: .cursor, half: .subscription)
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+        await model.refresh(target, manual: true)
+        var settings = model.settings(for: .cursor)
+
+        if wholeProvider {
+            settings.isEnabled = false
+        } else {
+            settings.isSubscriptionEnabled = false
+        }
+        model.setSettings(settings, for: .cursor)
+        if wholeProvider {
+            settings.isEnabled = true
+        } else {
+            settings.isSubscriptionEnabled = true
+        }
+        model.setSettings(settings, for: .cursor)
+        await model.refresh(target, manual: true)
+
+        #expect(failureAlerts.count == 2)
     }
 
     @Test func offlineFailuresNeverAlert() async {

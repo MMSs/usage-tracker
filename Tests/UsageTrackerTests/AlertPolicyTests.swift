@@ -175,8 +175,8 @@ struct AlertPolicyTests {
         let endedAt = iso("2026-10-27T08:00:00Z")
         let minutes = Int((endedAt.timeIntervalSince1970 / 60).rounded())
 
-        let plain = AlertPolicy.sessionAlert(displayName: "Anthropic", endedAt: endedAt, newSessionStarted: false, provider: .anthropic)
-        let started = AlertPolicy.sessionAlert(displayName: "Anthropic", endedAt: endedAt, newSessionStarted: true, provider: .anthropic)
+        let plain = AlertPolicy.sessionAlert(displayName: "Anthropic", endedAt: endedAt, sessionIsOpen: false, provider: .anthropic)
+        let started = AlertPolicy.sessionAlert(displayName: "Anthropic", endedAt: endedAt, sessionIsOpen: true, provider: .anthropic)
 
         #expect(plain == UsageAlert(key: "anthropic.session.\(minutes)", title: "Anthropic session reset", body: "You're back to 0%."))
         #expect(started == UsageAlert(key: "anthropic.session.\(minutes)", title: "Anthropic session reset", body: "New session started."))
