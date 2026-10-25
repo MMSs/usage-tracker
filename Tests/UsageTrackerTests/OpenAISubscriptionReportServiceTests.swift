@@ -317,6 +317,86 @@ struct OpenAISubscriptionReportServiceTests {
         #expect(tokens.refreshTokens == ["old-refresh"])
     }
 
+    @Test func anUnreadableKeychainAfterTheGrantStillSavesIt() async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = FailingCredentialStore()
+        store.base.values[Self.key] = Self.bundle()
+        tokens.whileRenewing = { store.secretReadError = FailingCredentialStore.Failure() }
+        let service = makeService(usage, tokens, store)
+
+        _ = try await fetch(service)
+
+        let saved = try CodexAuth(json: try #require(store.base.values[Self.key]))
+        #expect(saved.accessToken == "new-access")
+        #expect(saved.refreshToken == "new-refresh")
+        #expect(usage.accessTokens == ["old-access", "new-access"])
+    }
+
+    @Test func anUnreadableAndUnwritableKeychainAfterTheGrantKeepsItInMemory() async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = FailingCredentialStore()
+        store.base.values[Self.key] = Self.bundle()
+        tokens.whileRenewing = {
+            store.secretReadError = FailingCredentialStore.Failure()
+            store.failsWrites = true
+        }
+        let service = makeService(usage, tokens, store)
+
+        _ = try await fetch(service)
+        #expect(store.base.values[Self.key] == Self.bundle())
+
+        store.secretReadError = nil
+        _ = try await fetch(service)
+
+        #expect(tokens.refreshTokens == ["old-refresh"])
+        #expect(usage.accessTokens == ["old-access", "new-access", "new-access"])
+    }
+
+    @Test(arguments: [nil, "not json"] as [String?])
+    func anEmptyOrBrokenKeychainBeforeRenewingIsUnauthorized(stored: String?) async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = MemoryCredentialStore()
+        store.values[Self.key] = stored
+        let service = makeService(usage, tokens, store)
+
+        await #expect(throws: FetchError.unauthorized) {
+            try await fetch(service)
+        }
+        #expect(tokens.refreshTokens.isEmpty)
+        #expect(store.values[Self.key] == stored)
+    }
+
+    @Test func anUnreadableKeychainAtFetchStartKeepsTheUnsavedBundle() async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = FailingCredentialStore()
+        store.base.values[Self.key] = Self.bundle()
+        store.failsWrites = true
+        let service = makeService(usage, tokens, store)
+        _ = try await fetch(service)
+
+        store.secretReadError = FailingCredentialStore.Failure()
+        store.failsWrites = false
+        _ = try await fetch(service)
+
+        #expect(usage.accessTokens == ["old-access", "new-access", "new-access"])
+        #expect(store.base.values[Self.key] == Self.bundle())
+
+        store.secretReadError = nil
+        _ = try await fetch(service)
+
+        let saved = try CodexAuth(json: try #require(store.base.values[Self.key]))
+        #expect(saved.accessToken == "new-access")
+        #expect(tokens.refreshTokens == ["old-refresh"])
+    }
+
     @Test func aRePasteDropsTheUnsavedBundle() async throws {
         let usage = StubUsage(response: response)
         usage.rejected = ["old-access"]
