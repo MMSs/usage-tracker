@@ -46,7 +46,7 @@ enum ProviderSettingsTab: Hashable {
         switch self {
         case .subscription: "Subscription"
         case .api: "API usage"
-        case .menuBar: "Menu bar"
+        case .menuBar: "Options"
         }
     }
 
@@ -308,6 +308,13 @@ struct ProviderSettingsView: View {
         )
     }
 
+    private var alertsEnabled: Binding<Bool> {
+        Binding(
+            get: { settings.wrappedValue.alertsEnabled },
+            set: { settings.wrappedValue.alertsEnabled = $0 }
+        )
+    }
+
     private var tabs: [ProviderSettingsTab] {
         ProviderSettingsTab.tabs(for: provider)
     }
@@ -353,6 +360,19 @@ struct ProviderSettingsView: View {
 
     @ViewBuilder
     private var menuBarTab: some View {
+        SettingsSection(title: "Alerts") {
+            SettingsRow(label: "Notify at 80% and 95%", isLast: true) {
+                SwitchToggle(isOn: alertsEnabled)
+                    .disabled(!appModel.alertsEnabled)
+            }
+        }
+
+        if !appModel.alertsEnabled {
+            Text("Alerts are off on the General tab.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+
         SettingsSection(title: "Refresh") {
             SettingsRow(label: "Every", isLast: true) {
                 RefreshIntervalSlider(interval: settings.refreshInterval)
@@ -521,6 +541,13 @@ struct GeneralSettingsView: View {
         )
     }
 
+    private var alertsEnabled: Binding<Bool> {
+        Binding(
+            get: { appModel.alertsEnabled },
+            set: { appModel.setAlertsEnabled($0) }
+        )
+    }
+
     /// The providers whose items the menu bar shows, left to right as they
     /// appear on screen (`AppModel.menuBarDisplayOrder`). None while the menu
     /// bar holds only the set-up item.
@@ -562,6 +589,16 @@ struct GeneralSettingsView: View {
             SettingsSection(title: "Menu bar") {
                 MenuBarAppearanceRows(appearance: appearance)
             }
+
+            SettingsSection(title: "Alerts") {
+                SettingsRow(label: "Usage alerts", isLast: true) {
+                    SwitchToggle(isOn: alertsEnabled)
+                }
+            }
+
+            Text("Notifies when a limit or an API budget reaches 80% and 95%.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             SettingsSection(title: "Startup") {
                 OpenAtLoginRows(loginItem: appModel.loginItem)

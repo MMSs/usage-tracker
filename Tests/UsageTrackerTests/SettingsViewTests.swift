@@ -3,6 +3,10 @@ import Testing
 @testable import UsageTracker
 
 @Suite @MainActor struct SettingsViewTests {
+    @Test func theMenuBarTabIsTitledOptions() {
+        #expect(ProviderSettingsTab.menuBar.title == "Options")
+    }
+
     @Test func requestedProviderPageWhenListed() {
         let request = SettingsRequest(provider: .anthropic)
 

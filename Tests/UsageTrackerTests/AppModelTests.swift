@@ -9,6 +9,8 @@ import Testing
     let settingsStore = MemoryProviderSettingsStore()
     let budgets = MemoryAPIBudgetStore()
     let sleeper = ControllableSleeper()
+    let notifier = RecordingNotifier()
+    let alertStore = MemoryAlertStateStore()
     let fetchers: [Provider: StubReportFetcher] = [
         .cursor: StubReportFetcher(result: .success(makeReport(1))),
         .anthropic: StubReportFetcher(result: .success(makeReport(2))),
@@ -34,7 +36,8 @@ import Testing
             loginItem: .stub(),
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver(),
-            sleep: { [sleeper] duration in await sleeper.sleep(duration) }
+            sleep: { [sleeper] duration in await sleeper.sleep(duration) },
+            alertMonitor: AlertMonitor(notifier: notifier, store: alertStore)
         )
     }
 
@@ -57,8 +60,27 @@ import Testing
             loginItem: .stub(),
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver(),
-            sleep: { [sleeper] duration in await sleeper.sleep(duration) }
+            sleep: { [sleeper] duration in await sleeper.sleep(duration) },
+            alertMonitor: AlertMonitor(notifier: notifier, store: alertStore)
         )
+    }
+
+    private func hotReport(_ percent: Double = 90) -> ProviderReport {
+        ProviderReport(
+            planName: nil,
+            windows: [LimitWindow(
+                id: "session", label: "Session", percentUsed: percent,
+                resetsAt: Date().addingTimeInterval(3600), parentID: nil
+            )],
+            extras: [],
+            spend: nil
+        )
+    }
+
+    private func useHotReport(for provider: Provider = .cursor) {
+        for (id, fetcher) in fetchers {
+            fetcher.result = .success(id == provider ? hotReport() : makeReport(1))
+        }
     }
 
     private func configureAll() {
@@ -287,5 +309,51 @@ import Testing
 
             #expect(model.budget(for: .anthropic) == nil)
         }
+    }
+
+    @Test func aRefreshEvaluatesAlertsForReadyHalves() async {
+        configureAll()
+        useHotReport()
+        let model = makeModel()
+
+        await model.refreshAll(manual: false)
+
+        #expect(notifier.delivered.map { $0.key.hasSuffix(".80") } == [true])
+    }
+
+    @Test func providerAlertsOffDeliversNothing() async {
+        configureAll()
+        useHotReport()
+        let model = makeModel()
+        var settings = model.settings(for: .cursor)
+        settings.alertsEnabled = false
+        model.setSettings(settings, for: .cursor)
+
+        await model.refreshAll(manual: false)
+
+        #expect(notifier.delivered.isEmpty)
+    }
+
+    @Test func masterAlertsOffDeliversNothing() async {
+        configureAll()
+        useHotReport()
+        let model = makeModel()
+        model.setAlertsEnabled(false)
+
+        await model.refreshAll(manual: false)
+
+        #expect(notifier.delivered.isEmpty)
+        #expect(!alertStore.isEnabled)
+    }
+
+    @Test func aHalfInErrorIsNotEvaluated() async {
+        configureAll()
+        useHotReport()
+        fetchers[.cursor]?.result = .failure(.transport)
+        let model = makeModel()
+
+        await model.refreshAll(manual: false)
+
+        #expect(notifier.delivered.isEmpty)
     }
 }

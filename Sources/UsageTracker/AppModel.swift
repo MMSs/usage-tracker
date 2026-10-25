@@ -11,6 +11,8 @@ final class AppModel: ObservableObject {
     let providerSettingsStore: ProviderSettingsStoring
     let appearanceStore: MenuBarAppearanceStoring
     private let budgetStore: APIBudgetStoring
+    private let alertMonitor: AlertMonitor?
+    private let now: () -> Date
     let loginItem: LoginItemModel
     private(set) var scheduler: RefreshScheduler!
     /// Set by the app delegate; opens the Settings window. A no-op until then.
@@ -21,6 +23,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var providerSettings: [Provider: ProviderSettings]
     /// Monthly API budgets that are set. The store alone would publish nothing.
     @Published private(set) var apiBudgets: [Provider: Decimal]
+    /// The master switch for usage alerts.
+    @Published private(set) var alertsEnabled: Bool
 
     private var isStarted = false
     private var providerObservers: [AnyCancellable] = []
@@ -36,7 +40,9 @@ final class AppModel: ObservableObject {
         networkObserver: NetworkReachabilityObserving,
         sleep: @escaping RefreshScheduler.Sleep = { duration in
             try? await Task.sleep(for: duration)
-        }
+        },
+        now: @escaping () -> Date = Date.init,
+        alertMonitor: AlertMonitor? = nil
     ) {
         self.providers = providers
         self.credentialStore = credentialStore
@@ -44,6 +50,9 @@ final class AppModel: ObservableObject {
         self.appearanceStore = appearanceStore
         self.budgetStore = budgetStore
         self.loginItem = loginItem
+        self.now = now
+        self.alertMonitor = alertMonitor
+        alertsEnabled = alertMonitor?.isEnabled ?? true
         globalAppearance = appearanceStore.appearance()
         providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, providerSettingsStore.settings(for: $0.id)) })
         apiBudgets = Dictionary(uniqueKeysWithValues: providers.compactMap { provider in
@@ -88,6 +97,10 @@ final class AppModel: ObservableObject {
                 }
             }
         }
+
+        for provider in providers where provider.isEnabled {
+            evaluateAlerts(for: provider)
+        }
     }
 
     private func refresh(_ id: Provider, manual: Bool) async {
@@ -98,6 +111,39 @@ final class AppModel: ObservableObject {
         }
 
         await provider.refresh(manual: manual)
+        evaluateAlerts(for: provider)
+    }
+
+    // MARK: Alerts
+
+    func setAlertsEnabled(_ enabled: Bool) {
+        alertMonitor?.isEnabled = enabled
+        alertsEnabled = alertMonitor?.isEnabled ?? enabled
+    }
+
+    /// Checks each ready half against the alert thresholds. A half in error
+    /// keeps its last report but is not evaluated, so a stale figure never alerts.
+    private func evaluateAlerts(for provider: ProviderViewModel) {
+        guard let alertMonitor else {
+            return
+        }
+
+        let delivers = alertsEnabled && settings(for: provider.id).alertsEnabled
+
+        for model in [provider.subscription, provider.api].compactMap({ $0 }) where model.status == .ready {
+            guard let report = model.report else {
+                continue
+            }
+
+            let measures = AlertPolicy.measures(
+                descriptor: provider.descriptor,
+                half: model.half,
+                report: report,
+                budget: budget(for: provider.id),
+                now: now()
+            )
+            alertMonitor.evaluate(measures, delivers: delivers)
+        }
     }
 
     // MARK: Settings
@@ -248,7 +294,8 @@ final class AppModel: ObservableObject {
             budgetStore: UserDefaultsAPIBudgetStore(),
             loginItem: LoginItemModel(manager: LoginItemManager(), store: UserDefaultsLoginItemPreferenceStore()),
             sleepObserver: SystemSleepObserver(),
-            networkObserver: NetworkReachabilityObserver()
+            networkObserver: NetworkReachabilityObserver(),
+            alertMonitor: AlertMonitor(notifier: SystemUsageNotifier(), store: UserDefaultsAlertStateStore())
         )
     }
 }

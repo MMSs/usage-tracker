@@ -9,6 +9,7 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     var appearanceOverride: MenuBarAppearance?
     var isSubscriptionEnabled = true
     var isAPIEnabled = true
+    var alertsEnabled = true
 
     static let `default` = ProviderSettings()
 
@@ -17,13 +18,15 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         refreshInterval: RefreshInterval = .default,
         appearanceOverride: MenuBarAppearance? = nil,
         isSubscriptionEnabled: Bool = true,
-        isAPIEnabled: Bool = true
+        isAPIEnabled: Bool = true,
+        alertsEnabled: Bool = true
     ) {
         self.isEnabled = isEnabled
         self.refreshInterval = refreshInterval
         self.appearanceOverride = appearanceOverride
         self.isSubscriptionEnabled = isSubscriptionEnabled
         self.isAPIEnabled = isAPIEnabled
+        self.alertsEnabled = alertsEnabled
     }
 
     func isEnabled(_ half: Half) -> Bool {
@@ -41,7 +44,7 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isEnabled, refreshInterval, appearanceOverride, isSubscriptionEnabled, isAPIEnabled
+        case isEnabled, refreshInterval, appearanceOverride, isSubscriptionEnabled, isAPIEnabled, alertsEnabled
     }
 
     /// Missing or unknown values fall back to the defaults so older records still load.
@@ -53,6 +56,7 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         appearanceOverride = try? container.decodeIfPresent(MenuBarAppearance.self, forKey: .appearanceOverride)
         isSubscriptionEnabled = try container.decodeIfPresent(Bool.self, forKey: .isSubscriptionEnabled) ?? true
         isAPIEnabled = try container.decodeIfPresent(Bool.self, forKey: .isAPIEnabled) ?? true
+        alertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .alertsEnabled) ?? true
     }
 
     func encode(to encoder: Encoder) throws {
@@ -62,5 +66,6 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         try container.encodeIfPresent(appearanceOverride, forKey: .appearanceOverride)
         try container.encode(isSubscriptionEnabled, forKey: .isSubscriptionEnabled)
         try container.encode(isAPIEnabled, forKey: .isAPIEnabled)
+        try container.encode(alertsEnabled, forKey: .alertsEnabled)
     }
 }
