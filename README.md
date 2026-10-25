@@ -112,6 +112,45 @@ window is open and leaves when it closes.
   1 hour (default 5 minutes), and an optional custom appearance that overrides the defaults.
   Refreshing pauses while the Mac is asleep or offline and resumes when both
   are back.
+- The provider tab's Options tab (called Menu bar before) holds that
+  provider's appearance and its Alerts switch.
+
+## Alerts
+
+Usage Tracker sends a macOS notification when a running limit window (the
+session, the weekly window, a per-model window, or Cursor's billing cycle) or
+an API budget reaches 80% and again at 95%. Each threshold alerts once per
+window. A new reset, or usage falling back under the threshold, re-arms it. If
+usage jumps past both at once, only the 95% alert is sent.
+
+Alerts are on by default. macOS asks for notification permission when the first
+alert is due. Turn them all off with General, Alerts, Usage alerts, or one
+provider off with its Options tab, Alerts, Notify at 80% and 95%.
+
+## Session start
+
+Anthropic and OpenAI subscription windows last 5 hours and begin with your
+first message. While the session is not running, the popover's Limits section
+shows a Start session button. It sends the one-word message `ping` with the
+cheapest model to begin the window, then refreshes. Anthropic creates a
+claude.ai chat, sends the message, and deletes the chat; OpenAI makes one Codex
+request.
+
+Auto-start sessions, on the provider's Subscription tab, does the same as soon
+as the previous window ends. It is off by default, runs at most once per 10
+minutes, only on scheduled refreshes, and never while the credential is expired
+or erroring.
+
+The default models are `claude-haiku-5-5` for Anthropic and `gpt-6-luna` for
+OpenAI. To use another, then relaunch the app:
+
+```zsh
+defaults write com.mohabsam.usage-tracker sessionStart.model.openai <model id>
+```
+
+Use `sessionStart.model.anthropic` for Anthropic, and `defaults delete` on the
+same key to restore the default. If claude.ai refuses its model, the app
+retries once without naming one.
 
 ## Open at login
 
@@ -151,6 +190,12 @@ log show --last 1h --predicate 'subsystem == "com.mohabsam.usage-tracker"'
 
 The log never contains credentials, cookies, headers, query strings, or
 response bodies. Organization ids in paths are shown as `{uuid}`.
+
+## Privacy
+
+Usage Tracker reads usage and spend from Cursor, Anthropic, and OpenAI using
+the credentials you paste. Session start, manual or auto, is the one thing that
+sends a real message (`ping`) on your account. Nothing else is sent.
 
 ## Status
 
