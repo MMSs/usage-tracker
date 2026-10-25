@@ -7,6 +7,7 @@ import Testing
     let t2 = Date(timeIntervalSince1970: 2_000_000)
     let store = MemoryCredentialStore()
     let cache = MemoryReportCache()
+    let history = MemoryUsageHistoryStore()
     let subFetcher = StubReportFetcher(result: .success(makeReport(1)))
     let apiFetcher = StubReportFetcher(result: .success(makeReport(2)))
 
@@ -16,7 +17,7 @@ import Testing
             descriptor: descriptor,
             subscriptionFetcher: descriptor.capabilities.hasSubscription ? subFetcher : nil,
             apiFetcher: descriptor.capabilities.hasAPISpend ? apiFetcher : nil,
-            credentialStore: store, cache: cache, now: now
+            credentialStore: store, cache: cache, history: history, now: now
         )
     }
 
@@ -118,6 +119,16 @@ import Testing
         await model.refresh(manual: true)
         #expect(!model.isConfigured)
         #expect(model.updatedAt == nil)
+    }
+
+    @Test func onlyTheSubscriptionHalfRecordsHistory() async {
+        store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
+        store.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let model = makeModel(.anthropic, now: { t1 })
+        await model.refresh(manual: true)
+
+        #expect(model.api?.status == .ready)
+        #expect(history.recorded.map(\.0) == [makeReport(1)])
     }
 
     @Test func oneHalfFailingDoesNotStopTheOther() async {

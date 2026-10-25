@@ -17,6 +17,7 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
     let now = Date(timeIntervalSince1970: 1_000_000)
     let store = MemoryCredentialStore()
     let cache = MemoryReportCache()
+    let history = MemoryUsageHistoryStore()
     let fetcher = StubReportFetcher(result: .success(makeReport()))
     let key = CredentialKey(provider: .cursor, fieldID: "session-token")
 
@@ -28,7 +29,7 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         let now = now
         return HalfViewModel(
             provider: .cursor, half: .subscription, fields: fields,
-            fetcher: fetcher, credentialStore: store, cache: cache, now: { now }
+            fetcher: fetcher, credentialStore: store, cache: cache, history: history, now: { now }
         )
     }
 
@@ -221,6 +222,46 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(model.report == nil)
         #expect(model.lastSuccess == nil)
         #expect(cache.cached(provider: .cursor, half: .subscription) == nil)
+    }
+
+    @Test func aSuccessfulRefreshRecordsHistory() async throws {
+        store.values[key] = "tok"
+        let model = makeModel()
+        await model.refresh(manual: true)
+
+        let call = try #require(history.recorded.first)
+        #expect(history.recorded.count == 1)
+        #expect(call.0 == makeReport())
+        #expect(call.1 == .cursor)
+        #expect(call.2 == now)
+    }
+
+    @Test func aFailedRefreshOrACachedReportRecordsNothing() async {
+        cache.store(CachedReport(report: makeReport(), fetchedAt: now), provider: .cursor, half: .subscription)
+        store.values[key] = "tok"
+        fetcher.result = .failure(.transport)
+        let model = makeModel()
+        #expect(model.report == makeReport())
+        await model.refresh(manual: true)
+
+        #expect(model.status == .error)
+        #expect(history.recorded.isEmpty)
+    }
+
+    @Test func removingTheCredentialClearsHistory() async {
+        store.values[key] = "tok"
+        let model = makeModel()
+        await model.refresh(manual: true)
+        #expect(history.clearCount == 0)
+
+        store.values[key] = nil
+        await model.credentialsChanged()
+        #expect(history.clearCount == 1)
+    }
+
+    @Test func aHalfBuiltWithoutACredentialClearsHistory() {
+        _ = makeModel()
+        #expect(history.clearCount == 1)
     }
 
     @Test func credentialsChangedClearsBlockAndRefreshes() async {
@@ -626,6 +667,7 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
     let now = Date(timeIntervalSince1970: 1_000_000)
     let store = MemoryCredentialStore()
     let cache = MemoryReportCache()
+    let history = MemoryUsageHistoryStore()
     let fetcher = StubOrganizationScopedFetcher()
     let key = CredentialKey(provider: .anthropic, fieldID: "session-key")
     let two = [AccountOrganization(id: "org-a", name: "Personal"), AccountOrganization(id: "org-b", name: "Team")]
@@ -635,7 +677,7 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         return HalfViewModel(
             provider: .anthropic, half: .subscription,
             fields: ProviderRegistry.descriptor(for: .anthropic).subscriptionFields,
-            fetcher: fetcher, credentialStore: store, cache: cache, now: { now }
+            fetcher: fetcher, credentialStore: store, cache: cache, history: history, now: { now }
         )
     }
 
@@ -706,6 +748,18 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(model.report == nil)
         #expect(model.lastSuccess == nil)
         #expect(cache.cached(provider: .anthropic, half: .subscription) == nil)
+    }
+
+    @Test func waitingForAnOrganizationClearsHistory() async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        #expect(history.clearCount == 0)
+
+        await model.refresh(manual: false)
+
+        #expect(model.status == .needsOrganization)
+        #expect(history.clearCount == 1)
     }
 
     @Test func choosingAnOrganizationAfterWaitingShowsItsReportAgain() async {

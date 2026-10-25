@@ -45,6 +45,11 @@ final class ProviderViewModel: ObservableObject, Identifiable {
         return subscription.report?.windows.first { $0.id == shortID }
     }
 
+    /// The subscription half's samples keyed by window id; empty without one.
+    func usageHistory(now: Date) -> [String: [UsageSample]] {
+        subscription?.usageHistory(now: now) ?? [:]
+    }
+
     func half(_ half: Half) -> HalfViewModel? {
         switch half {
         case .subscription: subscription
@@ -69,26 +74,27 @@ final class ProviderViewModel: ObservableObject, Identifiable {
         apiFetcher: ReportFetching?,
         credentialStore: CredentialStoring,
         cache: ReportCaching,
+        history: UsageHistoryStoring? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.descriptor = descriptor
 
-        func makeHalf(_ half: Half, fields: [CredentialField], fetcher: ReportFetching?) -> HalfViewModel? {
+        func makeHalf(_ half: Half, fields: [CredentialField], fetcher: ReportFetching?, history: UsageHistoryStoring?) -> HalfViewModel? {
             guard let fetcher else {
                 return nil
             }
 
             return HalfViewModel(
                 provider: descriptor.id, half: half, fields: fields, fetcher: fetcher,
-                credentialStore: credentialStore, cache: cache, now: now
+                credentialStore: credentialStore, cache: cache, history: history, now: now
             )
         }
 
         subscription = descriptor.capabilities.hasSubscription
-            ? makeHalf(.subscription, fields: descriptor.subscriptionFields, fetcher: subscriptionFetcher)
+            ? makeHalf(.subscription, fields: descriptor.subscriptionFields, fetcher: subscriptionFetcher, history: history)
             : nil
         api = descriptor.capabilities.hasAPISpend
-            ? makeHalf(.api, fields: descriptor.apiFields, fetcher: apiFetcher)
+            ? makeHalf(.api, fields: descriptor.apiFields, fetcher: apiFetcher, history: nil)
             : nil
 
         recomputeIsConfigured()

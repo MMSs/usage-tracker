@@ -42,6 +42,7 @@ final class HalfViewModel: ObservableObject {
     private let fetcher: ReportFetching
     private let credentialStore: CredentialStoring
     private let cache: ReportCaching
+    private let history: UsageHistoryStoring?
     private let now: () -> Date
     private var refreshGeneration = 0
 
@@ -73,6 +74,7 @@ final class HalfViewModel: ObservableObject {
         fetcher: ReportFetching,
         credentialStore: CredentialStoring,
         cache: ReportCaching,
+        history: UsageHistoryStoring? = nil,
         now: @escaping () -> Date = Date.init
     ) {
         self.provider = provider
@@ -82,6 +84,7 @@ final class HalfViewModel: ObservableObject {
         self.fetcher = fetcher
         self.credentialStore = credentialStore
         self.cache = cache
+        self.history = history
         self.now = now
         selectedOrganizationID = organizationScope?.selectedOrganizationID
 
@@ -97,6 +100,7 @@ final class HalfViewModel: ObservableObject {
 
         guard isConfigured(values) else {
             cache.clear(provider: provider, half: half)
+            history?.clear(provider: provider)
             // A choice made for a credential that is gone means nothing now.
             organizationScope?.resetOrganizations()
             selectedOrganizationID = nil
@@ -105,6 +109,11 @@ final class HalfViewModel: ObservableObject {
 
         loadCached()
         status = .loading
+    }
+
+    /// The last 24 hours of samples keyed by window id; empty without a store.
+    func usageHistory(now: Date) -> [String: [UsageSample]] {
+        history?.samples(provider: provider, now: now) ?? [:]
     }
 
     /// Enabled and holding a credential: the half takes part in the item and the popover.
@@ -160,6 +169,8 @@ final class HalfViewModel: ObservableObject {
 
             syncOrganizations()
             let date = now()
+            // Before the published properties change, so the menu bar rebuild they trigger reads it.
+            history?.record(fetched, provider: provider, at: date)
             report = fetched
             lastSuccess = date
             isStale = false
@@ -293,6 +304,7 @@ final class HalfViewModel: ObservableObject {
             report = nil
             lastSuccess = nil
             cache.clear(provider: provider, half: half)
+            history?.clear(provider: provider)
             Log.refresh.notice("\(name, privacy: .public): several organizations, none chosen; scheduled refreshes wait for a choice")
         default:
             // This failure replaces a block (an expired credential, a wait for
@@ -343,6 +355,7 @@ final class HalfViewModel: ObservableObject {
         rateLimitedUntil = nil
         organizations = []
         cache.clear(provider: provider, half: half)
+        history?.clear(provider: provider)
     }
 
     /// Non-blank values keyed by field id; throws if the store cannot be read.

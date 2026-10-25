@@ -28,12 +28,14 @@ struct ProviderMenuBarScene: Scene {
     }
 
     private var item: MenuBarItem {
+        let now = Date()
         return MenuBarItemBuilder.make(
             descriptor: provider.descriptor,
             subscription: provider.snapshot(.subscription),
             api: provider.snapshot(.api),
             apiBudget: model.budget(for: provider.id),
-            now: Date(),
+            now: now,
+            history: provider.usageHistory(now: now),
             forceSetUp: !provider.isConfigured
         ) ?? MenuBarItem(provider: provider.id, subscription: .status(.loading), api: nil)
     }

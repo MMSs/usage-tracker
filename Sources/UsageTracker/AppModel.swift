@@ -347,6 +347,7 @@ final class AppModel: ObservableObject {
 
         let credentialStore = KeychainCredentialStore()
         let cache = UserDefaultsReportCache()
+        let history = UserDefaultsUsageHistoryStore()
         // Read and written only by the organization-scoped fetchers.
         let organizationStore = UserDefaultsOrganizationSelectionStore()
 
@@ -364,7 +365,8 @@ final class AppModel: ObservableObject {
                 subscriptionFetcher: fetchers.subscription,
                 apiFetcher: fetchers.api,
                 credentialStore: credentialStore,
-                cache: cache
+                cache: cache,
+                history: history
             )
         }
 

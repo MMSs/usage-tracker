@@ -41,7 +41,8 @@ private func build(
     _ provider: Provider,
     subscription: HalfSnapshot?,
     api: HalfSnapshot? = nil,
-    apiBudget: Decimal? = nil
+    apiBudget: Decimal? = nil,
+    history: [String: [UsageSample]] = [:]
 ) -> MenuBarItem? {
     MenuBarItemBuilder.make(
         descriptor: ProviderRegistry.descriptor(for: provider),
@@ -49,7 +50,8 @@ private func build(
         api: api,
         apiBudget: apiBudget,
         now: now,
-        calendar: calendar
+        calendar: calendar,
+        history: history
     )
 }
 
@@ -203,6 +205,32 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(list[0].tick == nil)
         #expect(list[0].tint == .onPace)
         #expect(list[1].tint == .nearingLimit)
+    }
+
+    @Test func windowMetersCarryTheirHistory() throws {
+        let sample = UsageSample(date: now - 600, percent: 40)
+        let item = try #require(build(.anthropic, subscription: ready(anthropicReport), history: ["session": [sample], "weekly": []]))
+        let list = meters(item.subscription)
+
+        #expect(list.map(\.samples) == [[sample], []])
+    }
+
+    @Test func metersWithoutAWindowCarryNoHistory() throws {
+        let sample = UsageSample(date: now - 600, percent: 40)
+        let report = cursorReport(unit: .percent, spent: Decimal(string: "42.8")!, limit: 100, todaySpend: Decimal(string: "0.4")!, percentUsed: 43)
+        let cursor = try #require(build(.cursor, subscription: ready(report), history: ["cycle": [sample]]))
+        let list = meters(cursor.subscription)
+
+        #expect(list.map(\.letter) == ["D", "C"])
+        #expect(list[0].samples == nil)
+        #expect(list[1].samples == [sample])
+
+        let api = try #require(build(.anthropic, subscription: nil, api: ready(apiReport(spent: Decimal(string: "37.84")!)), apiBudget: 100, history: ["session": [sample]]))
+        guard case let .money(_, meter, _, _) = api.api else {
+            Issue.record("expected money")
+            return
+        }
+        #expect(try #require(meter).samples == nil)
     }
 
     private func timedReport(session: LimitWindow, weekly: LimitWindow) -> ProviderReport {

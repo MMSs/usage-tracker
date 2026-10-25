@@ -25,6 +25,8 @@ struct MenuBarMeter: Equatable {
     let tick: Double?
     let tint: PacingTint
     let role: Role
+    /// The window's recent readings, oldest first; nil when no window backs the meter.
+    var samples: [UsageSample]? = nil
 
     /// Which limit a meter measures; the Limits setting keeps meters by it.
     enum Role: Equatable, Sendable {
@@ -137,6 +139,7 @@ enum MenuBarItemBuilder {
         apiBudget: Decimal?,
         now: Date,
         calendar: Calendar = .current,
+        history: [String: [UsageSample]] = [:],
         forceSetUp: Bool = false
     ) -> MenuBarItem? {
         if forceSetUp {
@@ -144,7 +147,7 @@ enum MenuBarItemBuilder {
         }
 
         let subscriptionDisplay = display(subscription) { report in
-            subscriptionMeters(descriptor: descriptor, report: report, now: now, calendar: calendar)
+            subscriptionMeters(descriptor: descriptor, report: report, now: now, calendar: calendar, history: history)
         }
         let apiDisplay = display(api) { report in
             guard let spend = report.spend else {
@@ -207,19 +210,20 @@ enum MenuBarItemBuilder {
         descriptor: ProviderDescriptor,
         report: ProviderReport,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        history: [String: [UsageSample]]
     ) -> Content {
         var meters: [MenuBarMeter] = []
 
         if let shortID = descriptor.shortWindowID {
             if let window = report.windows.first(where: { $0.id == shortID }) {
-                meters.append(windowMeter(letter: "S", window: window, now: now, role: .short))
+                meters.append(windowMeter(letter: "S", window: window, now: now, role: .short, samples: history[window.id] ?? []))
             }
         } else if let spend = report.spend, let today = todayMeter(spend: spend, now: now, calendar: calendar) {
             meters.append(today)
         }
 
-        if let meter = longMeter(descriptor: descriptor, report: report, now: now, calendar: calendar) {
+        if let meter = longMeter(descriptor: descriptor, report: report, now: now, calendar: calendar, history: history) {
             meters.append(meter)
         }
 
@@ -230,7 +234,8 @@ enum MenuBarItemBuilder {
         descriptor: ProviderDescriptor,
         report: ProviderReport,
         now: Date,
-        calendar: Calendar
+        calendar: Calendar,
+        history: [String: [UsageSample]]
     ) -> MenuBarMeter? {
         let letter = descriptor.capabilities.hasCycle ? "C" : "W"
         let window = report.windows.first { $0.id == descriptor.longWindowID }
@@ -244,13 +249,14 @@ enum MenuBarItemBuilder {
         }
 
         let countdown = window.resetsAt.map { CountdownFormatter.compact(until: $0, now: now) }
+        let samples = history[window.id] ?? []
 
         // Team plans report dollars: the money row replaces the percent.
         if let money = report.extra(for: window.id) {
             guard let limit = money.limit else {
                 return MenuBarMeter(
                     letter: letter, text: "\(spendText(money.amount))/—", countdown: countdown,
-                    fraction: nil, tick: nil, tint: .neutral, role: .long
+                    fraction: nil, tick: nil, tint: .neutral, role: .long, samples: samples
                 )
             }
 
@@ -261,12 +267,13 @@ enum MenuBarItemBuilder {
                 fraction: pacing?.fillFraction ?? min(max(window.percentUsed / 100, 0), 1),
                 tick: pacing?.tickFraction,
                 tint: pacing.map { PacingTint.forPacing($0) } ?? PacingTint.forRemaining(percentUsed: window.percentUsed),
-                role: .long
+                role: .long,
+                samples: samples
             )
         }
 
         guard let pacing else {
-            return windowMeter(letter: letter, window: window, now: now, role: .long)
+            return windowMeter(letter: letter, window: window, now: now, role: .long, samples: samples)
         }
 
         return MenuBarMeter(
@@ -276,11 +283,18 @@ enum MenuBarItemBuilder {
             fraction: pacing.fillFraction,
             tick: pacing.tickFraction,
             tint: PacingTint.forPacing(pacing),
-            role: .long
+            role: .long,
+            samples: samples
         )
     }
 
-    private static func windowMeter(letter: String, window: LimitWindow, now: Date, role: MenuBarMeter.Role) -> MenuBarMeter {
+    private static func windowMeter(
+        letter: String,
+        window: LimitWindow,
+        now: Date,
+        role: MenuBarMeter.Role,
+        samples: [UsageSample]
+    ) -> MenuBarMeter {
         MenuBarMeter(
             letter: letter,
             text: window.percentText,
@@ -288,7 +302,8 @@ enum MenuBarItemBuilder {
             fraction: min(max(window.percentUsed / 100, 0), 1),
             tick: TimePacing.idealFraction(for: window, now: now),
             tint: PacingTint.forWindow(window, now: now),
-            role: role
+            role: role,
+            samples: samples
         )
     }
 

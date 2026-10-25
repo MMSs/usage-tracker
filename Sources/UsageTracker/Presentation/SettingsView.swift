@@ -264,12 +264,14 @@ struct RefreshIntervalSlider: View {
 /// The menu bar item for `provider` as it would render with `appearance`.
 @MainActor
 func previewItem(for provider: ProviderViewModel, in appModel: AppModel) -> MenuBarItem? {
-    MenuBarItemBuilder.make(
+    let now = Date()
+    return MenuBarItemBuilder.make(
         descriptor: provider.descriptor,
         subscription: provider.snapshot(.subscription),
         api: provider.snapshot(.api),
         apiBudget: appModel.budget(for: provider.id),
-        now: Date()
+        now: now,
+        history: provider.usageHistory(now: now)
     )
 }
 
