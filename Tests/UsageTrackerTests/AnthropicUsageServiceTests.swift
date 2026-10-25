@@ -344,6 +344,24 @@ struct AnthropicUsageServiceTests {
         #expect(startRequests(client).map(\.httpMethod) == ["POST", "POST", "DELETE"])
     }
 
+    /// A cancelled start must not leave empty chats piling up.
+    @Test func aCancelledCompletionStillDeletesTheConversation() async throws {
+        let client = CancellableHTTPClient(routes: try startRoutes(), heldSuffix: "/completion")
+        let service = AnthropicUsageService(client: client)
+
+        let start = Task { try await service.startSession(sessionKey: "k", organizationID: nil, model: "test-model") }
+        for _ in 0..<200 where !client.isHolding {
+            await Task.yield()
+        }
+        #expect(client.isHolding)
+        start.cancel()
+        client.gate.resume()
+
+        await #expect(throws: CancellationError.self) { try await start.value }
+        let sent = client.sent.filter { $0.httpMethod != "GET" }
+        #expect(sent.map(\.httpMethod) == ["POST", "DELETE"])
+    }
+
     @Test(arguments: [400, 404])
     func aRefusedModelRetriesOnceWithoutIt(status: Int) async throws {
         let client = try startRoutes(completion: [.status(status), .ok(json: "")])

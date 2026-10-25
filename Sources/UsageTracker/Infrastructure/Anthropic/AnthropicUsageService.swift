@@ -117,14 +117,19 @@ final class AnthropicUsageService: AnthropicUsageFetching {
     }
 
     /// A failure only leaves an empty chat behind, so it never fails the start.
+    /// Sent from a task of its own, which a cancelled start does not cancel:
+    /// otherwise every cancelled start would leave an empty chat behind.
     private func deleteConversation(path: String, sessionKey: String) async {
-        do {
-            _ = try await send(sessionRequest(path: path, method: "DELETE", sessionKey: sessionKey, body: nil))
-        } catch let FetchError.httpStatus(code) {
-            Log.http.notice("DELETE conversation failed: http \(code, privacy: .public)")
-        } catch {
-            Log.http.notice("DELETE conversation failed")
-        }
+        let request = sessionRequest(path: path, method: "DELETE", sessionKey: sessionKey, body: nil)
+        await Task {
+            do {
+                _ = try await send(request)
+            } catch let FetchError.httpStatus(code) {
+                Log.http.notice("DELETE conversation failed: http \(code, privacy: .public)")
+            } catch {
+                Log.http.notice("DELETE conversation failed")
+            }
+        }.value
     }
 
     private static func isStaleOrganization(_ error: FetchError) -> Bool {
