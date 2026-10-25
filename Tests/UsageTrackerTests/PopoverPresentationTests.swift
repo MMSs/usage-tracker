@@ -328,7 +328,7 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
     }
 
     // The week runs Tue 27 Oct 9:00 to Tue 3 Nov 9:00; now is Thursday noon.
-    @Test func weekBarsRunFromTheDayTheWindowBegan() throws {
+    @Test func weekBarsUseSlots() throws {
         let samples = [
             UsageSample(date: date(10, 27, hour: 10), percent: 3),
             UsageSample(date: date(10, 27, hour: 22), percent: 10),
@@ -337,11 +337,11 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ]
 
         let bars = try #require(PopoverPresentation.weekBars(
-            samples: samples, window: window("weekly"), now: date(10, 29, hour: 12), calendar: calendar
+            samples: samples, window: window("weekly"), now: date(10, 29, hour: 12)
         ))
 
         #expect(bars.count == 7)
-        #expect(bars[0].day == date(10, 27))
+        #expect(bars[0].day == date(10, 27, hour: 9))
         #expect(bars.map(\.value) == [10, 20, 4, nil, nil, nil, nil])
         #expect(bars[0].tint == .onPace)
         #expect(bars[1].tint == .overBudget)
@@ -354,8 +354,8 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
     @Test func weekBarsAreNilWithoutAnyDayOfData() {
         let before = [UsageSample(date: date(10, 20, hour: 10), percent: 50)]
 
-        #expect(PopoverPresentation.weekBars(samples: [], window: window("weekly"), now: date(10, 29), calendar: calendar) == nil)
-        #expect(PopoverPresentation.weekBars(samples: before, window: window("weekly"), now: date(10, 29), calendar: calendar) == nil)
+        #expect(PopoverPresentation.weekBars(samples: [], window: window("weekly"), now: date(10, 29)) == nil)
+        #expect(PopoverPresentation.weekBars(samples: before, window: window("weekly"), now: date(10, 29)) == nil)
     }
 
     private let spend = SpendPeriod(

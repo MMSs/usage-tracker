@@ -104,10 +104,11 @@ top of that bar:
 - Session: the last 24 hours of percent used, as a filled line over a
   `24h ago · 12h · now` axis. A reset drops it to zero, and time the app was
   not running stays empty.
-- Weekly: one bar per day of the current weekly window, named under the
-  block, each showing how much of the weekly limit that day used. The dashed
+- Weekly: one bar per 24 hours of the current weekly window, counted from
+  its reset time and named under the block by the weekday it starts, each
+  showing how much of the weekly limit that stretch used. The dashed
   line is an even pace (a seventh of the limit a day), bars are green at or
-  under it and amber or red over it, today is brighter, and days to come or
+  under it and amber or red over it, today is brighter, and slots to come or
   before the app had samples are empty.
 - API spend: one bar per day of the month. With a monthly budget the bars
   are coloured against an even daily share, the dashed line marks it, and the

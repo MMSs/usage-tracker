@@ -98,81 +98,6 @@ private func window(resetsAt: Date, length: TimeInterval? = 7 * 86_400) -> Limit
         #expect(UsageChartLayout.sessionGap(interval: .oneHour) == 7260)
     }
 
-    @Test func weekDaysSplitAtMidnight() {
-        let samples = [
-            sample(at(tuesday, 10), 5), sample(at(tuesday, 23, 59), 12),
-            sample(at(tuesday + 1, 23, 59), 30), sample(at(tuesday + 2, 12), 33),
-        ]
-
-        let days = UsageChartLayout.weekDays(
-            samples: samples, window: window(resetsAt: at(tuesday + 7, 9)),
-            assumedLength: 7 * 86_400, now: at(tuesday + 2, 12), calendar: layoutCalendar
-        )
-
-        #expect(days.count == 7)
-        #expect(days[at(tuesday, 0)] == .some(12))
-        #expect(days[at(tuesday + 1, 0)] == .some(18))
-        #expect(days[at(tuesday + 2, 0)] == .some(3))
-        for offset in 3...6 {
-            #expect(days[at(tuesday + offset, 0)] == .some(nil))
-        }
-    }
-
-    @Test func theResetMorningCountsTowardTheLastDay() {
-        let samples = [
-            sample(at(tuesday + 5, 23, 59), 58), sample(at(tuesday + 6, 23, 59), 64),
-            sample(at(tuesday + 7, 8), 70),
-        ]
-
-        let days = UsageChartLayout.weekDays(
-            samples: samples, window: window(resetsAt: at(tuesday + 7, 9)),
-            assumedLength: 7 * 86_400, now: at(tuesday + 7, 8, 30), calendar: layoutCalendar
-        )
-
-        #expect(days.count == 7)
-        #expect(days[at(tuesday + 6, 0)] == .some(12))
-    }
-
-    @Test func weekDaysBeforeHistoryAreEmpty() {
-        // The window began Monday 2 November; the first sample is Wednesday.
-        let samples = [sample(at(tuesday + 1, 10), 40), sample(at(tuesday + 1, 23, 59), 44)]
-
-        let days = UsageChartLayout.weekDays(
-            samples: samples, window: window(resetsAt: at(tuesday + 6, 9)),
-            assumedLength: 7 * 86_400, now: at(tuesday + 2, 8), calendar: layoutCalendar
-        )
-
-        #expect(days[at(tuesday - 1, 0)] == .some(nil))
-        #expect(days[at(tuesday, 0)] == .some(nil))
-        #expect(days[at(tuesday + 1, 0)] == .some(4))
-    }
-
-    @Test func aQuietDayMidWeekIsEmpty() {
-        // Samples Tuesday and Thursday, none on Wednesday.
-        let samples = [
-            sample(at(tuesday, 10), 5), sample(at(tuesday, 23), 12),
-            sample(at(tuesday + 2, 9), 30), sample(at(tuesday + 2, 18), 36),
-        ]
-
-        let days = UsageChartLayout.weekDays(
-            samples: samples, window: window(resetsAt: at(tuesday + 6, 9)),
-            assumedLength: 7 * 86_400, now: at(tuesday + 3, 8), calendar: layoutCalendar
-        )
-
-        #expect(days[at(tuesday, 0)] == .some(7))
-        #expect(days[at(tuesday + 1, 0)] == .some(nil))
-        #expect(days[at(tuesday + 2, 0)] == .some(6))
-    }
-
-    @Test func weekDaysUseTheAssumedLengthWithoutOne() {
-        let days = UsageChartLayout.weekDays(
-            samples: [], window: window(resetsAt: at(tuesday + 7, 9), length: nil),
-            assumedLength: 7 * 86_400, now: at(tuesday + 1, 8), calendar: layoutCalendar
-        )
-
-        #expect(days.count == 7)
-    }
-
     @Test func dayBarsAgainstAShare() {
         let period = CyclePeriod(start: at(tuesday, 0), end: at(tuesday + 3, 0))
         let values: [Date: Double?] = [at(tuesday, 0): 12, at(tuesday + 1, 0): 18, at(tuesday + 2, 0): 30]
@@ -227,60 +152,129 @@ private func window(resetsAt: Date, length: TimeInterval? = 7 * 86_400) -> Limit
         #expect(values[at(tuesday + 3, 0)] == .some(nil))
     }
 
-    @Test func aWeekAcrossTheAutumnClockChangeHasSevenLocalDays() {
-        // Sunday 25 October 2026 has 25 hours; the window ends Tuesday 27th.
-        let samples = [
-            sample(at(23, 12, month: 10), 8), sample(at(24, 12, month: 10), 10),
-            sample(at(25, 12, month: 10), 15), sample(at(25, 23, 30, month: 10), 20),
-            sample(at(26, 20, month: 10), 26),
-        ]
-
-        let days = UsageChartLayout.weekDays(
-            samples: samples, window: window(resetsAt: at(27, 9, month: 10)),
-            assumedLength: 7 * 86_400, now: at(26, 20, 30, month: 10), calendar: layoutCalendar
+    private func slots(
+        _ samples: [UsageSample], resetsAt: Date, now: Date, length: TimeInterval? = 7 * 86_400
+    ) -> [UsageSlot] {
+        UsageChartLayout.weekSlots(
+            samples: samples, window: window(resetsAt: resetsAt, length: length),
+            assumedLength: 7 * 86_400, now: now
         )
-
-        #expect(Set(days.keys) == Set((20...26).map { at($0, 0, month: 10) }))
-        #expect(days[at(24, 0, month: 10)] == .some(2))
-        #expect(days[at(25, 0, month: 10)] == .some(10))
-        #expect(days[at(26, 0, month: 10)] == .some(6))
     }
 
-    @Test func aWeekAcrossTheSpringClockChangeHasSevenLocalDays() {
-        // Sunday 29 March 2026 has 23 hours; the window ends Tuesday 31st.
-        let samples = [
-            sample(at(28, 12, month: 3), 10), sample(at(29, 12, month: 3), 16),
-            sample(at(30, 12, month: 3), 20),
-        ]
+    @Test func slotsStartAtTheReset() {
+        let result = slots([], resetsAt: at(tuesday, 9), now: at(tuesday - 5, 12))
 
-        let days = UsageChartLayout.weekDays(
-            samples: samples, window: window(resetsAt: at(31, 9, month: 3)),
-            assumedLength: 7 * 86_400, now: at(30, 13, month: 3), calendar: layoutCalendar
-        )
-
-        #expect(Set(days.keys) == Set((24...30).map { at($0, 0, month: 3) }))
-        #expect(days[at(29, 0, month: 3)] == .some(6))
-        #expect(days[at(30, 0, month: 3)] == .some(4))
+        #expect(result.count == 7)
+        #expect(result.first?.start == at(tuesday - 7, 9))
+        for (index, slot) in result.enumerated() {
+            #expect(slot.start == at(tuesday - 7, 9).addingTimeInterval(Double(index) * 86_400))
+            #expect(slot.end.timeIntervalSince(slot.start) == 86_400)
+        }
     }
 
-    @Test func aResetJustAfterMidnightStillStartsSevenDaysBack() {
-        // 7 days before Monday 30 March 00:30 BST is 23 March by the calendar,
-        // but 22 March 23:30 by seconds.
-        let days = UsageChartLayout.weekDays(
-            samples: [], window: window(resetsAt: at(30, 0, 30, month: 3)),
-            assumedLength: 7 * 86_400, now: at(25, 12, month: 3), calendar: layoutCalendar
-        )
-
-        #expect(Set(days.keys) == Set((23...29).map { at($0, 0, month: 3) }))
+    @Test func slotsUseTheAssumedLengthWithoutOne() {
+        #expect(slots([], resetsAt: at(tuesday + 7, 9), now: at(tuesday, 8), length: nil).count == 7)
     }
 
-    @Test func weekDaysWithoutAResetAreEmpty() {
+    @Test func slotsWithoutAResetAreEmpty() {
         let noReset = LimitWindow(id: "week", label: "Week", percentUsed: 0, resetsAt: nil, parentID: nil)
 
-        let days = UsageChartLayout.weekDays(
-            samples: [], window: noReset, assumedLength: 7 * 86_400, now: at(5, 12), calendar: layoutCalendar
+        let result = UsageChartLayout.weekSlots(
+            samples: [], window: noReset, assumedLength: 7 * 86_400, now: at(5, 12)
         )
 
-        #expect(days.isEmpty)
+        #expect(result.isEmpty)
+    }
+
+    @Test func aSlotSpansTwoCalendarDays() {
+        // The window began Tuesday 09:00.
+        let samples = [
+            sample(at(tuesday, 12), 4), sample(at(tuesday + 1, 8), 10), sample(at(tuesday + 2, 8, 59), 25),
+        ]
+
+        let result = slots(samples, resetsAt: at(tuesday + 7, 9), now: at(tuesday + 2, 8, 59))
+
+        // Wednesday 08:00 belongs to the Tuesday slot and is Wednesday's base.
+        #expect(result[0].value == 10)
+        #expect(result[1].value == 15)
+        #expect(result[2].value == nil)
+    }
+
+    @Test func theCurrentSlotRunsToNow() {
+        let samples = [
+            sample(at(tuesday, 12), 4), sample(at(tuesday + 1, 12), 10), sample(at(tuesday + 2, 10), 14),
+            sample(at(tuesday + 2, 14), 20),
+        ]
+
+        let result = slots(samples, resetsAt: at(tuesday + 7, 9), now: at(tuesday + 2, 12))
+
+        #expect(result.map(\.value) == [4, 6, 4, nil, nil, nil, nil])
+    }
+
+    @Test func anEmptySlotIsNilAndTheNextCountsFromItself() {
+        // Nothing during the Wednesday slot; Thursday starts from its own first sample.
+        let samples = [
+            sample(at(tuesday, 10), 5), sample(at(tuesday, 20), 12),
+            sample(at(tuesday + 2, 10), 30), sample(at(tuesday + 2, 18), 36),
+        ]
+
+        let result = slots(samples, resetsAt: at(tuesday + 7, 9), now: at(tuesday + 3, 8))
+
+        #expect(result.map(\.value) == [12, nil, 6, nil, nil, nil, nil])
+    }
+
+    @Test func slotsBeforeHistoryAreEmpty() {
+        let samples = [sample(at(tuesday + 2, 10), 40), sample(at(tuesday + 2, 20), 44)]
+
+        let result = slots(samples, resetsAt: at(tuesday + 7, 9), now: at(tuesday + 3, 8))
+
+        #expect(result.map(\.value) == [nil, nil, 4, nil, nil, nil, nil])
+    }
+
+    @Test func slotsAcrossAClockChange() {
+        // Sunday 25 October 2026 has 25 hours; the window ends Tuesday 27th at 09:00.
+        let samples = [
+            sample(at(20, 12, month: 10), 2), sample(at(23, 12, month: 10), 8), sample(at(24, 12, month: 10), 10),
+            sample(at(25, 12, month: 10), 15), sample(at(26, 12, month: 10), 26),
+        ]
+
+        let result = slots(samples, resetsAt: at(27, 9, month: 10), now: at(26, 13, month: 10))
+
+        #expect(result.count == 7)
+        #expect(result.allSatisfy { $0.end.timeIntervalSince($0.start) == 86_400 })
+        let weekdays = result.map { layoutCalendar.component(.weekday, from: $0.start) }
+        // 168 hours before Tuesday 09:00 GMT is Tuesday 10:00 BST; the weekdays run on from there.
+        #expect(weekdays == [3, 4, 5, 6, 7, 1, 2])
+        #expect(result.map(\.value) == [2, nil, nil, 0, 2, 5, 11])
+    }
+
+    @Test func slotBarsMarkTheCurrentSlot() {
+        let samples = [sample(at(tuesday, 10), 5), sample(at(tuesday + 1, 8), 30), sample(at(tuesday + 1, 12), 32)]
+        let result = slots(samples, resetsAt: at(tuesday + 7, 9), now: at(tuesday + 1, 12))
+
+        let bars = UsageChartLayout.slotBars(result, share: 100.0 / 7, now: at(tuesday + 1, 12))
+
+        #expect(bars.map(\.day) == result.map(\.start))
+        #expect(bars.map(\.isToday) == [false, true, false, false, false, false, false])
+        #expect(bars.map(\.isFuture) == [false, false, true, true, true, true, true])
+        #expect(bars[0].value == 30)
+        #expect(bars[1].value == 2)
+        #expect(bars[2].value == nil)
+        #expect(bars[2].heightFraction == 0)
+        #expect(bars[0].heightFraction == 1)
+        #expect(bars[1].tint == .onPace)
+        #expect(bars[0].tint == .overBudget)
+    }
+
+    @Test func slotBarsWithoutAShareScaleToTheLargest() {
+        let result = [
+            UsageSlot(start: at(tuesday, 9), end: at(tuesday + 1, 9), value: 2),
+            UsageSlot(start: at(tuesday + 1, 9), end: at(tuesday + 2, 9), value: 4),
+        ]
+
+        let bars = UsageChartLayout.slotBars(result, share: nil, now: at(tuesday + 1, 12))
+
+        #expect(bars.map(\.heightFraction) == [0.5, 1])
+        #expect(bars.map(\.tint) == [.neutral, .neutral])
     }
 }

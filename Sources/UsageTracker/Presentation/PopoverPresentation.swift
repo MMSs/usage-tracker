@@ -115,26 +115,15 @@ enum PopoverPresentation {
         return descriptor.capabilities.hasCycle ? .cycleBars : .weekBars
     }
 
-    /// One bar per day of a weekly window, each against the even share of the
-    /// limit; nil while no day has data.
-    static func weekBars(samples: [UsageSample], window: LimitWindow, now: Date, calendar: Calendar = .current) -> [DayBar]? {
-        let values = UsageChartLayout.weekDays(
-            samples: samples, window: window, assumedLength: 7 * 86_400, now: now, calendar: calendar
-        )
-        guard values.values.contains(where: { $0 != nil }),
-              let firstDay = values.keys.min(),
-              let end = calendar.date(byAdding: .day, value: values.count, to: firstDay)
-        else {
+    /// One bar per 24-hour slot of a weekly window, each against the even
+    /// share of the limit; nil while no slot has data.
+    static func weekBars(samples: [UsageSample], window: LimitWindow, now: Date) -> [DayBar]? {
+        let slots = UsageChartLayout.weekSlots(samples: samples, window: window, assumedLength: 7 * 86_400, now: now)
+        guard slots.contains(where: { $0.value != nil }) else {
             return nil
         }
 
-        return UsageChartLayout.dayBars(
-            values: values,
-            period: CyclePeriod(start: firstDay, end: end),
-            share: 100 / Double(values.count),
-            today: now,
-            calendar: calendar
-        )
+        return UsageChartLayout.slotBars(slots, share: 100 / Double(slots.count), now: now)
     }
 
     /// One bar per day of a spend period, against `limit`'s even daily share
