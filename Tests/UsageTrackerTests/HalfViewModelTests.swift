@@ -195,6 +195,38 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(!model.isRefreshing)
     }
 
+    @Test func aThrownFetchEndsNotRefreshing() async {
+        store.values[key] = "tok"
+        fetcher.result = .failure(.transport)
+        let model = makeModel()
+
+        await model.refresh(manual: true)
+
+        #expect(model.status == .error)
+        #expect(!model.isRefreshing)
+    }
+
+    @Test func aSupersededFetchEndsNotRefreshing() async {
+        store.values[key] = "tok"
+        let first = SuspendedGate()
+        let second = SuspendedGate()
+        fetcher.script = [(first, .success(makeReport(1))), (second, .success(makeReport(2)))]
+        let model = makeModel()
+        let one = Task { await model.refresh(manual: true) }
+        await settle()
+        let two = Task { await model.refresh(manual: true) }
+        await settle()
+        #expect(model.isRefreshing)
+
+        first.resume()
+        await one.value
+        #expect(model.isRefreshing)
+        second.resume()
+        await two.value
+
+        #expect(!model.isRefreshing)
+    }
+
     @Test func throwingStoreIsAnErrorNotUnconfigured() async {
         store.values[key] = "tok"
         let model = makeModel()

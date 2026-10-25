@@ -71,4 +71,37 @@ import Testing
         #expect(RefreshFeedback.shown(feedback.displayed(at: start), fetching: true) == .refreshing)
         #expect(RefreshFeedback.shown(feedback.displayed(at: start), fetching: false) == .succeeded)
     }
+
+    @Test func lapseIdlesAResultOnlyOnceItsTimeIsUp() {
+        var feedback = RefreshFeedback()
+        _ = feedback.begin()
+        feedback.finish(succeeded: true, now: start)
+
+        feedback.lapse(at: start.addingTimeInterval(1.4))
+        #expect(feedback.phase == .succeeded)
+        feedback.lapse(at: start.addingTimeInterval(1.5))
+        #expect(feedback.phase == .idle)
+        #expect(feedback.shownUntil == nil)
+    }
+
+    @Test func lapseDoesNothingWhileRefreshing() {
+        var feedback = RefreshFeedback()
+        _ = feedback.begin()
+
+        feedback.lapse(at: start.addingTimeInterval(60))
+
+        #expect(feedback.phase == .refreshing)
+    }
+
+    @Test func anEarlierResultsLapseLeavesANewerResultShowing() {
+        var feedback = RefreshFeedback()
+        _ = feedback.begin()
+        feedback.finish(succeeded: true, now: start)
+        _ = feedback.begin()
+        feedback.finish(succeeded: false, now: start.addingTimeInterval(1))
+
+        feedback.lapse(at: start.addingTimeInterval(1.6))
+
+        #expect(feedback.phase == .failed)
+    }
 }

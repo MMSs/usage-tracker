@@ -28,6 +28,17 @@ struct RefreshFeedback: Equatable {
         shownUntil = now.addingTimeInterval(Self.resultDuration)
     }
 
+    /// Returns a result that has been shown long enough to idle. A running
+    /// refresh, or a result still within its time, is left alone.
+    mutating func lapse(at now: Date) {
+        guard phase != .refreshing, let shownUntil, now >= shownUntil else {
+            return
+        }
+
+        phase = .idle
+        self.shownUntil = nil
+    }
+
     /// The phase to draw at `now`: a result lapses to idle once it has been shown long enough.
     func displayed(at now: Date) -> Phase {
         guard let shownUntil else {

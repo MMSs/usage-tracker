@@ -6,8 +6,7 @@ struct ProviderPopoverView: View {
     @ObservedObject var appModel: AppModel
     @State private var escapeMonitor = EscapeMonitorState()
     @State private var feedback = RefreshFeedback()
-    /// Bumped when a result has been shown long enough, to redraw the button.
-    @State private var feedbackTick = 0
+    @State private var lapseTask: Task<Void, Never>?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -19,7 +18,10 @@ struct ProviderPopoverView: View {
             PopoverWindowAnimator.install(on: window)
         }))
         .onAppear(perform: installEscapeMonitor)
-        .onDisappear(perform: removeEscapeMonitor)
+        .onDisappear {
+            removeEscapeMonitor()
+            lapseTask?.cancel()
+        }
     }
 
     // MARK: - Report page
@@ -437,12 +439,17 @@ struct ProviderPopoverView: View {
         }
 
         let id = provider.id
-        Task {
+        lapseTask?.cancel()
+        lapseTask = Task {
             let succeeded = await appModel.refresh(id, manual: true)
             feedback.finish(succeeded: succeeded, now: Date())
             try? await Task.sleep(for: .seconds(RefreshFeedback.resultDuration))
-            // Re-reads the clock so the result lapses to idle; a newer click keeps its own phase.
-            feedbackTick += 1
+            guard !Task.isCancelled else {
+                return
+            }
+
+            // Mutates the state the body reads, so the result lapses to idle on screen.
+            feedback.lapse(at: Date())
         }
     }
 
