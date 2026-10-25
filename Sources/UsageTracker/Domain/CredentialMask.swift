@@ -5,12 +5,20 @@ import Foundation
 struct CredentialMask: Equatable, Sendable {
     static let ellipsis = "…"
 
+    /// A stored value whose fragments are not worth showing: ellipses only.
+    static let hidden = CredentialMask(prefix: "", suffix: "")
+
     let prefix: String
     let suffix: String
 
+    private init(prefix: String, suffix: String) {
+        self.prefix = prefix
+        self.suffix = suffix
+    }
+
     /// Nil for an empty value. Long values show 6 and 4 characters, values
     /// under 12 show 2 and 2, values under 6 show ellipses only. Whitespace
-    /// is skipped so a pasted JSON file still yields one line of fragments.
+    /// is skipped so a value pasted with line breaks still yields one line.
     init?(value: String) {
         let characters = value.filter { !$0.isWhitespace }
         guard !characters.isEmpty else { return nil }

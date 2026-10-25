@@ -245,7 +245,7 @@ struct CredentialFieldView: View {
         }
 
         do {
-            state = CredentialFieldState(mask: try store.credential(for: key).flatMap(CredentialMask.init))
+            state = CredentialFieldState(mask: try store.credential(for: key).flatMap(field.format.mask(of:)))
         } catch {
             readFailed = true
         }
@@ -288,7 +288,7 @@ struct CredentialFieldView: View {
         }
 
         saveFailed = false
-        state.markSaved(mask: CredentialMask(value: state.trimmedDraft))
+        state.markSaved(mask: field.format.mask(of: state.trimmedDraft))
         Task { await onChange() }
     }
 
