@@ -38,6 +38,8 @@ struct CredentialField: Identifiable, Equatable, Sendable {
     let helpSteps: [String]
     /// Text the copy chip puts on the clipboard.
     let copyChip: String?
+    /// Checked before the value is saved.
+    var format: CredentialFormat = .plain
 }
 
 struct ProviderCapabilities: Equatable, Sendable {
@@ -174,7 +176,8 @@ enum ProviderRegistry {
                     "Paste here. The app keeps it only in Keychain and never changes the file.",
                     "If Codex later asks you to log in again, re-paste the new file.",
                 ],
-                copyChip: "cat ~/.codex/auth.json | pbcopy"
+                copyChip: "cat ~/.codex/auth.json | pbcopy",
+                format: .codexAuthJSON
             ),
             CredentialField(
                 id: "admin-key",

@@ -45,6 +45,7 @@ struct CredentialFieldView: View {
     @State private var hasLoaded = false
     @State private var readFailed = false
     @State private var saveFailed = false
+    @State private var formatProblem: String?
     @State private var removeFailed = false
     @State private var commitTask: Task<Void, Never>?
     @State private var budget: Decimal?
@@ -127,6 +128,7 @@ struct CredentialFieldView: View {
                     .frame(height: field.isMultiline ? 96 : 26)
                     .accessibilityLabel(field.title)
                     .onChange(of: state.draft) {
+                        formatProblem = nil
                         scheduleCommit()
                     }
             }
@@ -145,6 +147,12 @@ struct CredentialFieldView: View {
 
             if saveFailed {
                 Text("Unable to save credential.")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+
+            if let formatProblem {
+                Text(formatProblem)
                     .font(.caption)
                     .foregroundStyle(.red)
             }
@@ -264,6 +272,11 @@ struct CredentialFieldView: View {
 
     private func commit() {
         guard state.hasSavableChange else {
+            return
+        }
+
+        if let problem = field.format.problem(with: state.trimmedDraft) {
+            formatProblem = problem
             return
         }
 
