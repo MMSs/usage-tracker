@@ -20,7 +20,7 @@ protocol SessionModelStoring: AnyObject {
 /// another model sets the key by hand.
 final class UserDefaultsSessionModelStore: SessionModelStoring {
     /// The cheapest known model for each provider that can start a session.
-    static let defaults: [Provider: String] = [.anthropic: "claude-haiku-5-5", .openai: "gpt-6-luna"]
+    static let defaultModels: [Provider: String] = [.anthropic: "claude-haiku-5-5", .openai: "gpt-6-luna"]
 
     private let defaults: UserDefaults
 
@@ -35,6 +35,6 @@ final class UserDefaultsSessionModelStore: SessionModelStoring {
             return stored
         }
 
-        return Self.defaults[provider] ?? ""
+        return Self.defaultModels[provider] ?? ""
     }
 }

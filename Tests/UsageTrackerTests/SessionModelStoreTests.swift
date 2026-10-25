@@ -8,6 +8,7 @@ import Testing
             let store = UserDefaultsSessionModelStore(defaults: defaults)
             #expect(store.model(for: .anthropic) == "claude-haiku-5-5")
             #expect(store.model(for: .openai) == "gpt-6-luna")
+            #expect(UserDefaultsSessionModelStore.defaultModels == [.anthropic: "claude-haiku-5-5", .openai: "gpt-6-luna"])
         }
     }
 
