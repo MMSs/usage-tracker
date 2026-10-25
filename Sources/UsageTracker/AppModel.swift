@@ -71,7 +71,7 @@ final class AppModel: ObservableObject {
         alertsEnabled = alertMonitor?.isEnabled ?? true
         alertKinds = Set(AlertKind.allCases.filter { alertMonitor?.isEnabled($0) ?? $0.defaultEnabled })
         globalAppearance = appearanceStore.appearance()
-        providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, providerSettingsStore.settings(for: $0.id)) })
+        providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, Self.loadSettings(of: $0, from: providerSettingsStore)) })
         apiBudgets = Dictionary(uniqueKeysWithValues: providers.compactMap { provider in
             budgetStore.budget(for: provider.id).map { (provider.id, $0) }
         })
@@ -385,6 +385,26 @@ final class AppModel: ObservableObject {
                 lastOpenSessionReset[id] = nil
             }
         }
+    }
+
+    /// The stored settings. The old item drew a half its switch hid when the
+    /// other half had no credential, so such a half stays shown; the record is
+    /// then saved once, so its own keys decide from now on.
+    private static func loadSettings(of provider: ProviderViewModel, from store: ProviderSettingsStoring) -> ProviderSettings {
+        let loaded = store.loadSettings(for: provider.id)
+        guard !loaded.legacyHiddenHalves.isEmpty else {
+            return loaded.settings
+        }
+
+        var settings = loaded.settings
+        for half in loaded.legacyHiddenHalves {
+            let other: Half = half == .subscription ? .api : .subscription
+            if provider.half(other)?.isConfigured != true {
+                settings.setShowsInMenuBar(true, for: half)
+            }
+        }
+        store.setSettings(settings, for: provider.id)
+        return settings
     }
 
     private static func apply(_ settings: ProviderSettings, to provider: ProviderViewModel) {

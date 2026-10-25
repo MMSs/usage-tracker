@@ -115,7 +115,8 @@ struct ProviderSettings: Equatable, Codable, Sendable {
             ?? legacy.globalSubscription
         let oldAPI = override.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showAPISpend)) ?? true }
             ?? legacy.globalAPI
-        // The old item drew a hidden half when it was the only one it had, so a switch only counts beside a shown other half.
+        // The old item drew a hidden half when it was the only one it had, so a switch only counts beside a shown other half;
+        // whether that half has a credential is for the app model to check (see `Loaded`).
         showsSubscriptionInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showsSubscriptionInMenuBar)
             ?? (oldSubscription || !(legacy.hasAPI && isAPIEnabled))
         showsAPIInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showsAPIInMenuBar)
@@ -131,6 +132,29 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         var globalAPI = true
         var hasSubscription = true
         var hasAPI = true
+    }
+
+    /// A record as read, with the halves whose `false` came from the old
+    /// switches rather than the record. The old item never drew a half with
+    /// no credential, and only the app model can tell which halves have one.
+    struct Loaded: Decodable {
+        var settings: ProviderSettings
+        var legacyHiddenHalves: Set<Half>
+
+        init(settings: ProviderSettings, legacyHiddenHalves: Set<Half> = []) {
+            self.settings = settings
+            self.legacyHiddenHalves = legacyHiddenHalves
+        }
+
+        init(from decoder: Decoder) throws {
+            let settings = try ProviderSettings(from: decoder)
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let keys: [Half: CodingKeys] = [.subscription: .showsSubscriptionInMenuBar, .api: .showsAPIInMenuBar]
+            self.settings = settings
+            legacyHiddenHalves = Set(keys.filter { half, key in
+                !container.contains(key) && !settings.showsInMenuBar(half)
+            }.keys)
+        }
     }
 
     func encode(to encoder: Encoder) throws {

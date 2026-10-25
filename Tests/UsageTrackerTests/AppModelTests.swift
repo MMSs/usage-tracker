@@ -475,6 +475,63 @@ import Testing
         #expect(model.menuBarHalves(for: .cursor) == .all)
     }
 
+    /// A model reading Anthropic's settings from `defaults`, with both its halves.
+    private func makeModel(defaults: UserDefaults) -> AppModel {
+        let providers = ProviderRegistry.all.map { descriptor in
+            ProviderViewModel(
+                descriptor: descriptor,
+                subscriptionFetcher: fetchers[descriptor.id],
+                apiFetcher: descriptor.id == .anthropic ? StubReportFetcher(result: .success(makeReport(2))) : nil,
+                credentialStore: credentials, cache: cache
+            )
+        }
+
+        return AppModel(
+            providers: providers,
+            credentialStore: credentials,
+            providerSettingsStore: UserDefaultsProviderSettingsStore(defaults: defaults),
+            appearanceStore: MemoryMenuBarAppearanceStore(),
+            budgetStore: budgets,
+            loginItem: .stub(),
+            sleepObserver: ControllableSleepObserver(),
+            networkObserver: ControllableNetworkObserver(),
+            sleep: { [sleeper] duration in await sleeper.sleep(duration) },
+            alertMonitor: AlertMonitor(notifier: notifier, store: alertStore)
+        )
+    }
+
+    @Test func aLegacyHiddenHalfBesideAnUnconfiguredHalfStaysShown() throws {
+        configureAll()
+        try withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+
+            let model = makeModel(defaults: defaults)
+
+            // The old item drew plan usage, as the API spend half had no credential to draw.
+            #expect(model.menuBarHalves(for: .anthropic) == .all)
+            let data = try #require(defaults.data(forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic)))
+            let saved = try JSONDecoder().decode(ProviderSettings.self, from: data)
+            #expect(saved.showsSubscriptionInMenuBar)
+            #expect(UserDefaultsProviderSettingsStore(defaults: defaults).loadSettings(for: .anthropic).legacyHiddenHalves.isEmpty)
+        }
+    }
+
+    @Test func aLegacyHiddenHalfBesideAConfiguredHalfStaysHidden() {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+
+            let model = makeModel(defaults: defaults)
+
+            #expect(model.menuBarHalves(for: .anthropic) == MenuBarHalves(subscription: false, api: true))
+            // Saved once, so a credential removed later does not bring it back.
+            let store = UserDefaultsProviderSettingsStore(defaults: defaults)
+            #expect(store.loadSettings(for: .anthropic).legacyHiddenHalves.isEmpty)
+            #expect(!store.settings(for: .anthropic).showsSubscriptionInMenuBar)
+        }
+    }
+
     @Test func disabledProvidersAreNeitherInsertedNorRefreshed() async {
         configureAll()
         let model = makeModel()

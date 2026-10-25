@@ -165,6 +165,24 @@ import Testing
         }
     }
 
+    @Test func aLoadReportsTheHalvesOnlyTheOldSwitchesHid() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+            let store = UserDefaultsProviderSettingsStore(defaults: defaults)
+
+            let legacy = store.loadSettings(for: .anthropic)
+            #expect(!legacy.settings.showsSubscriptionInMenuBar)
+            #expect(legacy.legacyHiddenHalves == [.subscription])
+
+            // A record with the new keys is the user's own choice, never re-checked.
+            var settings = ProviderSettings()
+            settings.setShowsInMenuBar(false, for: .subscription)
+            store.setSettings(settings, for: .anthropic)
+            #expect(store.loadSettings(for: .anthropic).legacyHiddenHalves.isEmpty)
+            #expect(store.loadSettings(for: .anthropic).settings == settings)
+        }
+    }
+
     @Test func anOverrideWithoutTheOldKeysShowsBoth() {
         withIsolatedDefaults { defaults in
             defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
