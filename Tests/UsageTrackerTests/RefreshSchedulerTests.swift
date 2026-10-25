@@ -4,6 +4,9 @@ import Testing
 
 @MainActor
 @Suite struct RefreshSchedulerTests {
+    private let cursorPlan = RefreshTarget(provider: .cursor, half: .subscription)
+    private let anthropicAPI = RefreshTarget(provider: .anthropic, half: .api)
+
     @Test func periodicSchedulingStartsBeforeTheInitialRefreshCompletes() async {
         let initialRefresh = SuspendedRefresh()
         let context = SchedulerContext(initialRefresh: initialRefresh.refresh)
@@ -21,7 +24,7 @@ import Testing
     }
 
     @Test func theConfiguredIntervalDrivesTheWait() async {
-        let context = SchedulerContext(schedules: [.cursor: .oneMinute])
+        let context = SchedulerContext(schedules: [cursorPlan: .oneMinute])
 
         context.scheduler.start()
         await context.sleeper.waitForSleepCount(1)
@@ -141,7 +144,7 @@ import Testing
         context.scheduler.start()
         await context.sleeper.waitForSleepCount(1)
 
-        context.scheduler.setSchedule(.oneHour, for: .cursor)
+        context.scheduler.setSchedule(.oneHour, for: cursorPlan)
         await context.sleeper.waitForSleepCount(2)
         await settle()
 
@@ -151,8 +154,8 @@ import Testing
         context.tearDown()
     }
 
-    @Test func eachProviderWaitsOnItsOwnInterval() async {
-        let context = SchedulerContext(schedules: [.cursor: .oneMinute, .anthropic: .oneHour])
+    @Test func eachTargetTicksOnItsOwnInterval() async {
+        let context = SchedulerContext(schedules: [cursorPlan: .oneMinute, anthropicAPI: .oneHour])
 
         context.scheduler.start()
         await context.sleeper.waitForSleepCount(2)
@@ -162,22 +165,34 @@ import Testing
         context.sleeper.resume()
         await context.periodicRefresh.waitForCallCount(2)
 
-        #expect(Set(context.periodicRefresh.providers) == [.cursor, .anthropic])
+        #expect(Set(context.periodicRefresh.targets) == [cursorPlan, anthropicAPI])
 
         context.tearDown()
     }
 
-    @Test func removingAScheduleStopsOnlyThatProvider() async {
-        let context = SchedulerContext(schedules: [.cursor: .oneMinute, .anthropic: .oneHour])
+    @Test func theHalvesOfOneProviderKeepSeparateTimers() async {
+        let anthropicPlan = RefreshTarget(provider: .anthropic, half: .subscription)
+        let context = SchedulerContext(schedules: [anthropicPlan: .thirtySeconds, anthropicAPI: .tenMinutes])
 
         context.scheduler.start()
         await context.sleeper.waitForSleepCount(2)
 
-        context.scheduler.setSchedule(nil, for: .cursor)
+        #expect(Set(context.sleeper.durations) == [.seconds(30), .seconds(600)])
+
+        context.tearDown()
+    }
+
+    @Test func removingATargetStopsOnlyIt() async {
+        let context = SchedulerContext(schedules: [cursorPlan: .oneMinute, anthropicAPI: .oneHour])
+
+        context.scheduler.start()
+        await context.sleeper.waitForSleepCount(2)
+
+        context.scheduler.setSchedule(nil, for: cursorPlan)
         context.sleeper.resume()
         await settle()
 
-        #expect(context.periodicRefresh.providers == [.anthropic])
+        #expect(context.periodicRefresh.targets == [anthropicAPI])
         #expect(context.sleeper.durations.count == 3)
         #expect(context.sleeper.durations.last == .seconds(3600))
 
@@ -209,7 +224,7 @@ private struct SchedulerContext {
     let scheduler: RefreshScheduler
 
     init(
-        schedules: [Provider: RefreshInterval] = [.cursor: .fiveMinutes],
+        schedules: [RefreshTarget: RefreshInterval] = [RefreshTarget(provider: .cursor, half: .subscription): .fiveMinutes],
         initialRefresh: RefreshScheduler.Refresh? = nil
     ) {
         let periodicRefresh = RefreshRecorder()
@@ -224,7 +239,7 @@ private struct SchedulerContext {
         scheduler = RefreshScheduler(
             schedules: schedules,
             initialRefresh: initialRefresh ?? {},
-            periodicRefresh: periodicRefresh.refresh(_:),
+            periodicRefresh: { await periodicRefresh.refresh($0) },
             sleepObserver: sleepObserver,
             networkObserver: networkObserver,
             sleep: sleeper.sleep

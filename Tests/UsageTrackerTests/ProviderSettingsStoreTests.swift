@@ -13,13 +13,42 @@ import Testing
         withIsolatedDefaults { defaults in
             let store = UserDefaultsProviderSettingsStore(defaults: defaults)
             let override = MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: true)
-            let cursor = ProviderSettings(isEnabled: false, refreshInterval: .oneHour, appearanceOverride: override)
+            let cursor = ProviderSettings(
+                isEnabled: false, subscriptionRefreshInterval: .thirtySeconds, apiRefreshInterval: .tenMinutes,
+                appearanceOverride: override
+            )
 
             store.setSettings(cursor, for: .cursor)
 
             #expect(UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .cursor) == cursor)
             #expect(UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic) == .default)
         }
+    }
+
+    @Test func aSinglePlan5IntervalCarriesToBothHalves() {
+        withIsolatedDefaults { defaults in
+            defaults.set(Data(#"{"isEnabled":true,"refreshInterval":"thirtySeconds"}"#.utf8),
+                         forKey: UserDefaultsProviderSettingsStore.key(for: .openai))
+
+            let settings = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .openai)
+
+            #expect(settings.refreshInterval(for: .subscription) == .thirtySeconds)
+            #expect(settings.refreshInterval(for: .api) == .thirtySeconds)
+        }
+    }
+
+    @Test func eachHalfKeepsItsOwnInterval() throws {
+        var settings = ProviderSettings()
+        settings.setRefreshInterval(.thirtySeconds, for: .subscription)
+        settings.setRefreshInterval(.tenMinutes, for: .api)
+
+        let data = try JSONEncoder().encode(settings)
+        let json = try #require(String(data: data, encoding: .utf8))
+        let decoded = try JSONDecoder().decode(ProviderSettings.self, from: data)
+
+        #expect(decoded.refreshInterval(for: .subscription) == .thirtySeconds)
+        #expect(decoded.refreshInterval(for: .api) == .tenMinutes)
+        #expect(!json.contains(#""refreshInterval""#))
     }
 
     @Test func alertsEnabledDefaultsOnForOlderRecords() {
@@ -60,7 +89,8 @@ import Testing
             let settings = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .openai)
 
             #expect(settings.isEnabled == false)
-            #expect(settings.refreshInterval == .default)
+            #expect(settings.subscriptionRefreshInterval == .default)
+            #expect(settings.apiRefreshInterval == .default)
             #expect(settings.appearanceOverride == nil)
         }
     }

@@ -5,7 +5,8 @@ import Foundation
 /// be switched off on its own; it then has no meters and is never fetched.
 struct ProviderSettings: Equatable, Codable, Sendable {
     var isEnabled = true
-    var refreshInterval = RefreshInterval.default
+    var subscriptionRefreshInterval = RefreshInterval.default
+    var apiRefreshInterval = RefreshInterval.default
     var appearanceOverride: MenuBarAppearance?
     var isSubscriptionEnabled = true
     var isAPIEnabled = true
@@ -17,7 +18,8 @@ struct ProviderSettings: Equatable, Codable, Sendable {
 
     init(
         isEnabled: Bool = true,
-        refreshInterval: RefreshInterval = .default,
+        subscriptionRefreshInterval: RefreshInterval = .default,
+        apiRefreshInterval: RefreshInterval = .default,
         appearanceOverride: MenuBarAppearance? = nil,
         isSubscriptionEnabled: Bool = true,
         isAPIEnabled: Bool = true,
@@ -25,7 +27,8 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         autoStartSessions: Bool = false
     ) {
         self.isEnabled = isEnabled
-        self.refreshInterval = refreshInterval
+        self.subscriptionRefreshInterval = subscriptionRefreshInterval
+        self.apiRefreshInterval = apiRefreshInterval
         self.appearanceOverride = appearanceOverride
         self.isSubscriptionEnabled = isSubscriptionEnabled
         self.isAPIEnabled = isAPIEnabled
@@ -47,16 +50,36 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         }
     }
 
+    func refreshInterval(for half: Half) -> RefreshInterval {
+        switch half {
+        case .subscription: subscriptionRefreshInterval
+        case .api: apiRefreshInterval
+        }
+    }
+
+    mutating func setRefreshInterval(_ interval: RefreshInterval, for half: Half) {
+        switch half {
+        case .subscription: subscriptionRefreshInterval = interval
+        case .api: apiRefreshInterval = interval
+        }
+    }
+
     private enum CodingKeys: String, CodingKey {
-        case isEnabled, refreshInterval, appearanceOverride, isSubscriptionEnabled, isAPIEnabled, alertsEnabled, autoStartSessions
+        case isEnabled, subscriptionRefreshInterval, apiRefreshInterval, appearanceOverride, isSubscriptionEnabled, isAPIEnabled, alertsEnabled, autoStartSessions
+        /// The single interval records had before the halves got their own; read, never written.
+        case refreshInterval
     }
 
     /// Missing or unknown values fall back to the defaults so older records still load.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
-        refreshInterval = try container.decodeIfPresent(String.self, forKey: .refreshInterval)
+        let sharedInterval = try container.decodeIfPresent(String.self, forKey: .refreshInterval)
             .flatMap(RefreshInterval.init(rawValue:)) ?? .default
+        subscriptionRefreshInterval = try container.decodeIfPresent(String.self, forKey: .subscriptionRefreshInterval)
+            .flatMap(RefreshInterval.init(rawValue:)) ?? sharedInterval
+        apiRefreshInterval = try container.decodeIfPresent(String.self, forKey: .apiRefreshInterval)
+            .flatMap(RefreshInterval.init(rawValue:)) ?? sharedInterval
         appearanceOverride = try? container.decodeIfPresent(MenuBarAppearance.self, forKey: .appearanceOverride)
         isSubscriptionEnabled = try container.decodeIfPresent(Bool.self, forKey: .isSubscriptionEnabled) ?? true
         isAPIEnabled = try container.decodeIfPresent(Bool.self, forKey: .isAPIEnabled) ?? true
@@ -67,7 +90,8 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(isEnabled, forKey: .isEnabled)
-        try container.encode(refreshInterval.rawValue, forKey: .refreshInterval)
+        try container.encode(subscriptionRefreshInterval.rawValue, forKey: .subscriptionRefreshInterval)
+        try container.encode(apiRefreshInterval.rawValue, forKey: .apiRefreshInterval)
         try container.encodeIfPresent(appearanceOverride, forKey: .appearanceOverride)
         try container.encode(isSubscriptionEnabled, forKey: .isSubscriptionEnabled)
         try container.encode(isAPIEnabled, forKey: .isAPIEnabled)

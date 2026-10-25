@@ -325,6 +325,17 @@ struct ProviderSettingsView: View {
         }
     }
 
+    /// One slider for both halves until each half's tab has its own.
+    private var refreshInterval: Binding<RefreshInterval> {
+        Binding(
+            get: { settings.wrappedValue.subscriptionRefreshInterval },
+            set: {
+                settings.wrappedValue.setRefreshInterval($0, for: .subscription)
+                settings.wrappedValue.setRefreshInterval($0, for: .api)
+            }
+        )
+    }
+
     private func halfEnabled(_ half: Half) -> Binding<Bool> {
         Binding(
             get: { settings.wrappedValue.isEnabled(half) },
@@ -406,7 +417,7 @@ struct ProviderSettingsView: View {
 
         SettingsSection(title: "Refresh") {
             SettingsRow(label: "Every", isLast: true) {
-                RefreshIntervalSlider(interval: settings.refreshInterval)
+                RefreshIntervalSlider(interval: refreshInterval)
             }
         }
 

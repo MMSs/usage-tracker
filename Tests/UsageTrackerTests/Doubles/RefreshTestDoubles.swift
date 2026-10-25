@@ -117,10 +117,10 @@ final class RefreshRecorder {
     private var waiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
     private(set) var callCount = 0
-    private(set) var providers: [Provider] = []
+    private(set) var targets: [RefreshTarget] = []
 
-    func refresh(_ provider: Provider) async {
-        providers.append(provider)
+    func refresh(_ target: RefreshTarget) async {
+        targets.append(target)
         await refresh()
     }
 

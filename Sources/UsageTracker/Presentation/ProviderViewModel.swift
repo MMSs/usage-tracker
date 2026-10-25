@@ -112,6 +112,12 @@ final class ProviderViewModel: ObservableObject, Identifiable {
         recomputeIsConfigured()
     }
 
+    /// Refreshes one half; the other keeps its report and its own timer.
+    func refresh(_ half: Half, manual: Bool) async {
+        await refreshHalf(self.half(half), manual: manual)
+        recomputeIsConfigured()
+    }
+
     func credentialsChanged(half: Half) async {
         switch half {
         case .subscription: await subscription?.credentialsChanged()

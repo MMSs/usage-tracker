@@ -80,9 +80,9 @@ final class AppModel: ObservableObject {
 
         // The scheduler is owned by the model, so its closures hold the model weakly.
         scheduler = RefreshScheduler(
-            schedules: Self.schedules(providerSettings),
+            schedules: Self.schedules(providers, settings: providerSettings),
             initialRefresh: { [weak self] in await self?.refreshAll(manual: false) },
-            periodicRefresh: { [weak self] provider in await self?.refresh(provider, manual: false) },
+            periodicRefresh: { [weak self] target in await self?.refresh(target, manual: false) },
             sleepObserver: sleepObserver,
             networkObserver: networkObserver,
             sleep: sleep
@@ -123,15 +123,21 @@ final class AppModel: ObservableObject {
         }
     }
 
-    private func refresh(_ id: Provider, manual: Bool) async {
-        let provider = provider(id)
+    /// Refreshes one half of a provider. Only the plan usage half takes part in
+    /// the session bookkeeping and auto-start; the API spend half never does.
+    func refresh(_ target: RefreshTarget, manual: Bool) async {
+        let provider = provider(target.provider)
         guard provider.isEnabled else {
-            Log.refresh.debug("\(id.rawValue, privacy: .public): skipped, provider switched off")
+            Log.refresh.debug("\(target.provider.rawValue, privacy: .public): skipped, provider switched off")
             return
         }
 
-        await provider.refresh(manual: manual)
-        evaluateAlerts(for: provider)
+        await provider.refresh(target.half, manual: manual)
+        evaluateAlerts(for: provider, halves: [target.half])
+        guard target.half == .subscription else {
+            return
+        }
+
         noteOpenSession(provider)
         if !manual {
             await autoStartIfNeeded(provider)
@@ -195,15 +201,15 @@ final class AppModel: ObservableObject {
 
     /// Checks each enabled, ready half against the alert thresholds. A half
     /// in error or switched off keeps its last report but is not evaluated,
-    /// so a stale figure never alerts.
-    private func evaluateAlerts(for provider: ProviderViewModel) {
+    /// so a stale figure never alerts. Only the given halves are looked at.
+    private func evaluateAlerts(for provider: ProviderViewModel, halves: Set<Half> = [.subscription, .api]) {
         guard let alertMonitor else {
             return
         }
 
         let delivers = alertsEnabled && settings(for: provider.id).alertsEnabled
 
-        for model in [provider.subscription, provider.api].compactMap({ $0 }) where model.isEnabled && model.status == .ready {
+        for model in [provider.subscription, provider.api].compactMap({ $0 }) where halves.contains(model.half) && model.isEnabled && model.status == .ready {
             guard let report = model.report else {
                 continue
             }
@@ -231,12 +237,18 @@ final class AppModel: ObservableObject {
         providerSettings[id] = settings
         providerSettingsStore.setSettings(settings, for: id)
         Self.apply(settings, to: provider)
-        scheduler.setSchedule(settings.isEnabled ? settings.refreshInterval : nil, for: id)
+        for half in [Half.subscription, .api] {
+            scheduler.setSchedule(Self.interval(settings, half, of: provider), for: RefreshTarget(provider: id, half: half))
+        }
 
         // Turning something on should show data now, not after the next timer tick.
         let turnedOn = zip(wasOn, Self.enabledFlags(provider)).contains { !$0 && $1 }
         if settings.isEnabled, turnedOn {
-            Task { await refresh(id, manual: false) }
+            Task {
+                for half in [Half.subscription, .api] {
+                    await refresh(RefreshTarget(provider: id, half: half), manual: false)
+                }
+            }
         }
     }
 
@@ -260,8 +272,26 @@ final class AppModel: ObservableObject {
         settings(for: provider).appearanceOverride ?? globalAppearance
     }
 
-    private static func schedules(_ settings: [Provider: ProviderSettings]) -> [Provider: RefreshInterval] {
-        settings.filter { $0.value.isEnabled }.mapValues(\.refreshInterval)
+    /// The interval for one half's timer; nil when the provider or the half is off or missing.
+    private static func interval(_ settings: ProviderSettings, _ half: Half, of provider: ProviderViewModel) -> RefreshInterval? {
+        guard settings.isEnabled, settings.isEnabled(half), provider.half(half) != nil else {
+            return nil
+        }
+
+        return settings.refreshInterval(for: half)
+    }
+
+    private static func schedules(
+        _ providers: [ProviderViewModel], settings: [Provider: ProviderSettings]
+    ) -> [RefreshTarget: RefreshInterval] {
+        var schedules: [RefreshTarget: RefreshInterval] = [:]
+        for provider in providers {
+            let providerSettings = settings[provider.id] ?? .default
+            for half in [Half.subscription, .api] {
+                schedules[RefreshTarget(provider: provider.id, half: half)] = interval(providerSettings, half, of: provider)
+            }
+        }
+        return schedules
     }
 
     // MARK: API budget

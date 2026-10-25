@@ -84,12 +84,14 @@ import Testing
     }
 
     /// A model whose Anthropic subscription half is `starter`, with the clock `clock`.
-    private func makeAutoStartModel(starter: StubSessionFetcher, clock: Clock, autoStart: Bool = true) -> AppModel {
+    private func makeAutoStartModel(
+        starter: StubSessionFetcher, clock: Clock, autoStart: Bool = true, apiFetcher: StubReportFetcher? = nil
+    ) -> AppModel {
         let providers = ProviderRegistry.all.map { descriptor in
             ProviderViewModel(
                 descriptor: descriptor,
                 subscriptionFetcher: descriptor.id == .anthropic ? starter : fetchers[descriptor.id],
-                apiFetcher: nil,
+                apiFetcher: descriptor.id == .anthropic ? apiFetcher : nil,
                 credentialStore: credentials, cache: cache, now: { clock.date }
             )
         }
@@ -295,6 +297,66 @@ import Testing
         #expect(starter.startCount == 0)
     }
 
+    @Test func aScheduledAPIRefreshNeverAutoStarts() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let apiFetcher = StubReportFetcher(result: .success(makeReport(2)))
+        let model = makeAutoStartModel(starter: starter, clock: clock, apiFetcher: apiFetcher)
+        await model.refreshAll(manual: true)
+        #expect(model.provider(.anthropic).sessionIsClosed)
+
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .api), manual: false)
+
+        #expect(apiFetcher.callCount == 2)
+        #expect(starter.startCount == 0)
+
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .subscription), manual: false)
+
+        #expect(starter.startCount == 1)
+    }
+
+    @Test func aScheduledAPIRefreshLeavesThePlanUsageAlone() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let apiFetcher = StubReportFetcher(result: .success(makeReport(2)))
+        let model = makeModel(apiFetchers: [.anthropic: apiFetcher])
+
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .api), manual: false)
+
+        #expect(apiFetcher.callCount == 1)
+        #expect(fetchers[.anthropic]?.callCount == 0)
+    }
+
+    @Test func aSwitchedOffHalfHasNoSchedule() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let model = makeModel(apiFetchers: [.anthropic: StubReportFetcher(result: .success(makeReport(2)))])
+        model.setSettings(
+            ProviderSettings(subscriptionRefreshInterval: .thirtySeconds, apiRefreshInterval: .oneHour, isAPIEnabled: false),
+            for: .anthropic
+        )
+
+        model.start()
+        await sleeper.waitForSleepCount(3)
+        await settle()
+
+        #expect(sleeper.durations.count == 3)
+        #expect(!sleeper.durations.contains(.seconds(3600)))
+
+        model.setSettings(
+            ProviderSettings(subscriptionRefreshInterval: .thirtySeconds, apiRefreshInterval: .oneHour, isAPIEnabled: true),
+            for: .anthropic
+        )
+        await sleeper.waitForSleepCount(4)
+
+        #expect(sleeper.durations.last == .seconds(3600))
+
+        model.scheduler.stop()
+        sleeper.resume()
+    }
+
     private func hotReport(_ percent: Double = 90) -> ProviderReport {
         ProviderReport(
             planName: nil,
@@ -354,7 +416,7 @@ import Testing
 
     @Test func providerSettingsPersistAndReachTheProvider() {
         let model = makeModel()
-        let settings = ProviderSettings(isEnabled: false, refreshInterval: .oneHour, appearanceOverride: nil)
+        let settings = ProviderSettings(isEnabled: false, subscriptionRefreshInterval: .oneHour, appearanceOverride: nil)
 
         model.setSettings(settings, for: .cursor)
 
@@ -399,7 +461,7 @@ import Testing
 
         #expect(fetchers[.cursor]?.callCount == 1)
 
-        model.setSettings(ProviderSettings(isEnabled: true, refreshInterval: .oneHour), for: .cursor)
+        model.setSettings(ProviderSettings(isEnabled: true, subscriptionRefreshInterval: .oneHour), for: .cursor)
         await settle()
 
         #expect(fetchers[.cursor]?.callCount == 1, "a change while already enabled does not refetch")

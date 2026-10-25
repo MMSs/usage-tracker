@@ -269,7 +269,7 @@ struct ProviderPopoverView: View {
     private func rowChart(for window: LimitWindow, in report: ProviderReport, history: [UsageSample], now: Date) -> RowChart? {
         switch PopoverPresentation.chartKind(for: window, descriptor: provider.descriptor) {
         case .sessionLine:
-            let gap = UsageChartLayout.sessionGap(interval: appModel.settings(for: provider.id).refreshInterval)
+            let gap = UsageChartLayout.sessionGap(interval: appModel.settings(for: provider.id).refreshInterval(for: .subscription))
             let segments = UsageChartLayout.sessionSegments(
                 samples: history, now: now, gap: gap, size: CGSize(width: 1, height: 1)
             )

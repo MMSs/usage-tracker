@@ -32,6 +32,22 @@ import Testing
         #expect(anthropic.api != nil)
     }
 
+    @Test func refreshingOneHalfLeavesTheOther() async {
+        store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
+        store.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let model = makeModel(.anthropic, now: { t1 })
+
+        await model.refresh(.api, manual: false)
+
+        #expect(apiFetcher.callCount == 1)
+        #expect(subFetcher.callCount == 0)
+
+        await model.refresh(.subscription, manual: false)
+
+        #expect(apiFetcher.callCount == 1)
+        #expect(subFetcher.callCount == 1)
+    }
+
     @Test func hasAnyHalfOnlyWithAFetcher() {
         #expect(makeModel(.cursor, now: { t1 }).hasAnyHalf)
 
