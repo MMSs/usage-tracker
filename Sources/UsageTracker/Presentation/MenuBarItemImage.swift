@@ -48,14 +48,15 @@ enum MenuBarItemImage {
         }
 
         return [item.subscription, item.api].contains { half in
-            switch half {
-            case .meters, .money:
-                true
-            case let .status(status):
-                status == .expired || status == .error
-            case nil:
-                false
+            guard let half else {
+                return false
             }
+
+            if case let .status(status) = half {
+                return status == .expired || status == .error
+            }
+
+            return HalfView.drawsSomething(half, appearance: appearance)
         }
     }
 }

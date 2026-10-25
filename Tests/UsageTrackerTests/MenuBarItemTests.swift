@@ -96,7 +96,6 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(list[1].countdown == "17d")
         #expect(item.subscription == .meters(list, stale: false, errorMark: false))
         #expect(item.api == nil)
-        #expect(!item.showsDivider)
     }
 
     @Test(arguments: [1e300, -1e300, Double.infinity, Double.nan])
@@ -260,7 +259,6 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         let none = HalfSnapshot(status: .unconfigured, report: nil, isStale: true)
         let item = try #require(build(.anthropic, subscription: ready(anthropicReport), api: none))
         #expect(item.api == nil)
-        #expect(!item.showsDivider)
     }
 
     @Test func loadingWithoutReportIsStatus() throws {
@@ -316,7 +314,7 @@ private func apiReport(spent: Decimal) -> ProviderReport {
     @Test func apiMoneyWithoutBudgetHasNoMeter() throws {
         let item = try #require(build(.anthropic, subscription: ready(anthropicReport), api: ready(apiReport(spent: Decimal(string: "37.84")!))))
         #expect(item.api == .money(text: "$37.84", meter: nil, stale: false, errorMark: false))
-        #expect(item.showsDivider)
+        #expect(item.subscription != nil && item.api != nil)
     }
 
     @Test func apiMoneyWithBudgetHasTickAndFraction() throws {
@@ -362,7 +360,6 @@ private func apiReport(spent: Decimal) -> ProviderReport {
 
         #expect(shown.subscription == nil)
         #expect(shown.api == item.api)
-        #expect(!shown.showsDivider)
     }
 
     @Test func hidingAPISpendLeavesPlanUsage() throws {
@@ -371,7 +368,6 @@ private func apiReport(spent: Decimal) -> ProviderReport {
 
         #expect(shown.api == nil)
         #expect(shown.subscription == item.subscription)
-        #expect(!shown.showsDivider)
     }
 
     @Test func bothHalvesHiddenLeavesTheLogo() throws {

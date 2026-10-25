@@ -109,8 +109,6 @@ struct MenuBarItem: Equatable {
         self.hiddenFailures = hiddenFailures
     }
 
-    var showsDivider: Bool { subscription != nil && api != nil }
-
     func accessibilityText(displayName: String) -> String {
         let halves = [
             subscription?.accessibilityText(half: .subscription),

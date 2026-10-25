@@ -114,7 +114,7 @@ import Testing
                             let image = try #require(render(item, appearance))
 
                             #expect(image.size.width > 0)
-                            #expect(image.isTemplate == !colored)
+                            #expect(image.isTemplate == !(colored && (text || countdown || graph)))
                         }
                     }
                 }
@@ -146,6 +146,27 @@ import Testing
 
         #expect(try #require(render(meters, allOff)).size.width == 14)
         #expect(try #require(render(withBudget, allOff)).size.width == 14)
+    }
+
+    @Test func aBareLogoStaysATemplateUnlessBadged() throws {
+        let colored = MenuBarAppearance(showText: false, countdown: false, showGraph: false, colored: true)
+        let plain = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
+        let badged = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil, logoBadge: true)
+
+        #expect(try #require(render(plain, colored)).isTemplate)
+        #expect(try #require(render(badged, colored)).isTemplate == false)
+    }
+
+    @Test func theDividerSitsBetweenTwoDrawingHalves() throws {
+        let sub = MenuBarItem(provider: .cursor, subscription: twoMeters, api: nil)
+        let api = MenuBarItem(provider: .cursor, subscription: nil, api: money)
+        let both = MenuBarItem(provider: .cursor, subscription: twoMeters, api: money)
+        let width = { (item: MenuBarItem) throws in try #require(render(item)).size.width }
+
+        // Each half adds its own width after the 14 glyph and a 4 gap; the
+        // second half adds a 4 gap, the 1 divider and another 4 gap.
+        let expected = try width(sub) + width(api) - 14 + 4 + 1 + 4 - 4
+        #expect(abs(try width(both) - expected) < 0.5)
     }
 
     @Test func aStatusStillDrawsWithEverythingOff() throws {
