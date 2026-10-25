@@ -41,6 +41,17 @@ enum MenuBarGraphGeometry {
         fraction.map { 1 - $0 }
     }
 
+    enum BatteryLevel: Equatable {
+        case remaining(Double)
+        /// No fraction to show (unlimited, no limit, still loading).
+        case unknown
+    }
+
+    /// An unknown meter must not read as an empty battery, which means used up.
+    static func batteryLevel(_ fraction: Double?) -> BatteryLevel {
+        batteryFill(fraction).map { .remaining($0) } ?? .unknown
+    }
+
     /// One block per tenth started, so any use at all lights the first.
     /// The tolerance keeps 0.3 (3.0000000000000004 once scaled) at three.
     static func litSegments(_ fraction: Double?) -> Int {

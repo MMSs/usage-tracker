@@ -27,6 +27,16 @@ import Testing
         #expect(MenuBarGraphGeometry.batteryFill(nil) == nil)
     }
 
+    @Test func anUnknownBatteryMeterIsNotAnEmptyOne() {
+        #expect(MenuBarGraphGeometry.batteryLevel(nil) == .unknown)
+        #expect(MenuBarGraphGeometry.batteryLevel(1) == .remaining(0))
+        guard case let .remaining(remaining) = MenuBarGraphGeometry.batteryLevel(0.41) else {
+            Issue.record("a known fraction has a remaining level")
+            return
+        }
+        #expect(abs(remaining - 0.59) < 1e-9)
+    }
+
     @Test func dialsAreWiderThanRingsBecauseTheySitSideBySide() {
         #expect(MenuBarGraphGeometry.size(.dials, meterCount: 2).width == 35)
         #expect(MenuBarGraphGeometry.size(.dials, meterCount: 1).width == 16)

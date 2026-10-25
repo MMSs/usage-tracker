@@ -161,11 +161,20 @@ private struct MenuBarBattery: View {
             ForEach(Array(meters.prefix(2).enumerated()), id: \.offset) { index, meter in
                 let top = inset + CGFloat(index) * (fillHeight + fillGap)
 
-                if let remaining = MenuBarGraphGeometry.batteryFill(meter.fraction), remaining > 0 {
+                switch MenuBarGraphGeometry.batteryLevel(meter.fraction) {
+                case let .remaining(remaining) where remaining > 0:
                     RoundedRectangle(cornerRadius: 1)
                         .fill(palette.fill(meter.tint))
                         .frame(width: innerWidth * min(remaining, 1), height: fillHeight)
                         .offset(x: inset, y: top)
+                case .unknown:
+                    // Neutral and full: never tinted, never empty.
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(palette.track)
+                        .frame(width: innerWidth, height: fillHeight)
+                        .offset(x: inset, y: top)
+                case .remaining:
+                    EmptyView()
                 }
 
                 if let tick = meter.tick {
