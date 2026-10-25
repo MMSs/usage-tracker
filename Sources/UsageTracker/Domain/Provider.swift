@@ -50,6 +50,12 @@ struct ProviderCapabilities: Equatable, Sendable {
     let canStartSession: Bool
 }
 
+/// What the provider calls its short and long windows.
+struct MeterNames: Equatable, Sendable {
+    let short: String
+    let long: String
+}
+
 struct ProviderDescriptor: Identifiable, Sendable {
     let id: Provider
     let displayName: String
@@ -60,6 +66,7 @@ struct ProviderDescriptor: Identifiable, Sendable {
     let shortWindowID: String?
     /// "weekly" or "cycle".
     let longWindowID: String
+    let meterNames: MeterNames
 
     var subscriptionFields: [CredentialField] { fields.filter { $0.half == .subscription } }
     var apiFields: [CredentialField] { fields.filter { $0.half == .api } }
@@ -107,7 +114,8 @@ enum ProviderRegistry {
         ],
         services: [.subscription: HalfService(name: "Cursor", host: "cursor.com")],
         shortWindowID: nil,
-        longWindowID: "cycle"
+        longWindowID: "cycle",
+        meterNames: MeterNames(short: "Today", long: "Cycle")
     )
 
     private static let anthropic = ProviderDescriptor(
@@ -156,7 +164,8 @@ enum ProviderRegistry {
             .api: HalfService(name: "Anthropic API", host: "api.anthropic.com"),
         ],
         shortWindowID: "session",
-        longWindowID: "weekly"
+        longWindowID: "weekly",
+        meterNames: MeterNames(short: "Session", long: "Weekly")
     )
 
     private static let openai = ProviderDescriptor(
@@ -205,6 +214,7 @@ enum ProviderRegistry {
             .api: HalfService(name: "OpenAI API", host: "api.openai.com"),
         ],
         shortWindowID: "session",
-        longWindowID: "weekly"
+        longWindowID: "weekly",
+        meterNames: MeterNames(short: "Session", long: "Weekly")
     )
 }

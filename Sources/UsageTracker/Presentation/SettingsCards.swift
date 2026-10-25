@@ -152,7 +152,7 @@ struct MenuBarPreviewStrip: View {
     private static let fallbackFont = NSFont.systemFont(ofSize: 13)
 
     private static func fallbackWidth(_ entry: Entry) -> CGFloat {
-        (entry.item.accessibilityText(displayName: entry.displayName) as NSString)
+        (entry.item.visible(in: entry.appearance).accessibilityText(displayName: entry.displayName) as NSString)
             .size(withAttributes: [.font: fallbackFont]).width
     }
 
@@ -163,9 +163,9 @@ struct MenuBarPreviewStrip: View {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)
-                .accessibilityLabel(entry.item.accessibilityText(displayName: entry.displayName))
+                .accessibilityLabel(entry.item.visible(in: entry.appearance).accessibilityText(displayName: entry.displayName))
         } else {
-            Text(entry.item.accessibilityText(displayName: entry.displayName))
+            Text(entry.item.visible(in: entry.appearance).accessibilityText(displayName: entry.displayName))
                 .font(.system(size: 13))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)

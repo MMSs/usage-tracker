@@ -209,7 +209,8 @@ import Testing
             fields: anthropic.apiFields,
             services: anthropic.services,
             shortWindowID: nil,
-            longWindowID: "weekly"
+            longWindowID: "weekly",
+            meterNames: MeterNames(short: "Session", long: "Weekly")
         )
 
         #expect(SettingsHelp.tab(for: apiOnly, helpProvider: .anthropic) == .api)

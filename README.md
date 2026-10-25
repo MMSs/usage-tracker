@@ -104,7 +104,9 @@ window is open and leaves when it closes.
 
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings or Bars. Colored tints the text and graph by
-  remaining capacity or pacing. Open at login registers the app as a login
+  remaining capacity or pacing. Show plan usage and Show API spend hide a
+  half from the item (the popover still lists it), and Limits picks both
+  windows or just the short or the long one. Open at login registers the app as a login
   item; the line under the switch shows what macOS reports, with a button to
   System Settings when it needs your approval.
 - Each provider tab: an Enabled switch (off removes the item and stops

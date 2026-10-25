@@ -169,9 +169,12 @@ struct SwitchToggle: View {
     }
 }
 
-/// The five appearance rows, used for the global defaults and for a provider's override.
+/// The appearance rows, used for the global defaults and for a provider's override.
+/// The half switches show only where both halves exist; Limits names the provider's windows.
 struct MenuBarAppearanceRows: View {
     @Binding var appearance: MenuBarAppearance
+    let meterNames: MeterNames?
+    let showsHalfSwitches: Bool
 
     var body: some View {
         SettingsRow(label: "Show text") {
@@ -192,12 +195,32 @@ struct MenuBarAppearanceRows: View {
                     Text(style.title).tag(style)
                 }
             }
-            .pickerStyle(.segmented)
+            .pickerStyle(.menu)
             .labelsHidden()
             .fixedSize()
         }
-        SettingsRow(label: "Colored", isLast: true) {
+        SettingsRow(label: "Colored") {
             SwitchToggle(isOn: binding(\.colored) { var copy = $0; copy.colored = $1; return copy })
+        }
+        if showsHalfSwitches {
+            SettingsRow(label: "Show plan usage") {
+                SwitchToggle(isOn: binding(\.showPlanUsage) { $0.showingPlanUsage($1) })
+                    .disabled(appearance.showPlanUsage && !appearance.showAPISpend)
+            }
+            SettingsRow(label: "Show API spend") {
+                SwitchToggle(isOn: binding(\.showAPISpend) { $0.showingAPISpend($1) })
+                    .disabled(appearance.showAPISpend && !appearance.showPlanUsage)
+            }
+        }
+        SettingsRow(label: "Limits", isLast: true) {
+            Picker("Limits", selection: binding(\.limits) { var copy = $0; copy.limits = $1; return copy }) {
+                ForEach(MenuBarLimits.allCases) { limits in
+                    Text(limits.title(names: meterNames)).tag(limits)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
         }
     }
 
@@ -402,7 +425,12 @@ struct ProviderSettingsView: View {
                 .padding(.vertical, 10)
 
                 Divider()
-                MenuBarAppearanceRows(appearance: overrideAppearance)
+                MenuBarAppearanceRows(
+                    appearance: overrideAppearance,
+                    meterNames: provider.descriptor.meterNames,
+                    showsHalfSwitches: provider.descriptor.capabilities.hasSubscription
+                        && provider.descriptor.capabilities.hasAPISpend
+                )
             }
         }
 
@@ -612,7 +640,7 @@ struct GeneralSettingsView: View {
             )
 
             SettingsSection(title: "Menu bar") {
-                MenuBarAppearanceRows(appearance: appearance)
+                MenuBarAppearanceRows(appearance: appearance, meterNames: nil, showsHalfSwitches: true)
             }
 
             SettingsSection(title: "Alerts") {
@@ -629,7 +657,7 @@ struct GeneralSettingsView: View {
                 OpenAtLoginRows(loginItem: appModel.loginItem)
             }
 
-            Text("Defaults for every provider. A provider's tab can override them and sets its own refresh rate. Colored tints the item by remaining capacity or pacing.")
+            Text("Defaults for every provider. A provider's tab can override them and sets its own refresh rate. Colored tints the item by remaining capacity or pacing. Show plan usage and Show API spend hide a half from the item; the popover still lists it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

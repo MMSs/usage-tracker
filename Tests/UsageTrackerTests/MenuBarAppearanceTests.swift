@@ -3,6 +3,13 @@ import Testing
 @testable import UsageTracker
 
 @Suite struct MenuBarAppearanceTests {
+    @Test func limitsTitlesNameTheProvidersMeters() {
+        let cursor = ProviderRegistry.descriptor(for: .cursor).meterNames
+        #expect(MenuBarLimits.allCases.map { $0.title(names: cursor) } == ["Both", "Today", "Cycle"])
+        #expect(MenuBarLimits.allCases.map { $0.title(names: ProviderRegistry.descriptor(for: .anthropic).meterNames) } == ["Both", "Session", "Weekly"])
+        #expect(MenuBarLimits.allCases.map { $0.title(names: nil) } == ["Both", "Short", "Long"])
+    }
+
     @Test func refusesToHideBothParts() {
         #expect(MenuBarAppearance(showText: true, showGraph: false).showingText(false).showText == true)
         #expect(MenuBarAppearance(showText: false, showGraph: true).showingGraph(false).showGraph == true)

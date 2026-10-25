@@ -17,6 +17,15 @@ enum MenuBarLimits: String, CaseIterable, Identifiable, Codable, Sendable {
     case both, short, long
 
     var id: String { rawValue }
+
+    /// The provider's window names, or Short and Long when there is no one provider.
+    func title(names: MeterNames?) -> String {
+        switch self {
+        case .both: "Both"
+        case .short: names?.short ?? "Short"
+        case .long: names?.long ?? "Long"
+        }
+    }
 }
 
 struct MenuBarAppearance: Equatable, Codable, Sendable {
