@@ -127,9 +127,11 @@ private struct HalfView: View {
             .modifier(ErrorMark(shown: errorMark, color: palette.error))
         case let .money(text, meter, stale, errorMark):
             HStack(spacing: 4) {
-                Text(text)
-                    .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(palette.text(meter?.tint ?? .neutral))
+                if appearance.showsSpendAmount(hasMeter: meter != nil) {
+                    Text(text)
+                        .font(.system(size: 9.5, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(palette.text(meter?.tint ?? .neutral))
+                }
 
                 if appearance.drawsGraph, let meter {
                     graph([meter])

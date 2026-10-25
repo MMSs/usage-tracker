@@ -51,6 +51,14 @@ import Testing
         #expect(try #require(render(item, graphAndCountdown)).size.width > (try #require(render(item, graphOnly)).size.width))
     }
 
+    @Test func theSpendAmountHidesWithShowText() throws {
+        let item = MenuBarItem(provider: .openai, subscription: nil, api: money)
+        let withText = MenuBarAppearance(showText: true, countdown: false, showGraph: true)
+        let withoutText = MenuBarAppearance(showText: false, countdown: true, showGraph: true)
+
+        #expect(try #require(render(item, withoutText)).size.width < (try #require(render(item, withText)).size.width))
+    }
+
     @Test func singleMeterItemIsNarrowerThanTwoMeterItem() throws {
         let one = MenuBarItem(
             provider: .cursor,

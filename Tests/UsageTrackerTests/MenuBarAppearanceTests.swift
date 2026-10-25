@@ -22,6 +22,15 @@ import Testing
         #expect(MenuBarAppearance(showText: false, countdown: false, showGraph: true).showingCountdown(true).countdown == true)
     }
 
+    @Test func theSpendAmountFollowsShowTextUnlessNothingElseWouldShow() {
+        let textOff = MenuBarAppearance(showText: false, countdown: true, showGraph: true)
+        #expect(!textOff.showsSpendAmount(hasMeter: true))
+        // No budget, so no ring: the amount is all the API side has.
+        #expect(textOff.showsSpendAmount(hasMeter: false))
+        #expect(MenuBarAppearance(showText: false, countdown: true, showGraph: false).showsSpendAmount(hasMeter: true))
+        #expect(MenuBarAppearance(showText: true, showGraph: true).showsSpendAmount(hasMeter: true))
+    }
+
     @Test func defaults() {
         let appearance = MenuBarAppearance.default
         #expect(appearance.showText && appearance.showGraph)
