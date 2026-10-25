@@ -31,6 +31,8 @@ final class HalfViewModel: ObservableObject {
     @Published private(set) var organizations: [AccountOrganization] = []
     /// The stored choice, which may no longer be listed; see `chosenOrganization`.
     @Published private(set) var selectedOrganizationID: String?
+    /// Progress of the last "start the session" request.
+    @Published private(set) var sessionStart: SessionStartState = .idle
 
     private let provider: Provider
     private let credentialFieldIDs: [String]
@@ -53,6 +55,13 @@ final class HalfViewModel: ObservableObject {
     private var organizationScope: OrganizationScopedFetching? {
         fetcher as? OrganizationScopedFetching
     }
+
+    private var sessionStarter: SessionStarting? {
+        fetcher as? SessionStarting
+    }
+
+    /// True when the fetcher can open its provider's session.
+    var canStartSession: Bool { sessionStarter != nil }
 
     init(
         provider: Provider,
@@ -181,6 +190,43 @@ final class HalfViewModel: ObservableObject {
             }
             fail(cause)
         }
+    }
+
+    /// Sends the provider's session-starting message, then refreshes so the
+    /// new window shows. False when it cannot start, one is already running,
+    /// or it failed (`sessionStart` is then `.failed`).
+    @discardableResult
+    func startSession() async -> Bool {
+        guard let starter = sessionStarter, sessionStart != .starting else {
+            return false
+        }
+
+        let name = logName
+        sessionStart = .starting
+        do {
+            let values = try readValues()
+            guard isConfigured(values) else {
+                Log.refresh.debug("\(name, privacy: .public): session start skipped, no credential")
+                sessionStart = .failed
+                return false
+            }
+
+            try await starter.startSession(credentials: values)
+        } catch is CancellationError {
+            Log.refresh.debug("\(name, privacy: .public): session start cancelled")
+            sessionStart = .idle
+            return false
+        } catch {
+            // The type name only: an error's description could quote a response.
+            Log.refresh.error("\(name, privacy: .public): session start failed \(String(describing: type(of: error)), privacy: .public)")
+            sessionStart = .failed
+            return false
+        }
+
+        Log.refresh.info("\(name, privacy: .public): session started")
+        sessionStart = .idle
+        await refresh(manual: true)
+        return true
     }
 
     /// Called after Settings saved or removed a credential for this half.

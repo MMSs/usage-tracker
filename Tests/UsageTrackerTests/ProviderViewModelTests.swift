@@ -183,3 +183,61 @@ import Testing
         #expect(!model.isConfigured)
     }
 }
+
+@Suite @MainActor struct SessionIsClosedTests {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let store = MemoryCredentialStore()
+    let cache = MemoryReportCache()
+    let subFetcher = StubSessionFetcher(fetchResult: .success(makeReport()))
+
+    private func sessionReport(resetsAt: Date?, id: String = "session") -> ProviderReport {
+        ProviderReport(
+            planName: "Pro",
+            windows: [LimitWindow(id: id, label: "Session", percentUsed: 0, resetsAt: resetsAt, parentID: nil)],
+            extras: [], spend: nil
+        )
+    }
+
+    private func makeModel(_ provider: Provider = .anthropic) -> ProviderViewModel {
+        let now = now
+        return ProviderViewModel(
+            descriptor: ProviderRegistry.descriptor(for: provider),
+            subscriptionFetcher: subFetcher, apiFetcher: nil,
+            credentialStore: store, cache: cache, now: { now }
+        )
+    }
+
+    private func refreshed(_ report: ProviderReport) async -> ProviderViewModel {
+        store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
+        subFetcher.fetchResult = .success(report)
+        let model = makeModel()
+        await model.refresh(manual: true)
+        return model
+    }
+
+    @Test func sessionIsClosedOnlyWhenReadyAndTheSessionHasNoReset() async {
+        let closed = await refreshed(sessionReport(resetsAt: nil))
+        #expect(closed.sessionIsClosed)
+
+        let open = await refreshed(sessionReport(resetsAt: now.addingTimeInterval(3600)))
+        #expect(!open.sessionIsClosed)
+
+        let missing = await refreshed(sessionReport(resetsAt: nil, id: "weekly"))
+        #expect(!missing.sessionIsClosed)
+
+        store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
+        subFetcher.fetchResult = .failure(.transport)
+        let failed = makeModel()
+        await failed.refresh(manual: true)
+        #expect(failed.subscription?.status == .error)
+        #expect(!failed.sessionIsClosed)
+    }
+
+    @Test func aProviderThatCannotStartIsNeverClosed() async {
+        store.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "tok"
+        subFetcher.fetchResult = .success(sessionReport(resetsAt: nil))
+        let model = makeModel(.cursor)
+        await model.refresh(manual: true)
+        #expect(!model.sessionIsClosed)
+    }
+}

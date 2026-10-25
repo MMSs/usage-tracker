@@ -828,3 +828,95 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(width <= SettingsLayout.pageWidth - 2 * SettingsLayout.padding - 24)
     }
 }
+
+@Suite @MainActor struct HalfSessionStartTests {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let store = MemoryCredentialStore()
+    let cache = MemoryReportCache()
+    let fetcher = StubSessionFetcher(fetchResult: .success(makeReport()))
+    let key = CredentialKey(provider: .anthropic, fieldID: "session-key")
+
+    private func makeModel(fetcher: ReportFetching? = nil, store: CredentialStoring? = nil) -> HalfViewModel {
+        let now = now
+        return HalfViewModel(
+            provider: .anthropic, half: .subscription,
+            fields: ProviderRegistry.descriptor(for: .anthropic).subscriptionFields,
+            fetcher: fetcher ?? self.fetcher, credentialStore: store ?? self.store, cache: cache, now: { now }
+        )
+    }
+
+    @Test func aSuccessfulStartRefreshesTheHalf() async {
+        store.values[key] = "sk"
+        let model = makeModel()
+        #expect(model.canStartSession)
+
+        let started = await model.startSession()
+        #expect(started)
+        #expect(fetcher.startCount == 1)
+        #expect(fetcher.startCredentials == [["session-key": "sk"]])
+        #expect(fetcher.fetchCount == 1)
+        #expect(model.sessionStart == .idle)
+        #expect(model.status == .ready)
+    }
+
+    @Test func aFailedStartIsShownAndNothingIsRefreshed() async {
+        struct Secret: Error, CustomStringConvertible { var description: String { "sk-leaked" } }
+        store.values[key] = "sk"
+        fetcher.startResults = [.failure(Secret())]
+        let model = makeModel()
+
+        let started = await model.startSession()
+        #expect(!started)
+        #expect(model.sessionStart == .failed)
+        #expect(fetcher.fetchCount == 0)
+    }
+
+    @Test func aCancelledStartReturnsToIdle() async {
+        store.values[key] = "sk"
+        fetcher.startResults = [.failure(CancellationError())]
+        let model = makeModel()
+
+        #expect(await !model.startSession())
+        #expect(model.sessionStart == .idle)
+        #expect(fetcher.fetchCount == 0)
+    }
+
+    @Test func anUnreadableKeychainFailsTheStart() async {
+        let failing = FailingCredentialStore()
+        failing.failsReads = true
+        let model = makeModel(store: failing)
+
+        #expect(await !model.startSession())
+        #expect(model.sessionStart == .failed)
+        #expect(fetcher.startCount == 0)
+    }
+
+    @Test func aStartWhileOneRunsIsIgnored() async {
+        store.values[key] = "sk"
+        let gate = SuspendedGate()
+        fetcher.startGate = gate
+        let model = makeModel()
+
+        async let first = model.startSession()
+        await Task.yield()
+        #expect(model.sessionStart == .starting)
+        let second = await model.startSession()
+        #expect(!second)
+
+        gate.resume()
+        #expect(await first)
+        #expect(fetcher.startCount == 1)
+        #expect(model.sessionStart == .idle)
+    }
+
+    @Test func aHalfThatCannotStartReturnsFalse() async {
+        store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
+        let plain = StubReportFetcher(result: .success(makeReport()))
+        let model = makeModel(fetcher: plain)
+
+        #expect(!model.canStartSession)
+        #expect(await !model.startSession())
+        #expect(model.sessionStart == .idle)
+        #expect(plain.callCount == 0)
+    }
+}

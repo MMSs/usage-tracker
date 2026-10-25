@@ -20,6 +20,20 @@ final class ProviderViewModel: ObservableObject, Identifiable {
         [subscription, api].contains { $0?.isActive == true }
     }
 
+    /// The provider can start a session, its subscription half is up to date,
+    /// and the report's short window is not running.
+    var sessionIsClosed: Bool {
+        guard descriptor.capabilities.canStartSession,
+              let shortID = descriptor.shortWindowID,
+              let subscription, subscription.canStartSession, subscription.status == .ready,
+              let window = subscription.report?.windows.first(where: { $0.id == shortID })
+        else {
+            return false
+        }
+
+        return !window.isOpen
+    }
+
     func half(_ half: Half) -> HalfViewModel? {
         switch half {
         case .subscription: subscription
