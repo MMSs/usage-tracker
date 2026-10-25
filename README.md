@@ -165,6 +165,7 @@ Usage Tracker uses the names and marks only to identify which service a menu
 bar item reports on. It is not affiliated with or endorsed by any of them. The
 Cursor cube is drawn from the asset pack at <https://cursor.com/brand>. The
 Anthropic mark is an original "A\" drawing, not Anthropic's or Claude's logo.
+The OpenAI mark is an original hexagon ring, not OpenAI's logo.
 
 ## Removal
 
@@ -181,7 +182,8 @@ security delete-generic-password \
 ```
 
 Repeat with `-a "anthropic-session-key"` and `-a "anthropic-admin-key"` for the
-Anthropic credentials.
+Anthropic credentials, and with `-a "openai-auth-json"` and
+`-a "openai-admin-key"` for the OpenAI ones.
 
 Builds before the rename used the identifier `com.mohab.usage-tracker`. The
 first launch of a newer build moves their credentials and settings over.
