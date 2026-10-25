@@ -260,7 +260,8 @@ final class AppModel: ObservableObject {
                 OpenAISubscriptionReportService(
                     usage: OpenAIUsageService(),
                     tokens: OpenAITokenService(),
-                    credentialStore: credentialStore
+                    credentialStore: credentialStore,
+                    models: models
                 ),
                 OpenAIAPIReportService(service: OpenAICostService())
             )

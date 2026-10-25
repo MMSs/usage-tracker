@@ -1,12 +1,14 @@
 import Foundation
 
 @MainActor
-final class OpenAISubscriptionReportService: ReportFetching {
-    private static let key = CredentialKey(provider: .openai, fieldID: "auth-json")
+final class OpenAISubscriptionReportService: ReportFetching, SessionStarting {
+    private static let provider = Provider.openai
+    private static let key = CredentialKey(provider: provider, fieldID: "auth-json")
 
     private let usage: OpenAIUsageFetching
     private let tokens: OpenAITokenRenewing
     private let credentialStore: CredentialStoring
+    private let models: SessionModelStoring
     private let now: () -> Date
     /// Shared by overlapping fetches: the refresh token is single-use. A
     /// task of its own, so a cancelled fetch cannot abandon a spent token.
@@ -19,35 +21,58 @@ final class OpenAISubscriptionReportService: ReportFetching {
         usage: OpenAIUsageFetching,
         tokens: OpenAITokenRenewing,
         credentialStore: CredentialStoring,
+        models: SessionModelStoring,
         now: @escaping () -> Date = Date.init
     ) {
         self.usage = usage
         self.tokens = tokens
         self.credentialStore = credentialStore
+        self.models = models
         self.now = now
     }
 
     func fetchReport(credentials: [String: String], today: Date) async throws -> ProviderReport {
+        let response = try await withRenewal(try authJSON(credentials)) { auth in
+            try await usage.fetchUsage(auth: auth)
+        }
+
+        return OpenAIReportMapper.subscription(response, now: today)
+    }
+
+    func startSession(credentials: [String: String]) async throws {
+        let model = models.model(for: Self.provider)
+
+        try await withRenewal(try authJSON(credentials)) { auth in
+            try await usage.startSession(auth: auth, model: model)
+        }
+    }
+
+    /// The bundle to use: the pending one while Keychain still refuses it,
+    /// else the caller's.
+    private func authJSON(_ credentials: [String: String]) throws -> String {
         retryPendingSave()
 
         guard let json = pending?.json ?? credentials["auth-json"] else {
             throw FetchError.unauthorized
         }
 
+        return json
+    }
+
+    /// Runs `body`, and once more with a renewed token when it reports the
+    /// access token expired. A second expiry is `FetchError.unauthorized`.
+    private func withRenewal<T>(_ json: String, _ body: (CodexAuth) async throws -> T) async throws -> T {
         let auth = try CodexAuth(json: json)
-        let response: OpenAIUsageResponse
         do {
-            response = try await usage.fetchUsage(auth: auth)
+            return try await body(auth)
         } catch OpenAIUsageError.accessTokenExpired {
             let renewed = try await renewal(after: auth)
             do {
-                response = try await usage.fetchUsage(auth: renewed)
+                return try await body(renewed)
             } catch OpenAIUsageError.accessTokenExpired {
                 throw FetchError.unauthorized
             }
         }
-
-        return OpenAIReportMapper.subscription(response, now: today)
     }
 
     private func renewal(after failed: CodexAuth) async throws -> CodexAuth {

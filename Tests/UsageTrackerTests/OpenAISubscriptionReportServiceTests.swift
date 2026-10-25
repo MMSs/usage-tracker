@@ -26,6 +26,21 @@ struct OpenAISubscriptionReportServiceTests {
             }
             return response
         }
+
+        /// The access token and model of each session start.
+        private(set) var starts: [(accessToken: String, model: String)] = []
+        /// Thrown by every start whose token is not rejected, when set.
+        var startError: FetchError?
+
+        func startSession(auth: CodexAuth, model: String) async throws {
+            starts.append((auth.accessToken, model))
+            if rejected.contains(auth.accessToken) {
+                throw OpenAIUsageError.accessTokenExpired
+            }
+            if let startError {
+                throw startError
+            }
+        }
     }
 
     /// Holds every renewal mid-flight until opened, so a second renewal fails
@@ -116,7 +131,13 @@ struct OpenAISubscriptionReportServiceTests {
         _ tokens: StubTokens,
         _ store: some CredentialStoring
     ) -> OpenAISubscriptionReportService {
-        OpenAISubscriptionReportService(usage: usage, tokens: tokens, credentialStore: store, now: { Self.renewedAt })
+        OpenAISubscriptionReportService(
+            usage: usage,
+            tokens: tokens,
+            credentialStore: store,
+            models: StubSessionModelStore(),
+            now: { Self.renewedAt }
+        )
     }
 
     private func fetch(_ service: OpenAISubscriptionReportService, _ json: String? = bundle()) async throws -> ProviderReport {
@@ -453,6 +474,130 @@ struct OpenAISubscriptionReportServiceTests {
             try await fetch(service, nil)
         }
         #expect(usage.accessTokens.isEmpty)
+        #expect(tokens.refreshTokens.isEmpty)
+    }
+
+    // MARK: Starting a session
+
+    private func start(_ service: OpenAISubscriptionReportService, _ json: String? = bundle()) async throws {
+        try await service.startSession(credentials: json.map { ["auth-json": $0] } ?? [:])
+    }
+
+    @Test func aStartSendsTheSessionModel() async throws {
+        let usage = StubUsage(response: response)
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = MemoryCredentialStore()
+        store.values[Self.key] = Self.bundle()
+        let service = makeService(usage, tokens, store)
+
+        try await start(service)
+
+        #expect(usage.starts.map(\.accessToken) == ["old-access"])
+        #expect(usage.starts.map(\.model) == ["test-model"])
+        #expect(usage.accessTokens.isEmpty)
+        #expect(tokens.refreshTokens.isEmpty)
+    }
+
+    @Test func aRefusedStartThrows() async throws {
+        let usage = StubUsage(response: response)
+        usage.startError = .httpStatus(400)
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = MemoryCredentialStore()
+        store.values[Self.key] = Self.bundle()
+        let service = makeService(usage, tokens, store)
+
+        await #expect(throws: FetchError.httpStatus(400)) {
+            try await start(service)
+        }
+        #expect(usage.starts.map(\.accessToken) == ["old-access"])
+        #expect(tokens.refreshTokens.isEmpty)
+        #expect(store.values[Self.key] == Self.bundle())
+    }
+
+    @Test func anExpiredTokenIsRenewedOnceThenTheStartRetried() async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = MemoryCredentialStore()
+        store.values[Self.key] = Self.bundle()
+        let service = makeService(usage, tokens, store)
+
+        try await start(service)
+
+        #expect(tokens.refreshTokens == ["old-refresh"])
+        #expect(usage.starts.map(\.accessToken) == ["old-access", "new-access"])
+        #expect(try CodexAuth(json: try #require(store.values[Self.key])).refreshToken == "new-refresh")
+    }
+
+    @Test func aStartStillExpiredAfterRenewingIsUnauthorized() async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access", "new-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = MemoryCredentialStore()
+        store.values[Self.key] = Self.bundle()
+        let service = makeService(usage, tokens, store)
+
+        await #expect(throws: FetchError.unauthorized) {
+            try await start(service)
+        }
+        #expect(tokens.refreshTokens == ["old-refresh"])
+        #expect(usage.starts.map(\.accessToken) == ["old-access", "new-access"])
+    }
+
+    @Test func aStartAndAFetchShareOneRenewal() async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let gate = RenewalGate()
+        tokens.gate = gate
+        let store = MemoryCredentialStore()
+        store.values[Self.key] = Self.bundle()
+        let service = makeService(usage, tokens, store)
+
+        let fetching = Task { try await fetch(service) }
+        let starting = Task { try await start(service) }
+        await gate.waitUntilStarted()
+        await settle()
+
+        // Both got 401 before the renewal finished.
+        #expect(usage.accessTokens == ["old-access"])
+        #expect(usage.starts.map(\.accessToken) == ["old-access"])
+        gate.open()
+
+        #expect(try await fetching.value == OpenAIReportMapper.subscription(response, now: Self.today))
+        try await starting.value
+        #expect(tokens.refreshTokens == ["old-refresh"])
+        #expect(usage.accessTokens == ["old-access", "new-access"])
+        #expect(usage.starts.map(\.accessToken) == ["old-access", "new-access"])
+        #expect(try CodexAuth(json: try #require(store.values[Self.key])).refreshToken == "new-refresh")
+    }
+
+    @Test func aStartUsesTheUnsavedBundle() async throws {
+        let usage = StubUsage(response: response)
+        usage.rejected = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = FailingCredentialStore()
+        store.base.values[Self.key] = Self.bundle()
+        store.failsWrites = true
+        let service = makeService(usage, tokens, store)
+        _ = try await fetch(service)
+
+        // The caller still reads the spent bundle from Keychain.
+        try await start(service)
+
+        #expect(usage.starts.map(\.accessToken) == ["new-access"])
+        #expect(tokens.refreshTokens == ["old-refresh"])
+    }
+
+    @Test func aStartWithoutACredentialIsUnauthorized() async throws {
+        let usage = StubUsage(response: response)
+        let tokens = StubTokens(grant: try Self.grant())
+        let service = makeService(usage, tokens, MemoryCredentialStore())
+
+        await #expect(throws: FetchError.unauthorized) {
+            try await start(service, nil)
+        }
+        #expect(usage.starts.isEmpty)
         #expect(tokens.refreshTokens.isEmpty)
     }
 }
