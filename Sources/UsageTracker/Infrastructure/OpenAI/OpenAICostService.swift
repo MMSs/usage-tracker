@@ -8,8 +8,6 @@ protocol OpenAICostFetching {
 
 final class OpenAICostService: OpenAICostFetching {
     private static let endpoint = "https://api.openai.com/v1/organization/costs"
-    /// RFC 3986 unreserved characters; everything else in a query value is escaped.
-    private static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 
     private let client: HTTPClient
 
@@ -89,15 +87,12 @@ final class OpenAICostService: OpenAICostFetching {
     }
 
     private func request(query: [(name: String, value: String)], adminKey: String) -> URLRequest {
-        let encoded = query
-            .map { "\($0.name)=\($0.value.addingPercentEncoding(withAllowedCharacters: Self.unreserved) ?? "")" }
-            .joined(separator: "&")
+        let encoded = RequestSupport.encodedQuery(query)
         var request = URLRequest(url: URL(string: "\(Self.endpoint)?\(encoded)")!)
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         request.httpMethod = "GET"
         request.setValue("Bearer \(adminKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("UsageTracker/\(version) (https://github.com/MMSs/usage-tracker)", forHTTPHeaderField: "User-Agent")
+        request.setValue(RequestSupport.userAgent, forHTTPHeaderField: "User-Agent")
 
         return request
     }

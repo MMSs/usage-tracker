@@ -46,9 +46,8 @@ struct OpenAICostsResponse: Decodable, Equatable, Sendable {
             // Decimal's own Decodable reads the number token without a Double round trip.
             if let number = try? nested.decode(Decimal.self, forKey: .value) {
                 amount = number
-            } else if let text = try? nested.decode(String.self, forKey: .value),
-                      text.range(of: #"^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil {
-                amount = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX"))
+            } else if let text = try? nested.decode(String.self, forKey: .value) {
+                amount = RequestSupport.decimal(fromNumericString: text)
             } else {
                 amount = nil
             }

@@ -23,14 +23,13 @@ final class OpenAIUsageService: OpenAIUsageFetching {
 
     private func request(auth: CodexAuth) -> URLRequest {
         var request = URLRequest(url: Self.endpoint)
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         request.httpMethod = "GET"
         request.setValue("Bearer \(auth.accessToken)", forHTTPHeaderField: "Authorization")
         if let accountID = auth.accountID {
             request.setValue(accountID, forHTTPHeaderField: "ChatGPT-Account-Id")
         }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("UsageTracker/\(version) (https://github.com/MMSs/usage-tracker)", forHTTPHeaderField: "User-Agent")
+        request.setValue(RequestSupport.userAgent, forHTTPHeaderField: "User-Agent")
 
         return request
     }

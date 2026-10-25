@@ -107,7 +107,7 @@ struct OpenAICostServiceTests {
         let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
 
         #expect(days.count == 1)
-        #expect(client.requests.count <= 3)
+        #expect(client.requests.count == 2)
     }
 
     @Test func nonAdminKeyIsUnauthorized() async throws {

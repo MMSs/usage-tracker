@@ -8,9 +8,6 @@ protocol AnthropicCostFetching {
 
 final class AnthropicCostService: AnthropicCostFetching {
     private static let endpoint = "https://api.anthropic.com/v1/organizations/cost_report"
-    private static let posix = Locale(identifier: "en_US_POSIX")
-    /// RFC 3986 unreserved characters; everything else in a query value is escaped.
-    private static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 
     private let client: HTTPClient
 
@@ -75,9 +72,7 @@ final class AnthropicCostService: AnthropicCostFetching {
     }
 
     private static func cents(_ amount: String) throws -> Decimal {
-        // `Decimal(string:)` stops at the first bad character, so "12,5" would read as 12.
-        guard amount.range(of: #"^[+-]?[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$"#, options: .regularExpression) != nil,
-              let value = Decimal(string: amount, locale: posix)
+        guard let value = RequestSupport.decimal(fromNumericString: amount)
         else {
             Log.http.error("cost_report amount is not a decimal number")
             throw FetchError.decoding
@@ -94,16 +89,13 @@ final class AnthropicCostService: AnthropicCostFetching {
     }
 
     private func request(query: [(name: String, value: String)], adminKey: String) -> URLRequest {
-        let encoded = query
-            .map { "\($0.name)=\($0.value.addingPercentEncoding(withAllowedCharacters: Self.unreserved) ?? "")" }
-            .joined(separator: "&")
+        let encoded = RequestSupport.encodedQuery(query)
         var request = URLRequest(url: URL(string: "\(Self.endpoint)?\(encoded)")!)
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         request.httpMethod = "GET"
         request.setValue(adminKey, forHTTPHeaderField: "x-api-key")
         request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("UsageTracker/\(version) (https://github.com/MMSs/usage-tracker)", forHTTPHeaderField: "User-Agent")
+        request.setValue(RequestSupport.userAgent, forHTTPHeaderField: "User-Agent")
 
         return request
     }

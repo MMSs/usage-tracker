@@ -42,11 +42,10 @@ final class OpenAITokenService: OpenAITokenRenewing {
 
     private func request(refreshToken: String) throws -> URLRequest {
         var request = URLRequest(url: Self.endpoint)
-        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("UsageTracker/\(version) (https://github.com/MMSs/usage-tracker)", forHTTPHeaderField: "User-Agent")
+        request.setValue(RequestSupport.userAgent, forHTTPHeaderField: "User-Agent")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
             "client_id": Self.clientID,
             "grant_type": "refresh_token",
