@@ -41,6 +41,8 @@ final class AppModel: ObservableObject {
     private var autoStartsAwaitingCheck: Set<Provider> = []
     /// The reset of each provider's session as last seen open.
     private var lastOpenSessionReset: [Provider: Date] = [:]
+    /// Halves whose refreshes are failing, so a streak alerts once.
+    private var failingTargets: Set<RefreshTarget> = []
     private var providerObservers: [AnyCancellable] = []
 
     init(
@@ -109,6 +111,7 @@ final class AppModel: ObservableObject {
 
     /// Refreshes every enabled provider; disabled ones keep their last report untouched.
     func refreshAll(manual: Bool) async {
+        let started = now()
         await withTaskGroup(of: Void.self) { group in
             for provider in providers where provider.isEnabled {
                 group.addTask {
@@ -120,6 +123,7 @@ final class AppModel: ObservableObject {
         var ended: [Provider: Date] = [:]
         for provider in providers where provider.isEnabled {
             evaluateAlerts(for: provider)
+            trackFailures(of: provider, halves: [.subscription, .api], since: started)
             noteOpenSession(provider)
             ended[provider.id] = endedSession(of: provider)
         }
@@ -140,8 +144,10 @@ final class AppModel: ObservableObject {
             return
         }
 
+        let refreshStart = now()
         await provider.refresh(target.half, manual: manual)
         evaluateAlerts(for: provider, halves: [target.half])
+        trackFailures(of: provider, halves: [target.half], since: refreshStart)
         guard target.half == .subscription else {
             return
         }
@@ -256,6 +262,32 @@ final class AppModel: ObservableObject {
 
         if enabled, alertsEnabled {
             alertMonitor?.requestAuthorization()
+        }
+    }
+
+    /// Alerts once when a half starts failing. A failure recorded since
+    /// `started` with a cause that counts begins a streak; a success ends it.
+    /// A cached older failure is not reported again, and a lost connection
+    /// neither alerts nor ends a streak.
+    private func trackFailures(of provider: ProviderViewModel, halves: Set<Half>, since started: Date) {
+        for model in [provider.subscription, provider.api].compactMap({ $0 }) where halves.contains(model.half) && model.isEnabled {
+            let target = RefreshTarget(provider: provider.id, half: model.half)
+
+            guard let failure = model.lastFailure else {
+                failingTargets.remove(target)
+                continue
+            }
+
+            guard failure.date >= started, failure.cause.alertsAsFailure, failingTargets.insert(target).inserted else {
+                continue
+            }
+
+            let delivers = alertsEnabled && alertKinds.contains(.failures) && settings(for: provider.id).alertsEnabled
+            if delivers {
+                alertMonitor?.deliver(AlertPolicy.failureAlert(
+                    displayName: provider.descriptor.displayName, half: model.half, cause: failure.cause, provider: provider.id
+                ))
+            }
         }
     }
 

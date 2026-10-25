@@ -181,4 +181,33 @@ struct AlertPolicyTests {
         #expect(plain == UsageAlert(key: "anthropic.session.\(minutes)", title: "Anthropic session reset", body: "You're back to 0%."))
         #expect(started == UsageAlert(key: "anthropic.session.\(minutes)", title: "Anthropic session reset", body: "New session started."))
     }
+
+    @Test func transportNeverAlertsButEveryOtherCauseDoes() {
+        let others: [RefreshFailure] = [
+            .challenge, .unauthorized, .httpStatus(500), .rateLimited(until: nil), .decoding, .keychain, .needsOrganization, .unexpected,
+        ]
+
+        #expect(!RefreshFailure.transport.alertsAsFailure)
+        #expect(others.allSatisfy { $0.alertsAsFailure })
+    }
+
+    @Test func eachCauseHasItsAlertText() {
+        #expect(RefreshFailure.challenge.alertCause == "blocked by the provider's bot check")
+        #expect(RefreshFailure.unauthorized.alertCause == "credential expired")
+        #expect(RefreshFailure.httpStatus(503).alertCause == "server error 503")
+        #expect(RefreshFailure.rateLimited(until: nil).alertCause == "rate limited")
+        #expect(RefreshFailure.decoding.alertCause == "unexpected response")
+        #expect(RefreshFailure.keychain.alertCause == "couldn't read Keychain")
+        #expect(RefreshFailure.needsOrganization.alertCause == "choose an organization in Settings")
+        #expect(RefreshFailure.unexpected.alertCause == "unexpected error")
+        #expect(RefreshFailure.transport.alertCause == "network unavailable")
+    }
+
+    @Test func aFailureAlertNamesTheHalfAndTheCause() {
+        let plan = AlertPolicy.failureAlert(displayName: "Anthropic", half: .subscription, cause: .unauthorized, provider: .anthropic)
+        let spend = AlertPolicy.failureAlert(displayName: "OpenAI", half: .api, cause: .httpStatus(500), provider: .openai)
+
+        #expect(plan == UsageAlert(key: "anthropic.subscription.failure", title: "Anthropic plan usage couldn't refresh", body: "Credential expired."))
+        #expect(spend == UsageAlert(key: "openai.api.failure", title: "OpenAI API spend couldn't refresh", body: "Server error 500."))
+    }
 }

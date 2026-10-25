@@ -29,6 +29,11 @@ final class AlertMonitor {
         notifier.requestAuthorization()
     }
 
+    /// Delivers the alert as it is; the caller decides when it is due.
+    func deliver(_ alert: UsageAlert) {
+        notifier.deliver(alert)
+    }
+
     /// Marks the alert's key delivered, and delivers it when `delivers`.
     /// Nothing happens when the key was delivered before.
     func deliverOnce(_ alert: UsageAlert, delivers: Bool) {

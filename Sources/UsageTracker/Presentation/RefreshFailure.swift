@@ -50,6 +50,29 @@ extension RefreshFailure: CustomStringConvertible {
     }
 }
 
+extension RefreshFailure {
+    /// False when there was no response: the connection is down, which is not
+    /// the provider's failure, so it neither alerts nor ends a streak.
+    var alertsAsFailure: Bool {
+        self != .transport
+    }
+
+    /// The cause in a failure alert: a fixed phrase, never a header, body or URL.
+    var alertCause: String {
+        switch self {
+        case .challenge: "blocked by the provider's bot check"
+        case .unauthorized: "credential expired"
+        case let .httpStatus(code): "server error \(code)"
+        case .rateLimited: "rate limited"
+        case .decoding: "unexpected response"
+        case .keychain: "couldn't read Keychain"
+        case .needsOrganization: "choose an organization in Settings"
+        case .unexpected: "unexpected error"
+        case .transport: "network unavailable"
+        }
+    }
+}
+
 /// A half's last failure and when it happened; cleared by the next success.
 struct RecordedFailure: Equatable, Sendable {
     let cause: RefreshFailure

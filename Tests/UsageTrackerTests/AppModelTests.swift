@@ -885,4 +885,90 @@ import Testing
         #expect(model.provider(.cursor).subscription?.status != .ready)
         #expect(notifier.delivered.isEmpty)
     }
+
+    // MARK: Refresh failure alert
+
+    private var failureAlerts: [UsageAlert] {
+        notifier.delivered.filter { $0.key.hasSuffix(".failure") }
+    }
+
+    @Test func aFailingHalfAlertsOncePerStreak() async {
+        configureAll()
+        let model = makeModel()
+        model.setAlertKind(.failures, enabled: true)
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+
+        await model.refreshAll(manual: false)
+        await model.refresh(RefreshTarget(provider: .cursor, half: .subscription), manual: true)
+        await model.refresh(RefreshTarget(provider: .cursor, half: .subscription), manual: true)
+
+        #expect(failureAlerts.map(\.title) == ["Cursor plan usage couldn't refresh"])
+        #expect(failureAlerts.map(\.body) == ["Credential expired."])
+
+        fetchers[.cursor]?.result = .success(makeReport(1))
+        await model.refresh(RefreshTarget(provider: .cursor, half: .subscription), manual: true)
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+        await model.refresh(RefreshTarget(provider: .cursor, half: .subscription), manual: true)
+
+        #expect(failureAlerts.count == 2)
+    }
+
+    @Test func offlineFailuresNeverAlert() async {
+        configureAll()
+        let model = makeModel()
+        model.setAlertKind(.failures, enabled: true)
+        fetchers[.cursor]?.result = .failure(.transport)
+
+        await model.refreshAll(manual: false)
+
+        #expect(failureAlerts.isEmpty)
+    }
+
+    @Test func goingOfflineDoesNotEndAStreak() async {
+        configureAll()
+        let model = makeModel()
+        model.setAlertKind(.failures, enabled: true)
+        let target = RefreshTarget(provider: .cursor, half: .subscription)
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+        await model.refresh(target, manual: true)
+        fetchers[.cursor]?.result = .failure(.transport)
+        await model.refresh(target, manual: true)
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+        await model.refresh(target, manual: true)
+
+        #expect(failureAlerts.count == 1)
+    }
+
+    @Test func theFailuresKindGatesIt() async {
+        configureAll()
+        let model = makeModel()
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+
+        await model.refreshAll(manual: false)
+
+        #expect(failureAlerts.isEmpty)
+    }
+
+    @Test func eachHalfHasItsOwnStreak() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let apiFetcher = StubReportFetcher(result: .failure(.httpStatus(500)))
+        let model = makeModel(apiFetchers: [.anthropic: apiFetcher])
+        model.setAlertKind(.failures, enabled: true)
+        fetchers[.anthropic]?.result = .failure(.unauthorized)
+
+        await model.refreshAll(manual: false)
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .api), manual: true)
+
+        #expect(Set(failureAlerts.map(\.key)) == ["anthropic.subscription.failure", "anthropic.api.failure"])
+        #expect(failureAlerts.count == 2)
+
+        fetchers[.anthropic]?.result = .success(makeReport(2))
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .subscription), manual: true)
+        fetchers[.anthropic]?.result = .failure(.unauthorized)
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .subscription), manual: true)
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .api), manual: true)
+
+        #expect(failureAlerts.count == 3, "only the plan usage half started a new streak")
+    }
 }

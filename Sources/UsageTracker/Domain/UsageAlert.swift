@@ -80,6 +80,22 @@ enum AlertPolicy {
         )
     }
 
+    /// Posted when a half starts failing; the key names the half, and the
+    /// caller de-duplicates per streak.
+    static func failureAlert(displayName: String, half: Half, cause: RefreshFailure, provider: Provider) -> UsageAlert {
+        let text = cause.alertCause
+        let name = switch half {
+        case .subscription: "plan usage"
+        case .api: "API spend"
+        }
+
+        return UsageAlert(
+            key: "\(provider.rawValue).\(half.rawValue).failure",
+            title: "\(displayName) \(name) couldn't refresh",
+            body: text.prefix(1).uppercased() + text.dropFirst() + "."
+        )
+    }
+
     private static func windowMeasure(
         _ window: LimitWindow,
         descriptor: ProviderDescriptor,
