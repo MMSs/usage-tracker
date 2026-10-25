@@ -5,8 +5,7 @@ struct ProviderPopoverView: View {
     @ObservedObject var provider: ProviderViewModel
     @ObservedObject var appModel: AppModel
     @State private var escapeMonitor = EscapeMonitorState()
-    @State private var feedback = RefreshFeedback()
-    @State private var lapseTask: Task<Void, Never>?
+    @StateObject private var refreshButton = RefreshButtonModel()
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -20,7 +19,7 @@ struct ProviderPopoverView: View {
         .onAppear(perform: installEscapeMonitor)
         .onDisappear {
             removeEscapeMonitor()
-            lapseTask?.cancel()
+            refreshButton.panelClosed()
         }
     }
 
@@ -429,27 +428,14 @@ struct ProviderPopoverView: View {
     }
 
     private var refreshPhase: RefreshFeedback.Phase {
-        RefreshFeedback.shown(feedback.displayed(at: Date()), fetching: [provider.subscription, provider.api].contains { $0?.isRefreshing == true })
+        RefreshFeedback.shown(refreshButton.feedback.displayed(at: Date()), fetching: [provider.subscription, provider.api].contains { $0?.isRefreshing == true })
     }
 
     /// Refreshes the provider, showing the spinner and then the result for a moment.
     private func refresh() {
-        guard feedback.begin() else {
-            return
-        }
-
         let id = provider.id
-        lapseTask?.cancel()
-        lapseTask = Task {
-            let succeeded = await appModel.refresh(id, manual: true)
-            feedback.finish(succeeded: succeeded, now: Date())
-            try? await Task.sleep(for: .seconds(RefreshFeedback.resultDuration))
-            guard !Task.isCancelled else {
-                return
-            }
-
-            // Mutates the state the body reads, so the result lapses to idle on screen.
-            feedback.lapse(at: Date())
+        refreshButton.click { [appModel] in
+            await appModel.refresh(id, manual: true)
         }
     }
 
