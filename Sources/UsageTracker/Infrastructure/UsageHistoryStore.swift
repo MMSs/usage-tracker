@@ -2,7 +2,7 @@ import Foundation
 
 protocol UsageHistoryStoring: AnyObject {
     func record(_ report: ProviderReport, provider: Provider, at date: Date)
-    /// The last 24 hours of samples keyed by window id, oldest first.
+    /// The last 8 days of samples keyed by window id, oldest first.
     func samples(provider: Provider, now: Date) -> [String: [UsageSample]]
     func clear(provider: Provider)
 }
@@ -15,8 +15,8 @@ final class UserDefaultsUsageHistoryStore: UsageHistoryStoring {
     }
 
     func record(_ report: ProviderReport, provider: Provider, at date: Date) {
-        // Every stored window is trimmed, so one that left the report ages out.
-        var history = stored(provider: provider).mapValues { Self.trimmed($0, to: date) }
+        // Every stored window is trimmed and thinned, so one that left the report ages out.
+        var history = stored(provider: provider).mapValues { Self.thinned(Self.trimmed($0, to: date), to: date) }
 
         for window in report.windows where window.percentUsed.isFinite {
             let percent = UInt8(clamping: Int(max(min(window.percentUsed, 1_000), -1_000).rounded()))
@@ -29,7 +29,7 @@ final class UserDefaultsUsageHistoryStore: UsageHistoryStoring {
                 samples.removeLast()
             }
             samples.append(sample)
-            history[window.id] = samples
+            history[window.id] = Self.thinned(samples, to: date)
         }
 
         let encoded = history.compactMapValues { $0.isEmpty ? nil : UsageSampleCoding.encode($0) }
@@ -57,7 +57,7 @@ final class UserDefaultsUsageHistoryStore: UsageHistoryStoring {
         return raw.mapValues(UsageSampleCoding.decode)
     }
 
-    /// Samples in `(date - 24 h, date]`: older and future ones are dropped.
+    /// Samples in `(date - 8 d, date]`: older and future ones are dropped.
     private static func trimmed(_ samples: [UsageSample], to date: Date) -> [UsageSample] {
         let oldest = date.addingTimeInterval(-retention)
 
@@ -68,7 +68,27 @@ final class UserDefaultsUsageHistoryStore: UsageHistoryStoring {
         "history.\(provider.rawValue)"
     }
 
-    private static let retention: TimeInterval = 24 * 60 * 60
+    static let retention: TimeInterval = 8 * 86_400
+    static let fineSpan: TimeInterval = 86_400
+
+    /// Samples older than `fineSpan` before `date` keep only the latest of each hour.
+    private static func thinned(_ samples: [UsageSample], to date: Date) -> [UsageSample] {
+        let cutoff = date.addingTimeInterval(-fineSpan)
+        var result: [UsageSample] = []
+
+        for sample in samples {
+            if sample.date < cutoff, let last = result.last, last.date < cutoff, hour(of: last.date) == hour(of: sample.date) {
+                result.removeLast()
+            }
+            result.append(sample)
+        }
+
+        return result
+    }
+
+    private static func hour(of date: Date) -> UInt32 {
+        UInt32(clamping: Int(date.timeIntervalSince1970)) / 3600
+    }
 
     /// The wall-clock minute of the encoded (whole-second) date.
     private static func minute(of date: Date) -> UInt32 {

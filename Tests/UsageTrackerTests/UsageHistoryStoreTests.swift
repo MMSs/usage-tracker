@@ -46,11 +46,11 @@ struct UsageHistoryStoreTests {
         }
     }
 
-    @Test func samplesOlderThanADayAreDroppedOnWrite() {
+    @Test func samplesOlderThanAWeekAreDroppedOnWrite() {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsUsageHistoryStore(defaults: defaults)
-            let later = start.addingTimeInterval(hours(23))
-            let latest = start.addingTimeInterval(hours(25))
+            let later = start.addingTimeInterval(hours(24 * 7))
+            let latest = start.addingTimeInterval(hours(24 * 8 + 1) + 1)
 
             store.record(report([("session", 10)]), provider: .anthropic, at: start)
             store.record(report([("session", 20)]), provider: .anthropic, at: later)
@@ -63,10 +63,73 @@ struct UsageHistoryStoreTests {
         }
     }
 
+    @Test func aWeekOfSamplesIsKept() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsUsageHistoryStore(defaults: defaults)
+            let week = start.addingTimeInterval(hours(24 * 7))
+            let past = start.addingTimeInterval(hours(24 * 8) + 1)
+
+            store.record(report([("session", 10)]), provider: .anthropic, at: start)
+            store.record(report([("session", 20)]), provider: .anthropic, at: week)
+
+            #expect(store.samples(provider: .anthropic, now: week)["session"] == [
+                UsageSample(date: start, percent: 10),
+                UsageSample(date: week, percent: 20),
+            ])
+
+            store.record(report([("session", 30)]), provider: .anthropic, at: past)
+
+            #expect(store.samples(provider: .anthropic, now: past)["session"] == [
+                UsageSample(date: week, percent: 20),
+                UsageSample(date: past, percent: 30),
+            ])
+        }
+    }
+
+    @Test func samplesOlderThanADayThinToOnePerHour() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsUsageHistoryStore(defaults: defaults)
+            let now = start.addingTimeInterval(hours(26))
+
+            for minute in 0...(26 * 60) {
+                store.record(
+                    report([("session", Double(minute % 100))]),
+                    provider: .anthropic,
+                    at: start.addingTimeInterval(Double(minute) * 60)
+                )
+            }
+
+            let samples = store.samples(provider: .anthropic, now: now)["session"] ?? []
+            let thinned = samples.filter { $0.date < now.addingTimeInterval(-hours(24)) }
+            let recent = samples.filter { $0.date >= now.addingTimeInterval(-hours(24)) }
+
+            #expect(thinned == [59, 119].map {
+                UsageSample(date: start.addingTimeInterval(Double($0) * 60), percent: UInt8($0 % 100))
+            })
+            #expect(recent.count == 24 * 60 + 1)
+            #expect(zip(recent, recent.dropFirst()).allSatisfy { $1.date.timeIntervalSince($0.date) == 60 })
+        }
+    }
+
+    @Test func thinningKeepsTimeOrder() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsUsageHistoryStore(defaults: defaults)
+            let now = start.addingTimeInterval(hours(26))
+
+            for minute in 0...(26 * 60) {
+                store.record(report([("session", 1)]), provider: .anthropic, at: start.addingTimeInterval(Double(minute) * 60))
+            }
+
+            let dates = (store.samples(provider: .anthropic, now: now)["session"] ?? []).map(\.date)
+            #expect(dates.count > 2)
+            #expect(zip(dates, dates.dropFirst()).allSatisfy { $0 < $1 })
+        }
+    }
+
     @Test func aWindowMissingFromTheReportAgesOut() {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsUsageHistoryStore(defaults: defaults)
-            let later = start.addingTimeInterval(hours(25))
+            let later = start.addingTimeInterval(hours(24 * 9))
 
             store.record(report([("session", 10), ("opus", 5)]), provider: .anthropic, at: start)
             store.record(report([("session", 20)]), provider: .anthropic, at: later)
@@ -148,11 +211,11 @@ struct UsageHistoryStoreTests {
         }
     }
 
-    @Test func samplesReadsOnlyTheLastDay() {
+    @Test func samplesReadsOnlyTheLastWeek() {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsUsageHistoryStore(defaults: defaults)
             let recent = start.addingTimeInterval(hours(2))
-            let now = start.addingTimeInterval(hours(25))
+            let now = start.addingTimeInterval(hours(24 * 8 + 1))
 
             store.record(report([("session", 10)]), provider: .anthropic, at: start)
             store.record(report([("session", 20)]), provider: .anthropic, at: recent)
@@ -160,7 +223,7 @@ struct UsageHistoryStoreTests {
             #expect(store.samples(provider: .anthropic, now: now) == [
                 "session": [UsageSample(date: recent, percent: 20)],
             ])
-            #expect(store.samples(provider: .anthropic, now: start.addingTimeInterval(hours(27))).isEmpty)
+            #expect(store.samples(provider: .anthropic, now: start.addingTimeInterval(hours(24 * 8 + 3))).isEmpty)
         }
     }
 
