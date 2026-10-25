@@ -111,6 +111,17 @@ struct OpenAIReportMapperTests {
         #expect(report.windows.map(\.resetsAt) == [resetAt])
     }
 
+    /// The server's time left says running; a missing or past `reset_at`
+    /// must not read the window as closed.
+    @Test(arguments: [nil, Date(timeIntervalSince1970: 1_792_800_000 - 60)])
+    func aRunningWindowWithoutAFutureResetEndsWhenTheServerSays(resetAt: Date?) {
+        let running = Window(usedPercent: 0, windowSeconds: 18000, resetAt: resetAt, resetAfterSeconds: 7000)
+        let report = map(usage(primary: running))
+
+        #expect(report.windows.map(\.resetsAt) == [now.addingTimeInterval(7000)])
+        #expect(report.windows.map(\.isOpen) == [true])
+    }
+
     @Test func aSessionStartedAMinuteAgoIsRunning() {
         let resetAt = now.addingTimeInterval(18000 - 61)
         let report = map(usage(primary: window(18000, percent: 0, resetAt: resetAt)))

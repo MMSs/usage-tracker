@@ -102,18 +102,24 @@ enum OpenAIReportMapper {
     }
 
     /// The server's time left decides when it sends one: a whole window left
-    /// is not started, whatever the local clock says. Without it, the reset
-    /// has to sit clear of a whole window away.
+    /// is not started, whatever the local clock says, and less than that is
+    /// running even when `reset_at` is missing or behind the local clock (the
+    /// reset is then the time left from now). Without it, the reset has to
+    /// sit clear of a whole window away.
     private static func resetsAt(of window: OpenAIUsageResponse.Window, seconds: Int, now: Date) -> Date? {
         guard let remaining = window.resetAfterSeconds else {
             return LimitWindow.runningReset(window.resetAt, windowLength: TimeInterval(seconds), now: now)
         }
 
-        guard remaining < seconds, let resetAt = window.resetAt, resetAt > now else {
+        guard remaining < seconds else {
             return nil
         }
 
-        return resetAt
+        if let resetAt = window.resetAt, resetAt > now {
+            return resetAt
+        }
+
+        return remaining > 0 ? now.addingTimeInterval(TimeInterval(remaining)) : nil
     }
 
     /// `id`, or `id:2`, `id:3`... when it is already taken.
