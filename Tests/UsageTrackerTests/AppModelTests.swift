@@ -329,6 +329,30 @@ import Testing
         #expect(fetchers[.anthropic]?.callCount == 0)
     }
 
+    @Test func aHalfHiddenFromTheMenuBarIsStillScheduledAndFetched() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let apiFetcher = StubReportFetcher(result: .success(makeReport(2)))
+        let model = makeModel(apiFetchers: [.anthropic: apiFetcher])
+        var settings = ProviderSettings(subscriptionRefreshInterval: .thirtySeconds, apiRefreshInterval: .oneHour)
+        settings.setShowsInMenuBar(false, for: .api)
+        model.setSettings(settings, for: .anthropic)
+
+        model.start()
+        await sleeper.waitForSleepCount(3)
+        await settle()
+
+        #expect(sleeper.durations.contains(.seconds(3600)))
+
+        await model.refresh(RefreshTarget(provider: .anthropic, half: .api), manual: false)
+
+        #expect(apiFetcher.callCount >= 1)
+        #expect(model.menuBarHalves(for: .anthropic) == MenuBarHalves(subscription: true, api: false))
+
+        model.scheduler.stop()
+        sleeper.resume()
+    }
+
     @Test func aSwitchedOffHalfHasNoSchedule() async {
         configureAll()
         credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"

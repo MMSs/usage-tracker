@@ -383,15 +383,6 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(shown.provider == item.provider)
     }
 
-    @Test func aHiddenHalfIsStillListedInThePopover() throws {
-        // The popover lists what the builder returns; hiding only filters a copy.
-        let item = try bothHalves()
-        _ = item.visible(in: MenuBarAppearance(), halves: MenuBarHalves(subscription: false, api: false))
-
-        #expect(item == (try bothHalves()))
-        #expect(item.subscription != nil && item.api != nil)
-    }
-
     @Test func allHalvesShowEverything() throws {
         let item = try bothHalves()
 

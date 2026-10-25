@@ -137,8 +137,44 @@ import Testing
 
             #expect(store.settings(for: .anthropic).showsSubscriptionInMenuBar == false)
             #expect(store.settings(for: .anthropic).showsAPIInMenuBar == true)
+            // Cursor has no API half, so the switch never hid anything there.
+            #expect(store.settings(for: .cursor).showsSubscriptionInMenuBar == true)
             // A provider with no record at all falls back the same way.
-            #expect(store.settings(for: .cursor).showsSubscriptionInMenuBar == false)
+            #expect(store.settings(for: .openai).showsSubscriptionInMenuBar == false)
+        }
+    }
+
+    @Test func aLegacyHiddenOnlyHalfStaysShown() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+
+            #expect(UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .cursor).showsSubscriptionInMenuBar)
+        }
+    }
+
+    @Test func aLegacyHiddenHalfWithItsOtherHalfOffStaysShown() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+            defaults.set(Data(#"{"isAPIEnabled":false}"#.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic))
+            let off = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic)
+
+            #expect(off.showsSubscriptionInMenuBar)
+
+            defaults.set(Data(#"{"isAPIEnabled":true}"#.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic))
+            #expect(!UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic).showsSubscriptionInMenuBar)
+        }
+    }
+
+    @Test func anOverrideWithoutTheOldKeysShowsBoth() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showAPISpendKey)
+            let json = #"{"appearanceOverride":{"showText":true}}"#
+            defaults.set(Data(json.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic))
+
+            let settings = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic)
+
+            #expect(settings.showsSubscriptionInMenuBar && settings.showsAPIInMenuBar)
         }
     }
 

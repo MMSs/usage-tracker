@@ -16,17 +16,6 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     /// Whether the half is drawn in the menu bar item. A hidden half is still fetched, alerts and shows in the panel.
     var showsSubscriptionInMenuBar = true
     var showsAPIInMenuBar = true
-    /// Halves a record had no value for, neither of its own nor in its override;
-    /// the store fills them from the old global switches. Never encoded, never compared.
-    var unresolvedMenuBarHalves = UnresolvedMenuBarHalves()
-
-    struct UnresolvedMenuBarHalves: Equatable, Sendable {
-        var subscription = false
-        var api = false
-
-        static func == (lhs: Self, rhs: Self) -> Bool { true }
-    }
-
     static let `default` = ProviderSettings()
 
     init(
@@ -119,14 +108,29 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         autoStartSessions = try container.decodeIfPresent(Bool.self, forKey: .autoStartSessions) ?? false
 
         // The new key, then the old switch inside the override; a record with neither is left for the store.
-        let legacy = try? container.nestedContainer(keyedBy: LegacyAppearanceKeys.self, forKey: .appearanceOverride)
-        let subscriptionSwitch = try container.decodeIfPresent(Bool.self, forKey: .showsSubscriptionInMenuBar)
-            ?? legacy.flatMap { try? $0.decodeIfPresent(Bool.self, forKey: .showPlanUsage) }
-        let apiSwitch = try container.decodeIfPresent(Bool.self, forKey: .showsAPIInMenuBar)
-            ?? legacy.flatMap { try? $0.decodeIfPresent(Bool.self, forKey: .showAPISpend) }
-        showsSubscriptionInMenuBar = subscriptionSwitch ?? true
-        showsAPIInMenuBar = apiSwitch ?? true
-        unresolvedMenuBarHalves = UnresolvedMenuBarHalves(subscription: subscriptionSwitch == nil, api: apiSwitch == nil)
+        let legacy = decoder.userInfo[Self.legacyHalvesKey] as? LegacyHalves ?? LegacyHalves()
+        let override = try? container.nestedContainer(keyedBy: LegacyAppearanceKeys.self, forKey: .appearanceOverride)
+        // A record with an override took its switches from the override alone; one without, from the global ones.
+        let oldSubscription = override.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showPlanUsage)) ?? true }
+            ?? legacy.globalSubscription
+        let oldAPI = override.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showAPISpend)) ?? true }
+            ?? legacy.globalAPI
+        // The old item drew a hidden half when it was the only one it had, so a switch only counts beside a shown other half.
+        showsSubscriptionInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showsSubscriptionInMenuBar)
+            ?? (oldSubscription || !(legacy.hasAPI && isAPIEnabled))
+        showsAPIInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showsAPIInMenuBar)
+            ?? (oldAPI || !(legacy.hasSubscription && isSubscriptionEnabled))
+    }
+
+    /// The `JSONDecoder.userInfo` key under which the store hands `init(from:)` what the old build kept elsewhere.
+    static let legacyHalvesKey = CodingUserInfoKey(rawValue: "legacyMenuBarHalves")!
+
+    /// The old global half switches and the halves the provider has, for migrating records without the new keys.
+    struct LegacyHalves {
+        var globalSubscription = true
+        var globalAPI = true
+        var hasSubscription = true
+        var hasAPI = true
     }
 
     func encode(to encoder: Encoder) throws {

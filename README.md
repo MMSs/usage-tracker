@@ -140,9 +140,9 @@ open closes.
 - Each provider tab: an Enabled switch (off removes the item and stops
   fetching, credentials stay) and, on each half's tab, a Show in menu bar
   switch (off hides that half from the item; it is still fetched, alerts and
-  shows in the panel; with both off the item is the logo) and its own refresh interval
-  on a slider from 30 seconds to 1 hour (default 5 minutes). The Options tab can
-  give the provider its own appearance in place of the defaults.
+  shows in the panel; with both off the item is the logo) and its own refresh
+  interval on a slider from 30 seconds to 1 hour (default 5 minutes). The
+  Options tab can give the provider its own appearance in place of the defaults.
   Refreshing pauses while the Mac is asleep or offline and resumes when both
   are back.
 - The provider tab's Options tab (called Menu bar before) holds that

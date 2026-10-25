@@ -490,6 +490,7 @@ struct ProviderSettingsView: View {
             ) {
                 SettingsRow(label: "Show in menu bar", isLast: true) {
                     SwitchToggle(isOn: showsInMenuBar(half))
+                        .disabled(!settings.wrappedValue.isEnabled(half))
                 }
             }
         case ("Refresh", let half?):

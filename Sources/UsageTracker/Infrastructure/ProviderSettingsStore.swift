@@ -18,25 +18,21 @@ final class UserDefaultsProviderSettingsStore: ProviderSettingsStoring {
     }
 
     func settings(for provider: Provider) -> ProviderSettings {
-        var settings = ProviderSettings.default
-        var unresolved = ProviderSettings.UnresolvedMenuBarHalves(subscription: true, api: true)
+        let capabilities = ProviderRegistry.descriptor(for: provider).capabilities
+        let decoder = JSONDecoder()
+        decoder.userInfo[ProviderSettings.legacyHalvesKey] = ProviderSettings.LegacyHalves(
+            globalSubscription: legacyGlobalSwitch(UserDefaultsMenuBarAppearanceStore.showPlanUsageKey),
+            globalAPI: legacyGlobalSwitch(UserDefaultsMenuBarAppearanceStore.showAPISpendKey),
+            hasSubscription: capabilities.hasSubscription,
+            hasAPI: capabilities.hasAPISpend
+        )
 
-        if let data = defaults.data(forKey: Self.key(for: provider)),
-           let decoded = try? JSONDecoder().decode(ProviderSettings.self, from: data) {
-            settings = decoded
-            unresolved = decoded.unresolvedMenuBarHalves
-        }
-
-        // A half the record has no value for takes the old global switch, else stays on.
-        if unresolved.subscription {
-            settings.showsSubscriptionInMenuBar = legacyGlobalSwitch(UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
-        }
-
-        if unresolved.api {
-            settings.showsAPIInMenuBar = legacyGlobalSwitch(UserDefaultsMenuBarAppearanceStore.showAPISpendKey)
-        }
-
-        return settings
+        // No record migrates like an empty one, so it picks up the old global switches too.
+        let empty = Data("{}".utf8)
+        let data = defaults.data(forKey: Self.key(for: provider)) ?? empty
+        return (try? decoder.decode(ProviderSettings.self, from: data))
+            ?? (try? decoder.decode(ProviderSettings.self, from: empty))
+            ?? .default
     }
 
     private func legacyGlobalSwitch(_ key: String) -> Bool {
