@@ -27,6 +27,12 @@ struct AnthropicSubscriptionReportServiceTests {
             }
             return snapshot
         }
+
+        private(set) var started: [(sessionKey: String, organizationID: String?, model: String)] = []
+
+        func startSession(sessionKey: String, organizationID: String?, model: String) async throws {
+            started.append((sessionKey, organizationID, model))
+        }
     }
 
     private let snapshot = AnthropicSubscriptionSnapshot(
@@ -44,7 +50,7 @@ struct AnthropicSubscriptionReportServiceTests {
     private let selections = MemoryOrganizationSelectionStore()
 
     private func makeService(_ fetcher: StubFetcher) -> AnthropicSubscriptionReportService {
-        AnthropicSubscriptionReportService(service: fetcher, selectionStore: selections)
+        AnthropicSubscriptionReportService(service: fetcher, selectionStore: selections, models: StubSessionModelStore())
     }
 
     private static let listed: [AnthropicOrganizationsResponse.Organization] = [
@@ -83,6 +89,29 @@ struct AnthropicSubscriptionReportServiceTests {
 
         #expect(service.selectedOrganizationID == "org-b")
         #expect(fetcher.organizationIDs == ["org-b"])
+    }
+
+    @Test func startUsesTheChosenOrganization() async throws {
+        let fetcher = StubFetcher(snapshot: snapshot)
+        selections.selections[.anthropic] = "org-b"
+        let service = makeService(fetcher)
+
+        try await service.startSession(credentials: ["session-key": "k"])
+
+        #expect(fetcher.started.count == 1)
+        #expect(fetcher.started.first?.sessionKey == "k")
+        #expect(fetcher.started.first?.organizationID == "org-b")
+        #expect(fetcher.started.first?.model == "test-model")
+    }
+
+    @Test func startWithoutASessionKeyIsUnauthorized() async {
+        let fetcher = StubFetcher(snapshot: snapshot)
+        let service = makeService(fetcher)
+
+        await #expect(throws: FetchError.unauthorized) {
+            try await service.startSession(credentials: [:])
+        }
+        #expect(fetcher.started.isEmpty)
     }
 
     @Test func organizationsListedForTheKeyAreKnownEvenWhenAChoiceIsNeeded() async {

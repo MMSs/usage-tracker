@@ -240,14 +240,19 @@ final class AppModel: ObservableObject {
     private static func fetchers(
         for provider: Provider,
         organizationStore: OrganizationSelectionStoring,
-        credentialStore: CredentialStoring
+        credentialStore: CredentialStoring,
+        models: SessionModelStoring
     ) -> (subscription: ReportFetching?, api: ReportFetching?) {
         switch provider {
         case .cursor:
             (CursorReportService(service: CursorUsageService()), nil)
         case .anthropic:
             (
-                AnthropicSubscriptionReportService(service: AnthropicUsageService(), selectionStore: organizationStore),
+                AnthropicSubscriptionReportService(
+                    service: AnthropicUsageService(),
+                    selectionStore: organizationStore,
+                    models: models
+                ),
                 AnthropicAPIReportService(service: AnthropicCostService())
             )
         case .openai:
@@ -271,11 +276,14 @@ final class AppModel: ObservableObject {
         // Read and written only by the organization-scoped fetchers.
         let organizationStore = UserDefaultsOrganizationSelectionStore()
 
+        let models = UserDefaultsSessionModelStore()
+
         let providers = ProviderRegistry.all.map { descriptor in
             let fetchers = fetchers(
                 for: descriptor.id,
                 organizationStore: organizationStore,
-                credentialStore: credentialStore
+                credentialStore: credentialStore,
+                models: models
             )
             return ProviderViewModel(
                 descriptor: descriptor,

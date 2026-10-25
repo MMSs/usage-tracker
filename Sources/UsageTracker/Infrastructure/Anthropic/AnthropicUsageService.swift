@@ -9,6 +9,10 @@ protocol AnthropicUsageFetching {
     /// whatever it is; with several, one of them must be chosen, or this
     /// throws `FetchError.needsOrganizationChoice` without fetching usage.
     func fetchSubscription(sessionKey: String, organizationID: String?) async throws -> AnthropicSubscriptionSnapshot
+    /// Opens the 5-hour session by creating a conversation, sending one
+    /// message and deleting it again. Resolves the organization like
+    /// `fetchSubscription` does.
+    func startSession(sessionKey: String, organizationID: String?, model: String) async throws
 }
 
 final class AnthropicUsageService: AnthropicUsageFetching {
@@ -70,6 +74,57 @@ final class AnthropicUsageService: AnthropicUsageFetching {
             spendLimit: spendLimit,
             creditGrant: creditGrant
         )
+    }
+
+    func startSession(sessionKey: String, organizationID: String?, model: String) async throws {
+        let organization = try await resolveOrganization(sessionKey: sessionKey, organizationID: organizationID)
+        let conversations = "organizations/\(organization.uuid)/chat_conversations"
+        let conversation = UUID().uuidString.lowercased()
+
+        _ = try await send(sessionRequest(
+            path: conversations,
+            method: "POST",
+            sessionKey: sessionKey,
+            body: ["uuid": conversation, "name": ""]
+        ))
+
+        // Whatever happens to the message, the empty chat must not stay behind.
+        do {
+            try await sendPing(path: "\(conversations)/\(conversation)/completion", sessionKey: sessionKey, model: model)
+        } catch {
+            await deleteConversation(path: "\(conversations)/\(conversation)", sessionKey: sessionKey)
+            throw error
+        }
+        await deleteConversation(path: "\(conversations)/\(conversation)", sessionKey: sessionKey)
+    }
+
+    /// Retries once without the model on a 400 or 404, which is how the
+    /// web endpoint answers a model the plan does not offer.
+    private func sendPing(path: String, sessionKey: String, model: String) async throws {
+        func completion(model: String?) -> URLRequest {
+            var body = ["prompt": "ping", "timezone": TimeZone.current.identifier]
+            body["model"] = model
+
+            return sessionRequest(path: path, method: "POST", sessionKey: sessionKey, body: body, accept: "text/event-stream")
+        }
+
+        do {
+            _ = try await send(completion(model: model))
+        } catch FetchError.httpStatus(let code) where code == 400 || code == 404 {
+            Log.http.info("completion refused the model with http \(code, privacy: .public); retrying without it")
+            _ = try await send(completion(model: nil))
+        }
+    }
+
+    /// A failure only leaves an empty chat behind, so it never fails the start.
+    private func deleteConversation(path: String, sessionKey: String) async {
+        do {
+            _ = try await send(sessionRequest(path: path, method: "DELETE", sessionKey: sessionKey, body: nil))
+        } catch let FetchError.httpStatus(code) {
+            Log.http.notice("DELETE conversation failed: http \(code, privacy: .public)")
+        } catch {
+            Log.http.notice("DELETE conversation failed")
+        }
     }
 
     private static func isStaleOrganization(_ error: FetchError) -> Bool {
@@ -164,6 +219,26 @@ final class AnthropicUsageService: AnthropicUsageFetching {
         request.setValue("https://claude.ai", forHTTPHeaderField: "Referer")
         request.setValue("https://claude.ai", forHTTPHeaderField: "Origin")
         request.setValue(Self.userAgent, forHTTPHeaderField: "User-Agent")
+
+        return request
+    }
+
+    /// A state-changing request: the GET headers plus the ones the web app sends.
+    private func sessionRequest(
+        path: String,
+        method: String,
+        sessionKey: String,
+        body: [String: String]?,
+        accept: String = "application/json"
+    ) -> URLRequest {
+        var request = request(path: path, sessionKey: sessionKey)
+        request.httpMethod = method
+        request.setValue(accept, forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("https://claude.ai/new", forHTTPHeaderField: "Referer")
+        if let body {
+            request.httpBody = try? JSONSerialization.data(withJSONObject: body, options: [.sortedKeys])
+        }
 
         return request
     }

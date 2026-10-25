@@ -264,6 +264,120 @@ struct AnthropicUsageServiceTests {
         #expect(snapshot.planName == "Max 20x")
     }
 
+    // MARK: Starting a session
+
+    private func startRoutes(
+        completion: [RecordingHTTPClient.Response] = [.ok(json: "")],
+        delete: RecordingHTTPClient.Response = .status(204)
+    ) throws -> RoutingHTTPClient {
+        RoutingHTTPClient(sequences: [
+            "/organizations": [.ok(json: try fixture("anthropic-organizations"))],
+            "/chat_conversations": [.status(201)],
+            "/completion": completion,
+            // The conversation id is random, so only the catch-all can match the DELETE.
+            "": [delete],
+        ])
+    }
+
+    private func body(_ request: URLRequest) throws -> [String: String] {
+        let data = try #require(request.httpBody)
+
+        return try #require(JSONSerialization.jsonObject(with: data) as? [String: String])
+    }
+
+    private func startRequests(_ client: RoutingHTTPClient) -> [URLRequest] {
+        client.requests.filter { $0.httpMethod != "GET" }
+    }
+
+    @Test func startingASessionCreatesSendsAndDeletesAConversation() async throws {
+        let client = try startRoutes()
+        let service = AnthropicUsageService(client: client)
+
+        try await service.startSession(sessionKey: "sk-test", organizationID: nil, model: "test-model")
+
+        let requests = startRequests(client)
+        #expect(requests.map(\.httpMethod) == ["POST", "POST", "DELETE"])
+        let org = "3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14"
+        let base = "https://claude.ai/api/organizations/\(org)/chat_conversations"
+
+        let create = try body(requests[0])
+        let conversation = try #require(create["uuid"])
+        #expect(conversation == conversation.lowercased())
+        #expect(UUID(uuidString: conversation) != nil)
+        #expect(create == ["uuid": conversation, "name": ""])
+        #expect(requests[0].url?.absoluteString == base)
+        #expect(requests[1].url?.absoluteString == "\(base)/\(conversation)/completion")
+        #expect(requests[2].url?.absoluteString == "\(base)/\(conversation)")
+        #expect(try body(requests[1]) == [
+            "prompt": "ping", "model": "test-model", "timezone": TimeZone.current.identifier,
+        ])
+        #expect(requests[2].httpBody == nil)
+
+        for request in requests {
+            #expect(request.value(forHTTPHeaderField: "Cookie") == "sessionKey=sk-test")
+            #expect(request.value(forHTTPHeaderField: "Content-Type") == "application/json")
+            #expect(request.value(forHTTPHeaderField: "Origin") == "https://claude.ai")
+            #expect(request.value(forHTTPHeaderField: "Referer") == "https://claude.ai/new")
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == Self.safariUserAgent)
+            #expect(request.value(forHTTPHeaderField: "anthropic-version") == nil)
+        }
+        #expect(requests[1].value(forHTTPHeaderField: "Accept") == "text/event-stream")
+    }
+
+    @Test func aFailedDeleteStillCountsAsStarted() async throws {
+        let client = try startRoutes(delete: .status(500))
+        let service = AnthropicUsageService(client: client)
+
+        try await service.startSession(sessionKey: "k", organizationID: nil, model: "test-model")
+
+        #expect(startRequests(client).map(\.httpMethod) == ["POST", "POST", "DELETE"])
+    }
+
+    @Test func aFailedCompletionThrowsAndStillDeletes() async throws {
+        let client = try startRoutes(completion: [.status(403, headers: ["Content-Type": "application/json"])])
+        let service = AnthropicUsageService(client: client)
+
+        await #expect(throws: FetchError.unauthorized) {
+            try await service.startSession(sessionKey: "k", organizationID: nil, model: "test-model")
+        }
+
+        #expect(startRequests(client).map(\.httpMethod) == ["POST", "POST", "DELETE"])
+    }
+
+    @Test(arguments: [400, 404])
+    func aRefusedModelRetriesOnceWithoutIt(status: Int) async throws {
+        let client = try startRoutes(completion: [.status(status), .ok(json: "")])
+        let service = AnthropicUsageService(client: client)
+
+        try await service.startSession(sessionKey: "k", organizationID: nil, model: "test-model")
+
+        let completions = client.requests.filter { $0.url!.path.hasSuffix("/completion") }
+        #expect(completions.count == 2)
+        #expect(try body(completions[0])["model"] == "test-model")
+        #expect(try body(completions[1])["model"] == nil)
+        #expect(try body(completions[1])["prompt"] == "ping")
+        #expect(startRequests(client).last?.httpMethod == "DELETE")
+    }
+
+    @Test func aRefusedRetryThrowsItsError() async throws {
+        let client = try startRoutes(completion: [.status(400), .status(500)])
+        let service = AnthropicUsageService(client: client)
+
+        await #expect(throws: FetchError.httpStatus(500)) {
+            try await service.startSession(sessionKey: "k", organizationID: nil, model: "test-model")
+        }
+    }
+
+    @Test func severalOrganizationsAndNoChoiceThrowsNeedsOrganization() async throws {
+        var routes = try routes()
+        routes["/organizations"] = .ok(json: Self.twoOrganizations)
+        let service = AnthropicUsageService(client: RoutingHTTPClient(routes: routes))
+
+        await #expect(throws: FetchError.needsOrganizationChoice) {
+            try await service.startSession(sessionKey: "k", organizationID: nil, model: "test-model")
+        }
+    }
+
     @Test func severalOrganizationsAndNoChoiceNeedAChoiceWithoutFetchingUsage() async throws {
         var routes = try routes()
         routes["/organizations"] = .ok(json: Self.twoOrganizations)
