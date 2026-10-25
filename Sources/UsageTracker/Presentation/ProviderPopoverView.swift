@@ -146,9 +146,10 @@ struct ProviderPopoverView: View {
         return sectionShell(label: label, half: half, display: display, now: now) {
             if let report {
                 let pacing = report.spend.flatMap { PacingCalculator.make($0, today: now) }
+                let history = provider.usageHistory(now: now)
 
                 ForEach(report.topLevelWindows) { window in
-                    limitRow(window, in: report, pacing: pacing, now: now)
+                    limitRow(window, in: report, pacing: pacing, history: history[window.id] ?? [], now: now)
                     ForEach(report.children(of: window.id)) { child in
                         let money = report.extra(for: child.id)
                         let childPacing = PopoverPresentation.rowPacing(window: child, now: now)
@@ -174,19 +175,19 @@ struct ProviderPopoverView: View {
                     extraRow(extra)
                 }
 
+                // An unlimited cycle has no window row to carry its bars.
+                if provider.descriptor.capabilities.hasCycle,
+                   !report.topLevelWindows.contains(where: { $0.id == provider.descriptor.longWindowID }),
+                   let spend = report.spend, let bars = cycleBars(spend, now: now) {
+                    ChartedBarBlock(chartHeight: Self.barsHeight, floor: nil) {
+                        DailyBarsChart(bars: bars, showsPaceLine: false, dayLabels: false, unit: spend.unit)
+                    }
+                }
+
                 sessionControls(half)
 
-                if let spend = report.spend {
-                    if let pacing {
-                        PacingView(pacing: pacing, unit: spend.unit, periodEnd: spend.period.end)
-                    }
-
-                    if provider.descriptor.capabilities.hasDailyChart, !spend.daily.isEmpty {
-                        DailySpendChartView(
-                            title: "Daily spend · this cycle", subtitleRow: nil,
-                            days: spend.daily, period: spend.period, today: now, unit: spend.unit
-                        )
-                    }
+                if let spend = report.spend, let pacing {
+                    PacingView(pacing: pacing, unit: spend.unit, periodEnd: spend.period.end)
                 }
             }
         }
@@ -220,7 +221,19 @@ struct ProviderPopoverView: View {
         }
     }
 
-    private func limitRow(_ window: LimitWindow, in report: ProviderReport, pacing: Pacing?, now: Date) -> some View {
+    private static let sessionHeight: CGFloat = 26
+    private static let barsHeight: CGFloat = 30
+
+    /// A window row's chart, as data, so the row knows whether it has one.
+    private enum RowChart {
+        case session([[CGPoint]])
+        case bars([DayBar], showsPaceLine: Bool, dayLabels: Bool, unit: BudgetUnit?)
+    }
+
+    @ViewBuilder
+    private func limitRow(
+        _ window: LimitWindow, in report: ProviderReport, pacing: Pacing?, history: [UsageSample], now: Date
+    ) -> some View {
         let isLong = window.id == provider.descriptor.longWindowID
         let isPaced = pacing != nil && isLong
         let money = report.extra(for: window.id)
@@ -229,20 +242,72 @@ struct ProviderPopoverView: View {
             ? pacing.map(PopoverPresentation.daysLeftText)
             : nil
         let timed = PopoverPresentation.rowPacing(window: window, now: now)
-
-        return LimitRowView(
-            label: window.label,
-            text: PopoverPresentation.rowText(
-                window: window,
-                money: money,
-                resetText: resetText(for: window, now: now),
-                daysLeft: daysLeft
-            ),
-            fraction: PopoverPresentation.rowFraction(window: window, money: money),
-            indented: false,
-            tick: isPaced ? pacing?.tickFraction : timed.tick,
-            tint: isPaced ? PacingTint.forPacing(pacing) : timed.tint
+        let text = PopoverPresentation.rowText(
+            window: window,
+            money: money,
+            resetText: resetText(for: window, now: now),
+            daysLeft: daysLeft
         )
+        let fraction = PopoverPresentation.rowFraction(window: window, money: money)
+        let tick = isPaced ? pacing?.tickFraction : timed.tick
+        let tint = isPaced ? PacingTint.forPacing(pacing) : timed.tint
+
+        if let chart = rowChart(for: window, in: report, history: history, now: now) {
+            VStack(alignment: .leading, spacing: 4) {
+                LimitRowLine(label: window.label, text: text, indented: false)
+                chartBlock(chart, floor: fraction.map { ChartFloor(fraction: $0, tint: tint, tick: tick) }, tint: tint)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(window.label)
+            .accessibilityValue(text)
+        } else {
+            LimitRowView(label: window.label, text: text, fraction: fraction, indented: false, tick: tick, tint: tint)
+        }
+    }
+
+    /// Nil, for a plain row, until there is something to draw.
+    private func rowChart(for window: LimitWindow, in report: ProviderReport, history: [UsageSample], now: Date) -> RowChart? {
+        switch PopoverPresentation.chartKind(for: window, descriptor: provider.descriptor) {
+        case .sessionLine:
+            let gap = UsageChartLayout.sessionGap(interval: appModel.settings(for: provider.id).refreshInterval)
+            let segments = UsageChartLayout.sessionSegments(
+                samples: history, now: now, gap: gap, size: CGSize(width: 1, height: 1)
+            )
+            return segments.isEmpty ? nil : .session(segments)
+        case .weekBars:
+            return PopoverPresentation.weekBars(samples: history, window: window, now: now)
+                .map { .bars($0, showsPaceLine: true, dayLabels: true, unit: nil) }
+        case .cycleBars:
+            guard let spend = report.spend, let bars = cycleBars(spend, now: now) else {
+                return nil
+            }
+            return .bars(bars, showsPaceLine: spend.limit != nil, dayLabels: false, unit: spend.unit)
+        case nil:
+            return nil
+        }
+    }
+
+    @ViewBuilder
+    private func chartBlock(_ chart: RowChart, floor: ChartFloor?, tint: PacingTint) -> some View {
+        switch chart {
+        case let .session(segments):
+            ChartedBarBlock(chartHeight: Self.sessionHeight, floor: floor) {
+                SessionHistoryChart(segments: segments, tint: tint)
+            }
+        case let .bars(bars, showsPaceLine, dayLabels, unit):
+            ChartedBarBlock(chartHeight: Self.barsHeight, floor: floor) {
+                DailyBarsChart(bars: bars, showsPaceLine: showsPaceLine, dayLabels: dayLabels, unit: unit)
+            }
+        }
+    }
+
+    /// The cycle's daily spend against its limit; nil without a daily series.
+    private func cycleBars(_ spend: SpendPeriod, now: Date) -> [DayBar]? {
+        guard provider.descriptor.capabilities.hasDailyChart, !spend.daily.isEmpty else {
+            return nil
+        }
+
+        return PopoverPresentation.spendBars(spend, limit: spend.limit, today: now)
     }
 
     /// The session reads as a bare time; every other window names its day.
@@ -284,6 +349,12 @@ struct ProviderPopoverView: View {
             if let spend {
                 let spent = BudgetUnit.dollars.format(spend.spent)
                 let pacing = budget.flatMap { PacingCalculator.make(spend, budgetOverride: $0, today: now) }
+                let floor = budget.map { budget in
+                    ChartFloor(
+                        fraction: NSDecimalNumber(decimal: spend.spent / budget).doubleValue,
+                        tint: PacingTint.forPacing(pacing), tick: pacing?.tickFraction
+                    )
+                }
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
@@ -293,24 +364,21 @@ struct ProviderPopoverView: View {
                             .font(.callout.monospacedDigit())
                     }
 
-                    if let budget, budget > 0 {
-                        UsageBar(
-                            fraction: NSDecimalNumber(decimal: spend.spent / budget).doubleValue,
-                            tint: PacingTint.forPacing(pacing), height: 5, tick: pacing?.tickFraction
-                        )
+                    if provider.descriptor.capabilities.hasDailyChart, !spend.daily.isEmpty {
+                        ChartedBarBlock(chartHeight: Self.barsHeight, floor: floor) {
+                            DailyBarsChart(
+                                bars: PopoverPresentation.spendBars(spend, limit: budget, today: now),
+                                showsPaceLine: budget != nil, dayLabels: false, unit: .dollars
+                            )
+                        }
+                    } else if let floor {
+                        UsageBar(fraction: floor.fraction, tint: floor.tint, height: 5, tick: floor.tick)
                     }
                 }
                 .accessibilityElement(children: .combine)
 
                 if let pacing {
                     PacingView(pacing: pacing, unit: .dollars, periodEnd: spend.period.end)
-                }
-
-                if provider.descriptor.capabilities.hasDailyChart, !spend.daily.isEmpty {
-                    DailySpendChartView(
-                        title: "Daily spend", subtitleRow: nil,
-                        days: spend.daily, period: spend.period, today: now, unit: .dollars
-                    )
                 }
             }
         }

@@ -270,7 +270,7 @@ final class HalfViewModel: ObservableObject {
 
         scope.selectOrganization(id)
         // History is keyed by provider, so another organization's samples would
-        // draw a jump in the sparkline.
+        // draw a jump in the popover's charts.
         if selectedOrganizationID != id {
             history?.clear(provider: provider)
         }

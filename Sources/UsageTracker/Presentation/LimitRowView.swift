@@ -41,14 +41,7 @@ struct LimitRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(label)
-                    .font(indented ? .caption : .body)
-                Spacer()
-                Text(text)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+            LimitRowLine(label: label, text: text, indented: indented)
 
             if let fraction {
                 UsageBar(fraction: fraction, tint: tint, height: indented ? 3 : 5, tick: tick)
@@ -58,5 +51,23 @@ struct LimitRowView: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(label)
         .accessibilityValue(text)
+    }
+}
+
+/// A window row's label and text, above its bar or its chart.
+struct LimitRowLine: View {
+    let label: String
+    let text: String
+    let indented: Bool
+
+    var body: some View {
+        HStack {
+            Text(label)
+                .font(indented ? .caption : .body)
+            Spacer()
+            Text(text)
+                .font(.caption.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
     }
 }

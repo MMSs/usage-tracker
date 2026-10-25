@@ -95,6 +95,30 @@ asks you to log in again, or the OpenAI item shows `Expired`, run
 Both values save shortly after you stop typing, and only to the login
 Keychain.
 
+## Popover
+
+Click a provider's menu bar item for its popover. Each limit row shows its
+percent and reset time over a progress bar, and the main rows draw a chart on
+top of that bar:
+
+- Session: the last 24 hours of percent used, as a filled line over a
+  `24h ago · 12h · now` axis. A reset drops it to zero, and time the app was
+  not running stays empty.
+- Weekly: one bar per day of the current weekly window, named under the
+  block, each showing how much of the weekly limit that day used. The dashed
+  line is an even pace (a seventh of the limit a day), bars are green at or
+  under it and amber or red over it, today is brighter, and days to come or
+  before the app had samples are empty.
+- API spend: one bar per day of the month. With a monthly budget the bars
+  are coloured against an even daily share, the dashed line marks it, and the
+  budget bar sits under them; without one they are plain and scaled to the
+  largest day.
+- Cursor's billing cycle: one bar per day of the cycle over the Included usage
+  bar, coloured against the cycle's even daily share.
+
+Hover a day's bar to see its date and amount. Per-model rows, Extra usage and
+Credits keep their plain bars.
+
 ## Settings
 
 Settings is its own window. Open it from the gear in any menu bar popover, or

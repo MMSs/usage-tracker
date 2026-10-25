@@ -306,3 +306,79 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         #expect(result.tint == .onPace)
     }
 }
+
+@Suite struct PopoverChartTests {
+    private let anthropic = ProviderRegistry.descriptor(for: .anthropic)
+    private let cursor = ProviderRegistry.descriptor(for: .cursor)
+
+    private func window(_ id: String, parent: String? = nil) -> LimitWindow {
+        LimitWindow(id: id, label: id, percentUsed: 40, resetsAt: date(11, 3, hour: 9), parentID: parent, windowLength: 7 * 86_400)
+    }
+
+    @Test func chartKindPicksEachRowsChart() {
+        #expect(PopoverPresentation.chartKind(for: window("session"), descriptor: anthropic) == .sessionLine)
+        #expect(PopoverPresentation.chartKind(for: window("weekly"), descriptor: anthropic) == .weekBars)
+        #expect(PopoverPresentation.chartKind(for: window("opus", parent: "weekly"), descriptor: anthropic) == nil)
+        #expect(PopoverPresentation.chartKind(for: window("cycle"), descriptor: cursor) == .cycleBars)
+        #expect(PopoverPresentation.chartKind(for: window("auto", parent: "cycle"), descriptor: cursor) == nil)
+    }
+
+    // The week runs Tue 27 Oct 9:00 to Tue 3 Nov 9:00; now is Thursday noon.
+    @Test func weekBarsRunFromTheDayTheWindowBegan() throws {
+        let samples = [
+            UsageSample(date: date(10, 27, hour: 10), percent: 3),
+            UsageSample(date: date(10, 27, hour: 22), percent: 10),
+            UsageSample(date: date(10, 28, hour: 12), percent: 30),
+            UsageSample(date: date(10, 29, hour: 11), percent: 34),
+        ]
+
+        let bars = try #require(PopoverPresentation.weekBars(
+            samples: samples, window: window("weekly"), now: date(10, 29, hour: 12), calendar: calendar
+        ))
+
+        #expect(bars.count == 7)
+        #expect(bars[0].day == date(10, 27))
+        #expect(bars.map(\.value) == [10, 20, 4, nil, nil, nil, nil])
+        #expect(bars[0].tint == .onPace)
+        #expect(bars[1].tint == .overBudget)
+        #expect(bars[2].isToday)
+        #expect(bars[3...].allSatisfy { $0.isFuture })
+        // Full height is twice the even share of 100% / 7.
+        #expect(abs(bars[0].heightFraction - 10 / (200.0 / 7)) < 0.0001)
+    }
+
+    @Test func weekBarsAreNilWithoutAnyDayOfData() {
+        let before = [UsageSample(date: date(10, 20, hour: 10), percent: 50)]
+
+        #expect(PopoverPresentation.weekBars(samples: [], window: window("weekly"), now: date(10, 29), calendar: calendar) == nil)
+        #expect(PopoverPresentation.weekBars(samples: before, window: window("weekly"), now: date(10, 29), calendar: calendar) == nil)
+    }
+
+    private let spend = SpendPeriod(
+        period: CyclePeriod(start: date(10, 1), end: date(11, 1)),
+        spent: 10, limit: nil, unit: .dollars,
+        daily: [DaySpend(day: date(10, 3), amount: 2), DaySpend(day: date(10, 4), amount: 8)]
+    )
+
+    @Test func spendBarsAgainstALimitUseItsEvenDailyShare() {
+        // $62 over 31 days is $2 a day.
+        let bars = PopoverPresentation.spendBars(spend, limit: 62, today: date(10, 24), calendar: calendar)
+
+        #expect(bars.count == 31)
+        #expect(bars[2].heightFraction == 0.5)
+        #expect(bars[2].tint == .onPace)
+        #expect(bars[3].heightFraction == 1)
+        #expect(bars[3].tint == .overBudget)
+        #expect(bars[0].value == 0)
+        #expect(bars[30].isFuture)
+        #expect(bars[30].value == nil)
+    }
+
+    @Test func spendBarsWithoutALimitScaleToTheLargestDay() {
+        let bars = PopoverPresentation.spendBars(spend, limit: nil, today: date(10, 24), calendar: calendar)
+
+        #expect(bars[3].heightFraction == 1)
+        #expect(bars[2].heightFraction == 0.25)
+        #expect(bars.allSatisfy { $0.tint == .neutral })
+    }
+}

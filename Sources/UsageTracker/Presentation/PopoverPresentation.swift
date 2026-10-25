@@ -1,5 +1,15 @@
 import Foundation
 
+/// What a window row draws over its bar.
+enum ChartKind: Equatable {
+    /// The session's last day of percent used.
+    case sessionLine
+    /// How much of the weekly limit each day used.
+    case weekBars
+    /// Each day's spend in the billing cycle.
+    case cycleBars
+}
+
 enum PopoverPresentation {
     static func pillText(_ pacing: Pacing, unit: BudgetUnit) -> String {
         switch pacing.status {
@@ -85,6 +95,57 @@ enum PopoverPresentation {
     /// window has a length and is open, otherwise by how much of it is used.
     static func rowPacing(window: LimitWindow, now: Date) -> (tick: Double?, tint: PacingTint) {
         (TimePacing.idealFraction(for: window, now: now), PacingTint.forWindow(window, now: now))
+    }
+
+    /// The chart a top-level window row draws over its bar; nil for child rows
+    /// and windows the descriptor does not name.
+    static func chartKind(for window: LimitWindow, descriptor: ProviderDescriptor) -> ChartKind? {
+        guard window.parentID == nil else {
+            return nil
+        }
+
+        if window.id == descriptor.shortWindowID {
+            return .sessionLine
+        }
+
+        guard window.id == descriptor.longWindowID else {
+            return nil
+        }
+
+        return descriptor.capabilities.hasCycle ? .cycleBars : .weekBars
+    }
+
+    /// One bar per day of a weekly window, each against the even share of the
+    /// limit; nil while no day has data.
+    static func weekBars(samples: [UsageSample], window: LimitWindow, now: Date, calendar: Calendar = .current) -> [DayBar]? {
+        let values = UsageChartLayout.weekDays(
+            samples: samples, window: window, assumedLength: 7 * 86_400, now: now, calendar: calendar
+        )
+        guard values.values.contains(where: { $0 != nil }),
+              let firstDay = values.keys.min(),
+              let end = calendar.date(byAdding: .day, value: values.count, to: firstDay)
+        else {
+            return nil
+        }
+
+        return UsageChartLayout.dayBars(
+            values: values,
+            period: CyclePeriod(start: firstDay, end: end),
+            share: 100 / Double(values.count),
+            today: now,
+            calendar: calendar
+        )
+    }
+
+    /// One bar per day of a spend period, against `limit`'s even daily share
+    /// when there is one.
+    static func spendBars(_ spend: SpendPeriod, limit: Decimal?, today: Date, calendar: Calendar = .current) -> [DayBar] {
+        let values = UsageChartLayout.spendValues(spend.daily, period: spend.period, today: today, calendar: calendar)
+        let share = limit.flatMap { limit in
+            values.isEmpty ? nil : NSDecimalNumber(decimal: limit).doubleValue / Double(values.count)
+        }
+
+        return UsageChartLayout.dayBars(values: values, period: spend.period, share: share, today: today, calendar: calendar)
     }
 
     /// The Projected tile's value: the amount alone, or a dash when there is no projection.
