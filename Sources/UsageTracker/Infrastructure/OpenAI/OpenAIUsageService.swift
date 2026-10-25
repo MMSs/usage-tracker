@@ -1,7 +1,14 @@
 import Foundation
 
+/// wham/usage answered 401: the access token expired, which renewing it fixes.
+/// A JSON 403 stays `FetchError.unauthorized`; a new token cannot fix it.
+enum OpenAIUsageError: Error, Equatable {
+    case accessTokenExpired
+}
+
 @MainActor
 protocol OpenAIUsageFetching {
+    /// Throws `OpenAIUsageError.accessTokenExpired` on 401.
     func fetchUsage(auth: CodexAuth) async throws -> OpenAIUsageResponse
 }
 
@@ -16,7 +23,11 @@ final class OpenAIUsageService: OpenAIUsageFetching {
     }
 
     func fetchUsage(auth: CodexAuth) async throws -> OpenAIUsageResponse {
-        let data = try await HTTPResponseHandler.data(for: request(auth: auth), client: client)
+        let data = try await HTTPResponseHandler.data(
+            for: request(auth: auth),
+            client: client,
+            overrides: [401: OpenAIUsageError.accessTokenExpired]
+        )
 
         return try HTTPResponseHandler.decode(OpenAIUsageResponse.self, from: data)
     }

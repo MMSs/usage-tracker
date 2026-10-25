@@ -38,9 +38,13 @@ final class OpenAISubscriptionReportService: ReportFetching {
         let response: OpenAIUsageResponse
         do {
             response = try await usage.fetchUsage(auth: auth)
-        } catch FetchError.unauthorized {
+        } catch OpenAIUsageError.accessTokenExpired {
             let renewed = try await renewal(after: auth)
-            response = try await usage.fetchUsage(auth: renewed)
+            do {
+                response = try await usage.fetchUsage(auth: renewed)
+            } catch OpenAIUsageError.accessTokenExpired {
+                throw FetchError.unauthorized
+            }
         }
 
         return OpenAIReportMapper.subscription(response, now: today)

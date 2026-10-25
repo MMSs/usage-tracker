@@ -3,8 +3,10 @@ import os
 
 /// Status and transport mapping shared by every provider's services.
 enum HTTPResponseHandler {
+    /// `overrides` replaces the shared error for a status, for a service that
+    /// must tell it apart from the statuses mapped alongside it.
     @MainActor
-    static func data(for request: URLRequest, client: HTTPClient) async throws -> Data {
+    static func data(for request: URLRequest, client: HTTPClient, overrides: [Int: any Error] = [:]) async throws -> Data {
         let method = request.httpMethod ?? "GET"
         let endpoint = LogFormat.endpoint(request.url)
         let start = ContinuousClock.now
@@ -44,6 +46,10 @@ enum HTTPResponseHandler {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
+            if let error = overrides[httpResponse.statusCode] {
+                throw error
+            }
+
             switch httpResponse.statusCode {
             case 401:
                 throw FetchError.unauthorized

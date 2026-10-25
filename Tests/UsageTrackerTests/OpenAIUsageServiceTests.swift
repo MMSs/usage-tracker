@@ -44,8 +44,18 @@ struct OpenAIUsageServiceTests {
     }
 
     @Test
-    func unauthorizedUsageIsUnauthorized() async {
+    func unauthorizedUsageIsAnExpiredAccessToken() async {
         let service = OpenAIUsageService(client: RecordingHTTPClient(response: .status(401)))
+
+        await #expect(throws: OpenAIUsageError.accessTokenExpired) {
+            try await service.fetchUsage(auth: try auth(accountID: "acct-1"))
+        }
+    }
+
+    @Test
+    func jsonForbiddenIsUnauthorizedNotExpired() async {
+        let client = RecordingHTTPClient(response: .status(403, headers: ["Content-Type": "application/json"]))
+        let service = OpenAIUsageService(client: client)
 
         await #expect(throws: FetchError.unauthorized) {
             try await service.fetchUsage(auth: try auth(accountID: "acct-1"))

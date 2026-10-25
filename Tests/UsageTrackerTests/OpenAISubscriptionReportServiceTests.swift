@@ -8,6 +8,8 @@ struct OpenAISubscriptionReportServiceTests {
         let response: OpenAIUsageResponse
         /// Access tokens answered with 401, as an expired token is.
         var rejected: Set<String> = []
+        /// Access tokens answered with a JSON 403, which a new token cannot fix.
+        var forbidden: Set<String> = []
         private(set) var accessTokens: [String] = []
 
         init(response: OpenAIUsageResponse) {
@@ -17,6 +19,9 @@ struct OpenAISubscriptionReportServiceTests {
         func fetchUsage(auth: CodexAuth) async throws -> OpenAIUsageResponse {
             accessTokens.append(auth.accessToken)
             if rejected.contains(auth.accessToken) {
+                throw OpenAIUsageError.accessTokenExpired
+            }
+            if forbidden.contains(auth.accessToken) {
                 throw FetchError.unauthorized
             }
             return response
@@ -172,6 +177,22 @@ struct OpenAISubscriptionReportServiceTests {
         }
         #expect(tokens.refreshTokens == ["old-refresh"])
         #expect(usage.accessTokens == ["old-access", "new-access"])
+    }
+
+    @Test func forbiddenUsageIsUnauthorizedWithoutRenewing() async throws {
+        let usage = StubUsage(response: response)
+        usage.forbidden = ["old-access"]
+        let tokens = StubTokens(grant: try Self.grant())
+        let store = MemoryCredentialStore()
+        store.values[Self.key] = Self.bundle()
+        let service = makeService(usage, tokens, store)
+
+        await #expect(throws: FetchError.unauthorized) {
+            try await fetch(service)
+        }
+        #expect(tokens.refreshTokens.isEmpty)
+        #expect(usage.accessTokens == ["old-access"])
+        #expect(store.values[Self.key] == Self.bundle())
     }
 
     @Test func rejectedRefreshIsExpired() async throws {
