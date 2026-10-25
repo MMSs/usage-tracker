@@ -117,6 +117,71 @@ import Testing
         }
     }
 
+    @Test func anOverridesOldHalfSwitchCarriesOver() {
+        withIsolatedDefaults { defaults in
+            let json = #"{"isEnabled":true,"appearanceOverride":{"showText":true,"countdown":false,"showGraph":true,"graphStyle":"rings","colored":false,"showAPISpend":false}}"#
+            defaults.set(Data(json.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic))
+
+            let settings = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic)
+
+            #expect(settings.showsAPIInMenuBar == false)
+            #expect(settings.showsSubscriptionInMenuBar == true)
+        }
+    }
+
+    @Test func theOldGlobalHalfSwitchCarriesOver() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+            defaults.set(Data(#"{"isEnabled":true}"#.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic))
+            let store = UserDefaultsProviderSettingsStore(defaults: defaults)
+
+            #expect(store.settings(for: .anthropic).showsSubscriptionInMenuBar == false)
+            #expect(store.settings(for: .anthropic).showsAPIInMenuBar == true)
+            // A provider with no record at all falls back the same way.
+            #expect(store.settings(for: .cursor).showsSubscriptionInMenuBar == false)
+        }
+    }
+
+    @Test func anOverrideWinsOverTheGlobalSwitch() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showAPISpendKey)
+            let json = #"{"appearanceOverride":{"showAPISpend":true}}"#
+            defaults.set(Data(json.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic))
+
+            #expect(UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic).showsAPIInMenuBar)
+        }
+    }
+
+    @Test func newKeysWinOverLegacyOnes() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+            let json = #"{"showsSubscriptionInMenuBar":true,"showsAPIInMenuBar":true,"appearanceOverride":{"showAPISpend":false}}"#
+            defaults.set(Data(json.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .anthropic))
+
+            let settings = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .anthropic)
+
+            #expect(settings.showsSubscriptionInMenuBar)
+            #expect(settings.showsAPIInMenuBar)
+        }
+    }
+
+    @Test func newRecordsKeepTheirOwnValues() {
+        withIsolatedDefaults { defaults in
+            defaults.set(false, forKey: UserDefaultsMenuBarAppearanceStore.showPlanUsageKey)
+            let store = UserDefaultsProviderSettingsStore(defaults: defaults)
+            var settings = ProviderSettings()
+            settings.setShowsInMenuBar(true, for: .subscription)
+            settings.setShowsInMenuBar(false, for: .api)
+            store.setSettings(settings, for: .anthropic)
+
+            let loaded = store.settings(for: .anthropic)
+
+            #expect(loaded == settings)
+            #expect(loaded.showsInMenuBar(.subscription))
+            #expect(!loaded.showsInMenuBar(.api))
+        }
+    }
+
     @Test func halfFlagsRoundTripAndDefaultToOn() {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsProviderSettingsStore(defaults: defaults)

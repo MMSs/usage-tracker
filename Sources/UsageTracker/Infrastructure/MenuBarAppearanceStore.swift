@@ -11,6 +11,7 @@ final class UserDefaultsMenuBarAppearanceStore: MenuBarAppearanceStoring {
     static let showGraphKey = "menuBarShowGraph"
     static let graphStyleKey = "menuBarGraphStyle"
     static let coloredKey = "menuBarColored"
+    /// No longer read or written here; `UserDefaultsProviderSettingsStore` reads them to migrate.
     static let showPlanUsageKey = "menuBarShowPlanUsage"
     static let showAPISpendKey = "menuBarShowAPISpend"
     static let limitsKey = "menuBarLimits"
@@ -31,8 +32,6 @@ final class UserDefaultsMenuBarAppearanceStore: MenuBarAppearanceStoring {
             graphStyle: defaults.string(forKey: Self.graphStyleKey).flatMap(MenuBarGraphStyle.init(rawValue:))
                 ?? fallback.graphStyle,
             colored: bool(Self.coloredKey) ?? fallback.colored,
-            showPlanUsage: bool(Self.showPlanUsageKey) ?? fallback.showPlanUsage,
-            showAPISpend: bool(Self.showAPISpendKey) ?? fallback.showAPISpend,
             limits: defaults.string(forKey: Self.limitsKey).flatMap(MenuBarLimits.init(rawValue:))
                 ?? fallback.limits
         )
@@ -44,8 +43,6 @@ final class UserDefaultsMenuBarAppearanceStore: MenuBarAppearanceStoring {
         defaults.set(appearance.showGraph, forKey: Self.showGraphKey)
         defaults.set(appearance.graphStyle.rawValue, forKey: Self.graphStyleKey)
         defaults.set(appearance.colored, forKey: Self.coloredKey)
-        defaults.set(appearance.showPlanUsage, forKey: Self.showPlanUsageKey)
-        defaults.set(appearance.showAPISpend, forKey: Self.showAPISpendKey)
         defaults.set(appearance.limits.rawValue, forKey: Self.limitsKey)
     }
 

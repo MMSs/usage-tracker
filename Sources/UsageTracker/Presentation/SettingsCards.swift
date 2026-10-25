@@ -9,6 +9,7 @@ struct MenuBarPreviewStrip: View {
     struct Entry: Identifiable {
         let item: MenuBarItem
         let appearance: MenuBarAppearance
+        let halves: MenuBarHalves
         let displayName: String
 
         var id: Provider { item.provider }
@@ -32,12 +33,13 @@ struct MenuBarPreviewStrip: View {
     init(
         item: MenuBarItem?,
         appearance: MenuBarAppearance,
+        halves: MenuBarHalves = .all,
         displayName: String,
         caption: String = "How the item looks in the menu bar.",
         placeholder: String = "No data yet"
     ) {
         self.init(
-            entries: item.map { [Entry(item: $0, appearance: appearance, displayName: displayName)] } ?? [],
+            entries: item.map { [Entry(item: $0, appearance: appearance, halves: halves, displayName: displayName)] } ?? [],
             caption: caption,
             placeholder: placeholder
         )
@@ -127,7 +129,7 @@ struct MenuBarPreviewStrip: View {
     /// places them; the same fit here hides the left-out ones from VoiceOver.
     private var items: some View {
         let images = entries.map { entry in
-            MenuBarItemImage.render(entry.item, appearance: entry.appearance, displayName: entry.displayName, darkMenuBar: isDark)
+            MenuBarItemImage.render(entry.item, appearance: entry.appearance, halves: entry.halves, displayName: entry.displayName, darkMenuBar: isDark)
         }
         let widths = zip(entries, images).map { entry, image in
             image?.size.width ?? Self.fallbackWidth(entry)
@@ -152,7 +154,7 @@ struct MenuBarPreviewStrip: View {
     private static let fallbackFont = NSFont.systemFont(ofSize: 13)
 
     private static func fallbackWidth(_ entry: Entry) -> CGFloat {
-        (entry.item.visible(in: entry.appearance).accessibilityText(displayName: entry.displayName) as NSString)
+        (entry.item.visible(in: entry.appearance, halves: entry.halves).accessibilityText(displayName: entry.displayName) as NSString)
             .size(withAttributes: [.font: fallbackFont]).width
     }
 
@@ -163,9 +165,9 @@ struct MenuBarPreviewStrip: View {
             Image(nsImage: image)
                 .resizable()
                 .interpolation(.high)
-                .accessibilityLabel(entry.item.visible(in: entry.appearance).accessibilityText(displayName: entry.displayName))
+                .accessibilityLabel(entry.item.visible(in: entry.appearance, halves: entry.halves).accessibilityText(displayName: entry.displayName))
         } else {
-            Text(entry.item.visible(in: entry.appearance).accessibilityText(displayName: entry.displayName))
+            Text(entry.item.visible(in: entry.appearance, halves: entry.halves).accessibilityText(displayName: entry.displayName))
                 .font(.system(size: 13))
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)

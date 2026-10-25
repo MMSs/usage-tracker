@@ -7,9 +7,9 @@ import Testing
         #expect(ProviderSettingsTab.menuBar.title == "Options")
     }
 
-    @Test func eachHalfTabHasARefreshSection() {
-        #expect(ProviderSettingsTab.subscription.sections == ["Refresh"])
-        #expect(ProviderSettingsTab.api.sections == ["Refresh"])
+    @Test func eachHalfTabHasAMenuBarSection() {
+        #expect(ProviderSettingsTab.subscription.sections == ["Menu bar", "Refresh"])
+        #expect(ProviderSettingsTab.api.sections == ["Menu bar", "Refresh"])
         #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance"])
     }
 

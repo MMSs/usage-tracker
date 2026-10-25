@@ -48,7 +48,7 @@ struct ProviderMenuBarScene: Scene {
         ) {
             ProviderPopoverView(provider: provider, appModel: model)
         } label: {
-            MenuBarLabel(item: item, appearance: appearance, displayName: provider.descriptor.displayName)
+            MenuBarLabel(item: item, appearance: appearance, halves: model.menuBarHalves(for: provider.id), displayName: provider.descriptor.displayName)
                 .task {
                     // Idempotent, so any inserted scene may start the refresh cycle.
                     model.start()

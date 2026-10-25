@@ -86,17 +86,21 @@ struct MenuBarItem: Equatable {
     }
 }
 
-extension MenuBarItem {
-    /// What the appearance lets the item draw. Neither half switch ever
-    /// empties the item, and a Limits choice with no matching meter keeps all.
-    func visible(in appearance: MenuBarAppearance) -> MenuBarItem {
-        var subscription = appearance.showPlanUsage ? subscription : nil
-        var api = appearance.showAPISpend ? api : nil
+/// Which halves of a provider's item the menu bar draws.
+struct MenuBarHalves: Equatable, Sendable {
+    var subscription: Bool
+    var api: Bool
 
-        if subscription == nil, api == nil {
-            subscription = self.subscription
-            api = self.api
-        }
+    static let all = MenuBarHalves(subscription: true, api: true)
+}
+
+extension MenuBarItem {
+    /// What the appearance and the provider's half switches let the item
+    /// draw. With both halves hidden only the logo is left; a Limits choice
+    /// with no matching meter keeps all.
+    func visible(in appearance: MenuBarAppearance, halves: MenuBarHalves) -> MenuBarItem {
+        var subscription = halves.subscription ? subscription : nil
+        let api = halves.api ? api : nil
 
         if case let .meters(meters, stale, errorMark) = subscription, appearance.limits != .both {
             let role: MenuBarMeter.Role = appearance.limits == .short ? .short : .long

@@ -78,7 +78,7 @@ import Testing
 
     @Test func batteryStillReadsPercentUsed() {
         let item = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
-        #expect(item.visible(in: MenuBarAppearance(graphStyle: .battery)).accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 62%")
+        #expect(item.visible(in: MenuBarAppearance(graphStyle: .battery), halves: .all).accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 62%")
     }
 
     @Test func everyGraphStyleDrawsAtItsOwnWidth() throws {
@@ -161,10 +161,12 @@ import Testing
 
     @Test func hidingAHalfNarrowsTheImage() throws {
         let item = MenuBarItem(provider: .cursor, subscription: twoMeters, api: money)
-        var hidden = MenuBarAppearance.default
-        hidden.showAPISpend = false
+        let hidden = MenuBarItemImage.render(
+            item, appearance: .default, halves: MenuBarHalves(subscription: true, api: false),
+            displayName: "Cursor", darkMenuBar: true
+        )
 
-        #expect(try #require(render(item, hidden)).size.width < (try #require(render(item)).size.width))
+        #expect(try #require(hidden).size.width < (try #require(render(item)).size.width))
     }
 
     @Test func statusStatesRender() throws {

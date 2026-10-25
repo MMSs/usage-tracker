@@ -12,10 +12,11 @@ enum MenuBarItemImage {
     static func render(
         _ full: MenuBarItem,
         appearance: MenuBarAppearance,
+        halves: MenuBarHalves = .all,
         displayName: String,
         darkMenuBar: Bool
     ) -> NSImage? {
-        let item = full.visible(in: appearance)
+        let item = full.visible(in: appearance, halves: halves)
         let colored = isColored(item, appearance: appearance)
         let palette = MenuBarPalette(
             foreground: colored && darkMenuBar ? .white : .black,

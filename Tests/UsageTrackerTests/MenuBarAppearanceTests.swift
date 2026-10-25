@@ -39,19 +39,11 @@ import Testing
         #expect(MenuBarAppearance(showText: true, showGraph: true).showsSpendAmount(hasMeter: true))
     }
 
-    @Test func refusesToHideBothHalves() {
-        let apiHidden = MenuBarAppearance().showingAPISpend(false)
-        #expect(!apiHidden.showAPISpend)
-        #expect(apiHidden.showingPlanUsage(false).showPlanUsage)
-        #expect(MenuBarAppearance().showingPlanUsage(false).showingAPISpend(false).showAPISpend)
-        #expect(apiHidden.showingAPISpend(true).showAPISpend)
-    }
-
     @Test func anOverrideSavedBeforeTheVisibilityFieldsKeepsItsValues() throws {
         let json = #"{"showText":false,"countdown":true,"showGraph":true,"graphStyle":"bars","colored":true}"#
         let appearance = try JSONDecoder().decode(MenuBarAppearance.self, from: Data(json.utf8))
         #expect(appearance == MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: true))
-        #expect(appearance.showPlanUsage && appearance.showAPISpend && appearance.limits == .both)
+        #expect(appearance.limits == .both)
     }
 
     @Test func unknownStoredValuesFallBackInsteadOfDroppingTheOverride() throws {
@@ -70,12 +62,18 @@ import Testing
         #expect(appearance.countdown && appearance.colored)
     }
 
+    @Test func anOverrideWithTheOldHalfKeysStillDecodes() throws {
+        let json = #"{"showText":false,"countdown":true,"showGraph":true,"graphStyle":"bars","colored":true,"showPlanUsage":false,"showAPISpend":false,"limits":"long"}"#
+        let appearance = try JSONDecoder().decode(MenuBarAppearance.self, from: Data(json.utf8))
+        #expect(appearance == MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: true, limits: .long))
+    }
+
     @Test func defaults() {
         let appearance = MenuBarAppearance.default
         #expect(appearance.showText && appearance.showGraph)
         #expect(!appearance.countdown && !appearance.colored)
         #expect(appearance.graphStyle == .rings)
-        #expect(appearance.showPlanUsage && appearance.showAPISpend && appearance.limits == .both)
+        #expect(appearance.limits == .both)
         #expect(MenuBarGraphStyle.allCases.map(\.title) == ["Rings", "Bars", "Battery", "Gauge", "Segments", "Columns", "Dials"])
     }
 

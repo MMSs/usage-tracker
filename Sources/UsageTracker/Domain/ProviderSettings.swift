@@ -13,6 +13,19 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     var alertsEnabled = true
     /// Start the provider's session from a scheduled refresh once the previous one ended.
     var autoStartSessions = false
+    /// Whether the half is drawn in the menu bar item. A hidden half is still fetched, alerts and shows in the panel.
+    var showsSubscriptionInMenuBar = true
+    var showsAPIInMenuBar = true
+    /// Halves a record had no value for, neither of its own nor in its override;
+    /// the store fills them from the old global switches. Never encoded, never compared.
+    var unresolvedMenuBarHalves = UnresolvedMenuBarHalves()
+
+    struct UnresolvedMenuBarHalves: Equatable, Sendable {
+        var subscription = false
+        var api = false
+
+        static func == (lhs: Self, rhs: Self) -> Bool { true }
+    }
 
     static let `default` = ProviderSettings()
 
@@ -50,6 +63,20 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         }
     }
 
+    func showsInMenuBar(_ half: Half) -> Bool {
+        switch half {
+        case .subscription: showsSubscriptionInMenuBar
+        case .api: showsAPIInMenuBar
+        }
+    }
+
+    mutating func setShowsInMenuBar(_ shows: Bool, for half: Half) {
+        switch half {
+        case .subscription: showsSubscriptionInMenuBar = shows
+        case .api: showsAPIInMenuBar = shows
+        }
+    }
+
     func refreshInterval(for half: Half) -> RefreshInterval {
         switch half {
         case .subscription: subscriptionRefreshInterval
@@ -65,9 +92,14 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isEnabled, subscriptionRefreshInterval, apiRefreshInterval, appearanceOverride, isSubscriptionEnabled, isAPIEnabled, alertsEnabled, autoStartSessions
+        case isEnabled, subscriptionRefreshInterval, apiRefreshInterval, appearanceOverride, isSubscriptionEnabled, isAPIEnabled, alertsEnabled, autoStartSessions, showsSubscriptionInMenuBar, showsAPIInMenuBar
         /// The single interval records had before the halves got their own; read, never written.
         case refreshInterval
+    }
+
+    /// The half switches that lived in the appearance override before they moved here; read, never written.
+    private enum LegacyAppearanceKeys: String, CodingKey {
+        case showPlanUsage, showAPISpend
     }
 
     /// Missing or unknown values fall back to the defaults so older records still load.
@@ -85,6 +117,16 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         isAPIEnabled = try container.decodeIfPresent(Bool.self, forKey: .isAPIEnabled) ?? true
         alertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .alertsEnabled) ?? true
         autoStartSessions = try container.decodeIfPresent(Bool.self, forKey: .autoStartSessions) ?? false
+
+        // The new key, then the old switch inside the override; a record with neither is left for the store.
+        let legacy = try? container.nestedContainer(keyedBy: LegacyAppearanceKeys.self, forKey: .appearanceOverride)
+        let subscriptionSwitch = try container.decodeIfPresent(Bool.self, forKey: .showsSubscriptionInMenuBar)
+            ?? legacy.flatMap { try? $0.decodeIfPresent(Bool.self, forKey: .showPlanUsage) }
+        let apiSwitch = try container.decodeIfPresent(Bool.self, forKey: .showsAPIInMenuBar)
+            ?? legacy.flatMap { try? $0.decodeIfPresent(Bool.self, forKey: .showAPISpend) }
+        showsSubscriptionInMenuBar = subscriptionSwitch ?? true
+        showsAPIInMenuBar = apiSwitch ?? true
+        unresolvedMenuBarHalves = UnresolvedMenuBarHalves(subscription: subscriptionSwitch == nil, api: apiSwitch == nil)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -97,5 +139,7 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         try container.encode(isAPIEnabled, forKey: .isAPIEnabled)
         try container.encode(alertsEnabled, forKey: .alertsEnabled)
         try container.encode(autoStartSessions, forKey: .autoStartSessions)
+        try container.encode(showsSubscriptionInMenuBar, forKey: .showsSubscriptionInMenuBar)
+        try container.encode(showsAPIInMenuBar, forKey: .showsAPIInMenuBar)
     }
 }

@@ -439,6 +439,18 @@ import Testing
         #expect(model.appearance(for: .anthropic) == global)
     }
 
+    @Test func menuBarHalvesFollowEachProvidersSettings() {
+        let model = makeModel()
+        #expect(model.menuBarHalves(for: .anthropic) == .all)
+
+        var settings = ProviderSettings()
+        settings.setShowsInMenuBar(false, for: .api)
+        model.setSettings(settings, for: .anthropic)
+
+        #expect(model.menuBarHalves(for: .anthropic) == MenuBarHalves(subscription: true, api: false))
+        #expect(model.menuBarHalves(for: .cursor) == .all)
+    }
+
     @Test func disabledProvidersAreNeitherInsertedNorRefreshed() async {
         configureAll()
         let model = makeModel()

@@ -133,13 +133,14 @@ open closes.
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings, Bars, Battery, Gauge, Segments, Columns or
   Dials. Colored tints the text and graph by remaining
-  capacity or pacing. Show plan usage and Show API spend hide a half from the
-  item (the popover still lists it), and Limits picks both windows or just the
-  short or the long one. Open at login registers the app as a login item; the
+  capacity or pacing. Limits picks both windows or just the short or the long
+  one. Open at login registers the app as a login item; the
   line under the switch shows what macOS reports, with a button to System
   Settings when it needs your approval.
 - Each provider tab: an Enabled switch (off removes the item and stops
-  fetching, credentials stay) and, on each half's tab, its own refresh interval
+  fetching, credentials stay) and, on each half's tab, a Show in menu bar
+  switch (off hides that half from the item; it is still fetched, alerts and
+  shows in the panel; with both off the item is the logo) and its own refresh interval
   on a slider from 30 seconds to 1 hour (default 5 minutes). The Options tab can
   give the provider its own appearance in place of the defaults.
   Refreshing pauses while the Mac is asleep or offline and resumes when both

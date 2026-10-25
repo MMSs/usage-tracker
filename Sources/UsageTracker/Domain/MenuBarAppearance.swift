@@ -39,8 +39,6 @@ struct MenuBarAppearance: Equatable, Codable, Sendable {
     var showGraph = true
     var graphStyle = MenuBarGraphStyle.rings
     var colored = false
-    var showPlanUsage = true
-    var showAPISpend = true
     var limits = MenuBarLimits.both
 
     static let `default` = MenuBarAppearance()
@@ -86,34 +84,13 @@ struct MenuBarAppearance: Equatable, Codable, Sendable {
         copy.showGraph = shows
         return copy
     }
-
-    /// The two halves follow the same rule: one stays visible.
-    func showingPlanUsage(_ shows: Bool) -> MenuBarAppearance {
-        guard shows || showAPISpend else {
-            return self
-        }
-
-        var copy = self
-        copy.showPlanUsage = shows
-        return copy
-    }
-
-    func showingAPISpend(_ shows: Bool) -> MenuBarAppearance {
-        guard shows || showPlanUsage else {
-            return self
-        }
-
-        var copy = self
-        copy.showAPISpend = shows
-        return copy
-    }
 }
 
 /// Decoding is tolerant so an override saved by an older build keeps its
 /// values: a missing key takes its default, an unknown raw value its fallback.
 extension MenuBarAppearance {
     private enum CodingKeys: String, CodingKey {
-        case showText, countdown, showGraph, graphStyle, colored, showPlanUsage, showAPISpend, limits
+        case showText, countdown, showGraph, graphStyle, colored, limits
     }
 
     init(from decoder: Decoder) throws {
@@ -127,8 +104,6 @@ extension MenuBarAppearance {
             graphStyle: try container.decodeIfPresent(String.self, forKey: .graphStyle)
                 .flatMap(MenuBarGraphStyle.init(rawValue:)) ?? fallback.graphStyle,
             colored: try container.decodeIfPresent(Bool.self, forKey: .colored) ?? fallback.colored,
-            showPlanUsage: try container.decodeIfPresent(Bool.self, forKey: .showPlanUsage) ?? fallback.showPlanUsage,
-            showAPISpend: try container.decodeIfPresent(Bool.self, forKey: .showAPISpend) ?? fallback.showAPISpend,
             limits: try container.decodeIfPresent(String.self, forKey: .limits)
                 .flatMap(MenuBarLimits.init(rawValue:)) ?? fallback.limits
         )

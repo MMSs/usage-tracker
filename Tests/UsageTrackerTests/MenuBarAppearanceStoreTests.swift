@@ -12,7 +12,7 @@ import Testing
     @Test func aStoredAppearanceSurvivesTheRoundTrip() {
         withIsolatedDefaults { defaults in
             let stored = MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: true,
-                                        showPlanUsage: false, showAPISpend: true, limits: .long)
+                                        limits: .long)
 
             UserDefaultsMenuBarAppearanceStore(defaults: defaults).setAppearance(stored)
 

@@ -410,6 +410,12 @@ final class AppModel: ObservableObject {
         settings(for: provider).appearanceOverride ?? globalAppearance
     }
 
+    /// Which halves of the provider's menu bar item are drawn.
+    func menuBarHalves(for provider: Provider) -> MenuBarHalves {
+        let settings = settings(for: provider)
+        return MenuBarHalves(subscription: settings.showsSubscriptionInMenuBar, api: settings.showsAPIInMenuBar)
+    }
+
     /// The interval for one half's timer; nil when the provider or the half is off or missing.
     private static func interval(_ settings: ProviderSettings, _ half: Half, of provider: ProviderViewModel) -> RefreshInterval? {
         guard settings.isEnabled, settings.isEnabled(half), provider.half(half) != nil else {

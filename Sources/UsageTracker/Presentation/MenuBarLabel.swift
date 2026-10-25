@@ -6,16 +6,18 @@ import SwiftUI
 struct MenuBarLabel: View {
     let item: MenuBarItem
     let appearance: MenuBarAppearance
+    let halves: MenuBarHalves
     let displayName: String
 
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        let shown = item.visible(in: appearance)
+        let shown = item.visible(in: appearance, halves: halves)
 
         if let image = MenuBarItemImage.render(
             item,
             appearance: appearance,
+            halves: halves,
             displayName: displayName,
             darkMenuBar: colorScheme == .dark
         ) {
