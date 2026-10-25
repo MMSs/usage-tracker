@@ -106,12 +106,20 @@ import Testing
     }
 
     @Test func aResetShowsAsADrop() throws {
-        let points = sparkline([sample(minutesAgo: 120, 80), sample(minutesAgo: 60, 2)], current: 0.02)
+        let points = sparkline([sample(minutesAgo: 120, 80), sample(minutesAgo: 60, 2)], current: 0.5)
         let high = try #require(points.firstIndex { abs($0.y - 16 * 0.2) < 1e-9 })
         let low = try #require(points.firstIndex { abs($0.y - 16 * 0.98) < 1e-9 })
 
         #expect(low > high)
         #expect(points.map(\.x) == points.map(\.x).sorted())
+    }
+
+    @Test func aSparklineKeepsTheLatestSampleInAColumn() {
+        // 100 and 95 minutes ago fall in the same whole-point column.
+        let points = sparkline([sample(minutesAgo: 100, 20), sample(minutesAgo: 95, 70)], current: 0.5)
+
+        #expect(points.count == 2)
+        #expect(abs(points[0].y - 16 * 0.3) < 1e-9)
     }
 
     @Test func aSparklineHasAtMostOnePointPerColumn() {
