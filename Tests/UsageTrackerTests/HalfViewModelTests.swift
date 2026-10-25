@@ -762,6 +762,23 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(history.clearCount == 1)
     }
 
+    @Test func choosingADifferentOrganizationClearsHistory() async {
+        store.values[key] = "sk"
+        fetcher.listing = two
+        let model = makeModel()
+        await model.refresh(manual: false)
+        let cleared = history.clearCount
+
+        await model.selectOrganization("org-a")
+        #expect(history.clearCount == cleared + 1)
+
+        await model.selectOrganization("org-a")
+        #expect(history.clearCount == cleared + 1)
+
+        await model.selectOrganization("org-b")
+        #expect(history.clearCount == cleared + 2)
+    }
+
     @Test func choosingAnOrganizationAfterWaitingShowsItsReportAgain() async {
         cache.store(CachedReport(report: makeReport(5), fetchedAt: now), provider: .anthropic, half: .subscription)
         store.values[key] = "sk"

@@ -269,6 +269,11 @@ final class HalfViewModel: ObservableObject {
         }
 
         scope.selectOrganization(id)
+        // History is keyed by provider, so another organization's samples would
+        // draw a jump in the sparkline.
+        if selectedOrganizationID != id {
+            history?.clear(provider: provider)
+        }
         selectedOrganizationID = id
         Log.refresh.info("\(self.logName, privacy: .public): organization chosen from \(self.organizations.count, privacy: .public) listed")
         // Invalidates any fetch still in flight for the previous choice.
