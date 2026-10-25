@@ -135,7 +135,8 @@ final class AppModel: ObservableObject {
 
     /// Starts the provider's closed session when the user turned that on, at
     /// most once per `autoStartInterval`. `sessionIsClosed` already requires
-    /// an up-to-date subscription half, so an expired or errored one is skipped.
+    /// a switched-on, up-to-date subscription half, so a switched-off, expired
+    /// or errored one is skipped.
     private func autoStartIfNeeded(_ provider: ProviderViewModel) async {
         guard settings(for: provider.id).autoStartSessions,
               provider.sessionIsClosed,
@@ -161,8 +162,9 @@ final class AppModel: ObservableObject {
         alertsEnabled = alertMonitor?.isEnabled ?? enabled
     }
 
-    /// Checks each ready half against the alert thresholds. A half in error
-    /// keeps its last report but is not evaluated, so a stale figure never alerts.
+    /// Checks each enabled, ready half against the alert thresholds. A half
+    /// in error or switched off keeps its last report but is not evaluated,
+    /// so a stale figure never alerts.
     private func evaluateAlerts(for provider: ProviderViewModel) {
         guard let alertMonitor else {
             return
@@ -170,7 +172,7 @@ final class AppModel: ObservableObject {
 
         let delivers = alertsEnabled && settings(for: provider.id).alertsEnabled
 
-        for model in [provider.subscription, provider.api].compactMap({ $0 }) where model.status == .ready {
+        for model in [provider.subscription, provider.api].compactMap({ $0 }) where model.isEnabled && model.status == .ready {
             guard let report = model.report else {
                 continue
             }

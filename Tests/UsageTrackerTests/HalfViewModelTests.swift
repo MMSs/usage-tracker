@@ -909,6 +909,16 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(model.sessionStart == .idle)
     }
 
+    @Test func aSwitchedOffHalfSendsNothing() async {
+        store.values[key] = "sk"
+        let model = makeModel()
+        model.isEnabled = false
+
+        #expect(await !model.startSession())
+        #expect(model.sessionStart == .idle)
+        #expect(fetcher.startCount == 0)
+    }
+
     @Test func aHalfThatCannotStartReturnsFalse() async {
         store.values[CredentialKey(provider: .anthropic, fieldID: "session-key")] = "sk"
         let plain = StubReportFetcher(result: .success(makeReport()))

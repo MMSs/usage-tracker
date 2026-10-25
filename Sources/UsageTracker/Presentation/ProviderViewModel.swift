@@ -20,12 +20,14 @@ final class ProviderViewModel: ObservableObject, Identifiable {
         [subscription, api].contains { $0?.isActive == true }
     }
 
-    /// The provider can start a session, its subscription half is up to date,
-    /// and the report's short window is not running.
+    /// The provider and its subscription half are switched on, the provider
+    /// can start a session, the half is up to date, and the report's short
+    /// window is not running. A switched-off half keeps its last report, but
+    /// nothing is fetched to show a start worked, so it never reads closed.
     var sessionIsClosed: Bool {
-        guard descriptor.capabilities.canStartSession,
+        guard isEnabled, descriptor.capabilities.canStartSession,
               let shortID = descriptor.shortWindowID,
-              let subscription, subscription.canStartSession, subscription.status == .ready,
+              let subscription, subscription.isEnabled, subscription.canStartSession, subscription.status == .ready,
               let window = subscription.report?.windows.first(where: { $0.id == shortID })
         else {
             return false

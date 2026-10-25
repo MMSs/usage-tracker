@@ -193,11 +193,11 @@ final class HalfViewModel: ObservableObject {
     }
 
     /// Sends the provider's session-starting message, then refreshes so the
-    /// new window shows. False when it cannot start, one is already running,
-    /// or it failed (`sessionStart` is then `.failed`).
+    /// new window shows. False when it cannot start, is switched off, one is
+    /// already running, or it failed (`sessionStart` is then `.failed`).
     @discardableResult
     func startSession() async -> Bool {
-        guard let starter = sessionStarter, sessionStart != .starting else {
+        guard isEnabled, let starter = sessionStarter, sessionStart != .starting else {
             return false
         }
 

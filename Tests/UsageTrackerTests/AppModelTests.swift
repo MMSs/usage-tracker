@@ -211,6 +211,22 @@ import Testing
         #expect(starter.startCount == 0)
     }
 
+    @Test func aSwitchedOffSubscriptionHalfIsNotAutoStarted() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+        await model.refreshAll(manual: true)
+        #expect(model.provider(.anthropic).sessionIsClosed)
+
+        var settings = model.settings(for: .anthropic)
+        settings.isSubscriptionEnabled = false
+        model.setSettings(settings, for: .anthropic)
+        await model.refreshAll(manual: false)
+
+        #expect(starter.startCount == 0)
+    }
+
     private func hotReport(_ percent: Double = 90) -> ProviderReport {
         ProviderReport(
             planName: nil,
@@ -490,6 +506,30 @@ import Testing
 
         #expect(notifier.delivered.isEmpty)
         #expect(!alertStore.isEnabled)
+    }
+
+    @Test func aSwitchedOffHalfDoesNotAlertFromItsKeptReport() async {
+        configureAll()
+        useHotReport()
+        let model = makeModel()
+        var settings = model.settings(for: .cursor)
+        settings.alertsEnabled = false
+        model.setSettings(settings, for: .cursor)
+
+        // A hot report is kept, with its alert keys forgotten so only the
+        // switched-off half can keep the next pass quiet.
+        await model.refreshAll(manual: false)
+        for key in alertStore.keys {
+            alertStore.clearDelivered(key)
+        }
+        settings.alertsEnabled = true
+        settings.isSubscriptionEnabled = false
+        model.setSettings(settings, for: .cursor)
+
+        await model.refreshAll(manual: false)
+
+        #expect(model.provider(.cursor).subscription?.status == .ready)
+        #expect(notifier.delivered.isEmpty)
     }
 
     @Test func aFailedRefreshDoesNotAlertFromItsKeptReport() async {

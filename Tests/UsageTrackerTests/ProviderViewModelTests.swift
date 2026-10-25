@@ -233,6 +233,16 @@ import Testing
         #expect(!failed.sessionIsClosed)
     }
 
+    @Test func aSwitchedOffProviderOrHalfIsNeverClosed() async {
+        let halfOff = await refreshed(sessionReport(resetsAt: nil))
+        halfOff.subscription?.isEnabled = false
+        #expect(!halfOff.sessionIsClosed)
+
+        let providerOff = await refreshed(sessionReport(resetsAt: nil))
+        providerOff.isEnabled = false
+        #expect(!providerOff.sessionIsClosed)
+    }
+
     @Test func aProviderThatCannotStartIsNeverClosed() async {
         store.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "tok"
         subFetcher.fetchResult = .success(sessionReport(resetsAt: nil))
