@@ -162,7 +162,7 @@ struct HalfView: View {
     /// Whether the half puts anything in the item. A status always does; the
     /// meters need text, a countdown or a graph; money needs its amount or a
     /// budget to draw a graph against.
-    static func drawsSomething(_ display: HalfDisplay, appearance: MenuBarAppearance) -> Bool {
+    nonisolated static func drawsSomething(_ display: HalfDisplay, appearance: MenuBarAppearance) -> Bool {
         switch display {
         case .status:
             true
