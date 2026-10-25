@@ -138,8 +138,10 @@ request.
 
 Auto-start sessions, on the provider's Subscription tab, does the same as soon
 as the previous window ends. It is off by default, runs at most once per 10
-minutes, only on scheduled refreshes, and never while the credential is expired
-or erroring.
+minutes after any start (Start session included), only on scheduled refreshes,
+and never while the credential is expired or erroring or the Subscription half
+is switched off. After three starts in a row that leave the session closed, it
+pauses until a refresh sees the session open; Start session still works.
 
 The default models are `claude-haiku-5-5` for Anthropic and `gpt-6-luna` for
 OpenAI. To use another model, set it and relaunch the app:
