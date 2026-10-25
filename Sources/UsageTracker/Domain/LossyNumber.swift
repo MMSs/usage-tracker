@@ -30,4 +30,13 @@ extension KeyedDecodingContainer {
     func decodeLossyNumber(forKey key: Key) -> Double? {
         (try? decodeIfPresent(LossyNumber.self, forKey: key))?.value
     }
+
+    /// True when `key` is present and not null but `decodeLossyNumber` cannot read it.
+    func hasUnreadableValue(forKey key: Key) -> Bool {
+        guard contains(key), (try? decodeNil(forKey: key)) == false else {
+            return false
+        }
+
+        return decodeLossyNumber(forKey: key) == nil
+    }
 }

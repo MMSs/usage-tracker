@@ -20,7 +20,8 @@ import Testing
         #expect(response.primary == OpenAIUsageResponse.Window(
             usedPercent: 41,
             windowSeconds: 18000,
-            resetAt: Date(timeIntervalSince1970: 1_792_890_000)
+            resetAt: Date(timeIntervalSince1970: 1_792_890_000),
+            resetAfterSeconds: 7800
         ))
         #expect(response.secondary?.usedPercent == 70)
         #expect(response.secondary?.windowSeconds == 604_800)
@@ -59,6 +60,28 @@ import Testing
         #expect(response.credits?.hasCredits == true)
         #expect(response.credits?.balance == nil)
         #expect(try usage(#"{"credits": {"balance": " 7.25 "}}"#).credits?.balance == Decimal(string: "7.25"))
+    }
+
+    @Test func resetAfterSecondsDecodes() throws {
+        let response = try JSONDecoder().decode(OpenAIUsageResponse.self, from: fixture("openai-wham-usage"))
+
+        #expect(response.primary?.resetAfterSeconds == 7800)
+        #expect(response.secondary?.resetAfterSeconds == 259_200)
+    }
+
+    @Test func unreadableResetIsFlagged() throws {
+        func window(_ fields: String) throws -> OpenAIUsageResponse.Window {
+            let json = #"{"rate_limit": {"primary_window": {"used_percent": 5\#(fields)}}}"#
+
+            return try #require(usage(json).primary)
+        }
+
+        let unreadable = try window(#", "reset_at": "soon""#)
+        #expect(unreadable.resetAt == nil)
+        #expect(unreadable.hasUnreadableReset)
+        #expect(try window(#", "reset_at": null"#).hasUnreadableReset == false)
+        #expect(try window("").hasUnreadableReset == false)
+        #expect(try window(#", "reset_at": "1792890000""#).hasUnreadableReset == false)
     }
 
     @Test func missingRateLimitDecodesWithoutWindows() throws {

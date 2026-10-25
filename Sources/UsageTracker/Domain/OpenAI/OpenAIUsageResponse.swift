@@ -9,6 +9,24 @@ struct OpenAIUsageResponse: Equatable, Sendable {
         let usedPercent: Double?
         let windowSeconds: Int?
         let resetAt: Date?
+        /// Seconds the server says are left, which does not depend on the local clock.
+        let resetAfterSeconds: Int?
+        /// `reset_at` is present and not null but is not a number.
+        let hasUnreadableReset: Bool
+
+        init(
+            usedPercent: Double?,
+            windowSeconds: Int?,
+            resetAt: Date?,
+            resetAfterSeconds: Int? = nil,
+            hasUnreadableReset: Bool = false
+        ) {
+            self.usedPercent = usedPercent
+            self.windowSeconds = windowSeconds
+            self.resetAt = resetAt
+            self.resetAfterSeconds = resetAfterSeconds
+            self.hasUnreadableReset = hasUnreadableReset
+        }
     }
 
     struct AdditionalLimit: Equatable, Sendable {
@@ -52,6 +70,7 @@ extension OpenAIUsageResponse.Window: Decodable {
         case usedPercent = "used_percent"
         case windowSeconds = "limit_window_seconds"
         case resetAt = "reset_at"
+        case resetAfterSeconds = "reset_after_seconds"
     }
 
     init(from decoder: Decoder) throws {
@@ -59,6 +78,8 @@ extension OpenAIUsageResponse.Window: Decodable {
         usedPercent = container.decodeLossyNumber(forKey: .usedPercent)
         windowSeconds = container.decodeLossyNumber(forKey: .windowSeconds).flatMap { Int(exactly: $0.rounded()) }
         resetAt = container.decodeLossyNumber(forKey: .resetAt).map { Date(timeIntervalSince1970: $0) }
+        resetAfterSeconds = container.decodeLossyNumber(forKey: .resetAfterSeconds).flatMap { Int(exactly: $0.rounded()) }
+        hasUnreadableReset = resetAt == nil && container.hasUnreadableValue(forKey: .resetAt)
     }
 }
 

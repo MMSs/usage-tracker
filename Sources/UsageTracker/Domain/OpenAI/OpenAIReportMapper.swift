@@ -89,9 +89,7 @@ enum OpenAIReportMapper {
         label: String,
         now: Date
     ) -> LimitWindow {
-        let resetsAt = LimitWindow.runningReset(
-            classified.window.resetAt, windowLength: TimeInterval(classified.seconds), now: now
-        )
+        let resetsAt = resetsAt(of: classified.window, seconds: classified.seconds, now: now)
 
         return LimitWindow(
             id: id,
@@ -101,6 +99,21 @@ enum OpenAIReportMapper {
             parentID: parentID,
             windowLength: TimeInterval(classified.seconds)
         )
+    }
+
+    /// The server's time left decides when it sends one: a whole window left
+    /// is not started, whatever the local clock says. Without it, the reset
+    /// has to sit clear of a whole window away.
+    private static func resetsAt(of window: OpenAIUsageResponse.Window, seconds: Int, now: Date) -> Date? {
+        guard let remaining = window.resetAfterSeconds else {
+            return LimitWindow.runningReset(window.resetAt, windowLength: TimeInterval(seconds), now: now)
+        }
+
+        guard remaining < seconds, let resetAt = window.resetAt, resetAt > now else {
+            return nil
+        }
+
+        return resetAt
     }
 
     /// `id`, or `id:2`, `id:3`... when it is already taken.

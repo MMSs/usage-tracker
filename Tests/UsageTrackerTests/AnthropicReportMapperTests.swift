@@ -60,10 +60,17 @@ struct AnthropicReportMapperTests {
     @Test func aWindowResettingAWholeLengthAwayHasNotStarted() {
         let report = map(snapshot(
             fiveHour: Window(utilization: 0, resetsAt: now.addingTimeInterval(5 * 3600)),
-            sevenDay: Window(utilization: 0, resetsAt: now.addingTimeInterval(7 * 86400 - 30))
+            sevenDay: Window(utilization: 0, resetsAt: now.addingTimeInterval(7 * 86400 - 3))
         ))
 
         #expect(report.windows.map(\.resetsAt) == [nil, nil])
+    }
+
+    @Test func aSessionStartedTenSecondsAgoIsRunning() {
+        let resetAt = now.addingTimeInterval(5 * 3600 - 10)
+        let report = map(snapshot(fiveHour: Window(utilization: 1, resetsAt: resetAt)))
+
+        #expect(report.windows.map(\.resetsAt) == [resetAt])
     }
 
     @Test func aPastResetIsClosed() {

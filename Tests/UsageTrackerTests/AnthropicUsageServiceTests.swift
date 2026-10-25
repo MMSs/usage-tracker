@@ -354,6 +354,20 @@ struct AnthropicUsageServiceTests {
         #expect(count(client, suffix: "/good-org/usage") == 1)
     }
 
+    @Test(arguments: [
+        #"{"five_hour":{"utilization":3,"resets_at":"soon"},"seven_day":{"utilization":1,"resets_at":null}}"#,
+        #"{"five_hour":{"utilization":3,"resets_at":null},"seven_day":{"utilization":1,"resets_at":"soon"}}"#,
+    ])
+    func anUnreadableSessionResetIsADecodingError(json: String) async throws {
+        var routes = try routes(overage: false)
+        routes["/usage"] = .ok(json: json)
+        let service = AnthropicUsageService(client: RoutingHTTPClient(routes: routes))
+
+        await #expect(throws: FetchError.decoding) {
+            try await service.fetchSubscription(sessionKey: "k")
+        }
+    }
+
     @Test func emptyOrganizationListIsAFailure() async throws {
         var routes = try routes()
         routes["/organizations"] = .ok(json: "[]")

@@ -134,6 +134,12 @@ final class AnthropicUsageService: AnthropicUsageFetching {
             throw FetchError.decoding
         }
 
+        // An unreadable reset would read as a closed session, which auto-start acts on.
+        if usage.fiveHour?.hasUnreadableReset == true || usage.sevenDay?.hasUnreadableReset == true {
+            Log.http.error("usage response has an unreadable reset time")
+            throw FetchError.decoding
+        }
+
         return usage
     }
 

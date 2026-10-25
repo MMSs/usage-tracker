@@ -8,8 +8,13 @@ struct OpenAIReportMapperTests {
     private let now = Date(timeIntervalSince1970: 1_792_800_000)
     private let reset = Date(timeIntervalSince1970: 1_792_890_000)
 
-    private func window(_ seconds: Int?, percent: Double? = 10, resetAt: Date? = nil) -> Window {
-        Window(usedPercent: percent, windowSeconds: seconds, resetAt: resetAt ?? reset)
+    private func window(
+        _ seconds: Int?,
+        percent: Double? = 10,
+        resetAt: Date? = nil,
+        resetAfterSeconds: Int? = nil
+    ) -> Window {
+        Window(usedPercent: percent, windowSeconds: seconds, resetAt: resetAt ?? reset, resetAfterSeconds: resetAfterSeconds)
     }
 
     private func usage(
@@ -84,11 +89,26 @@ struct OpenAIReportMapperTests {
     @Test func aWindowResettingAWholeLengthAwayHasNotStarted() {
         let report = map(usage(
             primary: window(18000, percent: 0, resetAt: now.addingTimeInterval(18000)),
-            secondary: window(604_800, percent: 0, resetAt: now.addingTimeInterval(604_800 + 30))
+            secondary: window(604_800, percent: 0, resetAt: now.addingTimeInterval(604_800 + 3))
         ))
 
         #expect(report.windows.map(\.resetsAt) == [nil, nil])
         #expect(report.windows.map(\.isOpen) == [false, false])
+    }
+
+    @Test func aWindowWithItsWholeLengthLeftHasNotStarted() {
+        let report = map(usage(primary: window(
+            18000, percent: 0, resetAt: now.addingTimeInterval(17_000), resetAfterSeconds: 18000
+        )))
+
+        #expect(report.windows.map(\.resetsAt) == [nil])
+    }
+
+    @Test func aWindowWithLessThanItsLengthLeftIsRunning() {
+        let resetAt = now.addingTimeInterval(18_000)
+        let report = map(usage(primary: window(18000, percent: 0, resetAt: resetAt, resetAfterSeconds: 17_990)))
+
+        #expect(report.windows.map(\.resetsAt) == [resetAt])
     }
 
     @Test func aSessionStartedAMinuteAgoIsRunning() {

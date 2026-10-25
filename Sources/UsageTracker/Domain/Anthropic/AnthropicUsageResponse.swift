@@ -8,6 +8,14 @@ struct AnthropicUsageResponse: Equatable, Sendable {
     struct UsageWindow: Equatable, Sendable {
         let utilization: Double?
         let resetsAt: Date?
+        /// `resets_at` is present and not null but is not an ISO 8601 date.
+        let hasUnreadableReset: Bool
+
+        init(utilization: Double?, resetsAt: Date?, hasUnreadableReset: Bool = false) {
+            self.utilization = utilization
+            self.resetsAt = resetsAt
+            self.hasUnreadableReset = hasUnreadableReset
+        }
     }
 
     struct ScopedLimit: Equatable, Sendable {
@@ -68,8 +76,11 @@ extension AnthropicUsageResponse.UsageWindow: Decodable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         utilization = container.decodeLossyNumber(forKey: .utilization)
-        // A bad date costs the countdown, not the whole window.
+        // A bad date costs the countdown, not the whole window; the flag lets
+        // the service refuse a report whose session state it cannot trust.
         resetsAt = (try? container.decodeIfPresent(Date.self, forKey: .resetsAt)) ?? nil
+        hasUnreadableReset = resetsAt == nil && container.contains(.resetsAt)
+            && (try? container.decodeNil(forKey: .resetsAt)) == false
     }
 }
 

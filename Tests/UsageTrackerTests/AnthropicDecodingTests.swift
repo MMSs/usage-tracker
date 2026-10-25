@@ -41,6 +41,18 @@ import Testing
         #expect(response.legacyModelWindows.values.allSatisfy { $0.utilization == nil })
     }
 
+    @Test func unreadableResetIsFlaggedNotDropped() throws {
+        let bad = try usage(#"{"five_hour":{"utilization":37.0,"resets_at":"next tuesday"}}"#)
+        #expect(bad.fiveHour?.utilization == 37)
+        #expect(bad.fiveHour?.resetsAt == nil)
+        #expect(bad.fiveHour?.hasUnreadableReset == true)
+
+        let null = try usage(#"{"five_hour":{"utilization":37.0,"resets_at":null}}"#)
+        #expect(null.fiveHour?.hasUnreadableReset == false)
+        let absent = try usage(#"{"five_hour":{"utilization":37.0}}"#)
+        #expect(absent.fiveHour?.hasUnreadableReset == false)
+    }
+
     @Test func oldFixtureShapeDecodesWindowsAndScopedLimits() throws {
         let response = try usage("""
         {"five_hour":{"utilization":37.0,"resets_at":"2026-10-24T19:59:59.661633+00:00"},

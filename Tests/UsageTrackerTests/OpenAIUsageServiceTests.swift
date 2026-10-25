@@ -33,6 +33,18 @@ struct OpenAIUsageServiceTests {
         #expect(response.planType == "plus")
     }
 
+    @Test(arguments: [
+        #"{"rate_limit":{"primary_window":{"used_percent":3,"limit_window_seconds":18000,"reset_at":"soon"}}}"#,
+        #"{"rate_limit":{"secondary_window":{"used_percent":3,"limit_window_seconds":604800,"reset_at":"soon"}}}"#,
+    ])
+    func anUnreadableSessionResetIsADecodingError(json: String) async throws {
+        let service = OpenAIUsageService(client: RecordingHTTPClient(response: .ok(json: json)))
+
+        await #expect(throws: FetchError.decoding) {
+            try await service.fetchUsage(auth: try auth(accountID: "acct-1"))
+        }
+    }
+
     @Test
     func missingAccountIDOmitsTheHeader() async throws {
         let client = try RecordingHTTPClient(response: .ok(json: fixture("openai-wham-usage")))

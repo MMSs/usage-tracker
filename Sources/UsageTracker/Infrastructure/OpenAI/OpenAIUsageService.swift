@@ -29,7 +29,15 @@ final class OpenAIUsageService: OpenAIUsageFetching {
             overrides: [401: OpenAIUsageError.accessTokenExpired]
         )
 
-        return try HTTPResponseHandler.decode(OpenAIUsageResponse.self, from: data)
+        let usage = try HTTPResponseHandler.decode(OpenAIUsageResponse.self, from: data)
+
+        // An unreadable reset would read as a closed session, which auto-start acts on.
+        if usage.primary?.hasUnreadableReset == true || usage.secondary?.hasUnreadableReset == true {
+            Log.http.error("usage response has an unreadable reset time")
+            throw FetchError.decoding
+        }
+
+        return usage
     }
 
     private func request(auth: CodexAuth) -> URLRequest {
