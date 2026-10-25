@@ -5,16 +5,16 @@ import Testing
 
 @MainActor
 @Suite struct MenuBarRenderingTests {
-    private func meter(_ letter: String, _ text: String, fraction: Double? = 0.4, tick: Double? = nil, countdown: String? = "2h10") -> MenuBarMeter {
-        MenuBarMeter(letter: letter, text: text, countdown: countdown, fraction: fraction, tick: tick, tint: .onPace)
+    private func meter(_ letter: String, _ text: String, fraction: Double? = 0.4, tick: Double? = nil, countdown: String? = "2h10", role: MenuBarMeter.Role = .short) -> MenuBarMeter {
+        MenuBarMeter(letter: letter, text: text, countdown: countdown, fraction: fraction, tick: tick, tint: .onPace, role: role)
     }
 
     private var twoMeters: HalfDisplay {
-        .meters([meter("S", "41%"), meter("W", "62%", tick: 0.5)], stale: false, errorMark: false)
+        .meters([meter("S", "41%"), meter("W", "62%", tick: 0.5, role: .long)], stale: false, errorMark: false)
     }
 
     private var money: HalfDisplay {
-        .money(text: "$12.40", meter: meter("$", "$12.40", tick: 0.3), stale: false, errorMark: false)
+        .money(text: "$12.40", meter: meter("$", "$12.40", tick: 0.3, role: .spend), stale: false, errorMark: false)
     }
 
     private func render(_ item: MenuBarItem, _ appearance: MenuBarAppearance = .default) -> NSImage? {
@@ -62,7 +62,7 @@ import Testing
     @Test func singleMeterItemIsNarrowerThanTwoMeterItem() throws {
         let one = MenuBarItem(
             provider: .cursor,
-            subscription: .meters([meter("C", "∞", fraction: nil)], stale: false, errorMark: false),
+            subscription: .meters([meter("C", "∞", fraction: nil, role: .long)], stale: false, errorMark: false),
             api: nil
         )
         let two = MenuBarItem(provider: .cursor, subscription: twoMeters, api: nil)
@@ -78,6 +78,14 @@ import Testing
         let both = MenuBarItem(provider: .cursor, subscription: twoMeters, api: money)
 
         #expect(try #require(render(both)).size.width > (try #require(render(alone)).size.width))
+    }
+
+    @Test func hidingAHalfNarrowsTheImage() throws {
+        let item = MenuBarItem(provider: .cursor, subscription: twoMeters, api: money)
+        var hidden = MenuBarAppearance.default
+        hidden.showAPISpend = false
+
+        #expect(try #require(render(item, hidden)).size.width < (try #require(render(item)).size.width))
     }
 
     @Test func statusStatesRender() throws {

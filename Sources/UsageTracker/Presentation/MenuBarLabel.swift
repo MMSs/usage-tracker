@@ -11,6 +11,8 @@ struct MenuBarLabel: View {
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let shown = item.visible(in: appearance)
+
         if let image = MenuBarItemImage.render(
             item,
             appearance: appearance,
@@ -18,9 +20,9 @@ struct MenuBarLabel: View {
             darkMenuBar: colorScheme == .dark
         ) {
             Image(nsImage: image)
-                .accessibilityLabel(item.accessibilityText(displayName: displayName))
+                .accessibilityLabel(shown.accessibilityText(displayName: displayName))
         } else {
-            Text(item.accessibilityText(displayName: displayName))
+            Text(shown.accessibilityText(displayName: displayName))
         }
     }
 }

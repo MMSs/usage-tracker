@@ -110,8 +110,8 @@ private func apiReport(spent: Decimal) -> ProviderReport {
     }
 
     @Test func aLineShowsTheValueTheCountdownOrBoth() {
-        let running = MenuBarMeter(letter: "S", text: "41%", countdown: "2h10", fraction: 0.41, tick: nil, tint: .onPace)
-        let closed = MenuBarMeter(letter: "S", text: "0%", countdown: nil, fraction: 0, tick: nil, tint: .onPace)
+        let running = MenuBarMeter(letter: "S", text: "41%", countdown: "2h10", fraction: 0.41, tick: nil, tint: .onPace, role: .short)
+        let closed = MenuBarMeter(letter: "S", text: "0%", countdown: nil, fraction: 0, tick: nil, tint: .onPace, role: .short)
 
         #expect(running.lineText(showsValue: true, showsCountdown: true) == "41% · 2h10")
         #expect(running.lineText(showsValue: true, showsCountdown: false) == "41%")
@@ -332,6 +332,106 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         let tick = try #require(apiMeter.tick)
         #expect(abs(tick - 24.0 / 31.0) < 0.0001)
         #expect(item.subscription == nil)
+    }
+
+    private func bothHalves() throws -> MenuBarItem {
+        try #require(build(.anthropic, subscription: ready(anthropicReport), api: ready(apiReport(spent: Decimal(string: "37.84")!)), apiBudget: 100))
+    }
+
+    @Test func metersCarryTheirRole() throws {
+        let anthropic = try #require(build(.anthropic, subscription: ready(anthropicReport)))
+        #expect(meters(anthropic.subscription).map(\.role) == [.short, .long])
+
+        let report = cursorReport(unit: .percent, spent: 40, limit: 100, todaySpend: 1, percentUsed: 40)
+        let cursor = try #require(build(.cursor, subscription: ready(report)))
+        #expect(meters(cursor.subscription).map(\.role) == [.short, .long])
+
+        let unlimited = try #require(build(.cursor, subscription: ready(cursorReport(unit: .dollars, spent: 12, limit: nil, todaySpend: nil, percentUsed: nil))))
+        #expect(meters(unlimited.subscription).map(\.role) == [.long])
+
+        guard case let .money(_, meter, _, _) = try bothHalves().api else {
+            Issue.record("expected money")
+            return
+        }
+        #expect(try #require(meter).role == .spend)
+    }
+
+    @Test func hidingPlanUsageLeavesTheAPISpend() throws {
+        let item = try bothHalves()
+        let shown = item.visible(in: MenuBarAppearance().showingPlanUsage(false))
+
+        #expect(shown.subscription == nil)
+        #expect(shown.api == item.api)
+        #expect(!shown.showsDivider)
+    }
+
+    @Test func hidingAPISpendLeavesPlanUsage() throws {
+        let item = try bothHalves()
+        let shown = item.visible(in: MenuBarAppearance().showingAPISpend(false))
+
+        #expect(shown.api == nil)
+        #expect(shown.subscription == item.subscription)
+        #expect(!shown.showsDivider)
+    }
+
+    @Test func aHiddenHalfStillDrawsWhenItIsTheOnlyOne() throws {
+        // Cursor has no API half: the global switch must not empty its item.
+        let item = try #require(build(.cursor, subscription: ready(cursorReport(unit: .percent, spent: 40, limit: 100, todaySpend: 1, percentUsed: 40))))
+        let shown = item.visible(in: MenuBarAppearance().showingPlanUsage(false))
+
+        #expect(shown.subscription == item.subscription)
+    }
+
+    @Test func bothHalvesOffKeepsBothHalves() throws {
+        let item = try bothHalves()
+        var appearance = MenuBarAppearance()
+        appearance.showPlanUsage = false
+        appearance.showAPISpend = false
+
+        #expect(item.visible(in: appearance) == item)
+    }
+
+    @Test func limitsKeepsTheChosenMeter() throws {
+        let item = try #require(build(.anthropic, subscription: ready(anthropicReport)))
+        var appearance = MenuBarAppearance()
+
+        appearance.limits = .short
+        #expect(meters(item.visible(in: appearance).subscription).map(\.letter) == ["S"])
+        appearance.limits = .long
+        #expect(meters(item.visible(in: appearance).subscription).map(\.letter) == ["W"])
+        appearance.limits = .both
+        #expect(item.visible(in: appearance) == item)
+
+        // Status and the stale and error flags are not touched.
+        let failed = HalfSnapshot(status: .error, report: anthropicReport, isStale: false)
+        let marked = try #require(build(.anthropic, subscription: failed))
+        appearance.limits = .short
+        guard case let .meters(list, stale, errorMark) = marked.visible(in: appearance).subscription else {
+            Issue.record("expected meters")
+            return
+        }
+        #expect(list.map(\.letter) == ["S"])
+        #expect(stale && errorMark)
+
+        let expired = try #require(build(.anthropic, subscription: HalfSnapshot(status: .expired, report: nil, isStale: true)))
+        #expect(expired.visible(in: appearance) == expired)
+    }
+
+    @Test func limitsFallsBackWhenTheChosenMeterIsMissing() throws {
+        // No budget, so Cursor has no Today meter.
+        let item = try #require(build(.cursor, subscription: ready(cursorReport(unit: .dollars, spent: 40, limit: nil, todaySpend: nil, percentUsed: nil))))
+        var appearance = MenuBarAppearance()
+        appearance.limits = .short
+
+        #expect(item.visible(in: appearance) == item)
+    }
+
+    @Test func limitsLeavesTheAPIMeterAlone() throws {
+        let item = try #require(build(.anthropic, subscription: nil, api: ready(apiReport(spent: Decimal(string: "37.84")!)), apiBudget: 100))
+        var appearance = MenuBarAppearance()
+        appearance.limits = .long
+
+        #expect(item.visible(in: appearance) == item)
     }
 
     @Test func apiReportWithoutSpendIsError() throws {

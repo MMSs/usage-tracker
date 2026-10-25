@@ -284,8 +284,8 @@ struct ProviderStatusHeader: View {
         item: MenuBarItem(
             provider: .cursor,
             subscription: .meters([
-                MenuBarMeter(letter: "D", text: "12/48", countdown: nil, fraction: 0.25, tick: nil, tint: .onPace),
-                MenuBarMeter(letter: "C", text: "41%", countdown: nil, fraction: 0.41, tick: 0.5, tint: .onPace),
+                MenuBarMeter(letter: "D", text: "12/48", countdown: nil, fraction: 0.25, tick: nil, tint: .onPace, role: .short),
+                MenuBarMeter(letter: "C", text: "41%", countdown: nil, fraction: 0.41, tick: 0.5, tint: .onPace, role: .long),
             ], stale: false, errorMark: false),
             api: nil
         ),

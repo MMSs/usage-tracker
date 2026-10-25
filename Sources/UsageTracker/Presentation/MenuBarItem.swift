@@ -24,6 +24,12 @@ struct MenuBarMeter: Equatable {
     let fraction: Double?
     let tick: Double?
     let tint: PacingTint
+    let role: Role
+
+    /// Which limit a meter measures; the Limits setting keeps meters by it.
+    enum Role: Equatable, Sendable {
+        case short, long, spend
+    }
 
     /// What follows the letter: the value, the countdown, or both. A
     /// countdown-only line with no reset to count to reads "—".
@@ -77,6 +83,31 @@ struct MenuBarItem: Equatable {
             api?.accessibilityText(half: .api),
         ]
         return ([displayName] + halves.compactMap { $0 }).joined(separator: ", ")
+    }
+}
+
+extension MenuBarItem {
+    /// What the appearance lets the item draw. Neither half switch ever
+    /// empties the item, and a Limits choice with no matching meter keeps all.
+    func visible(in appearance: MenuBarAppearance) -> MenuBarItem {
+        var subscription = appearance.showPlanUsage ? subscription : nil
+        var api = appearance.showAPISpend ? api : nil
+
+        if subscription == nil, api == nil {
+            subscription = self.subscription
+            api = self.api
+        }
+
+        if case let .meters(meters, stale, errorMark) = subscription, appearance.limits != .both {
+            let role: MenuBarMeter.Role = appearance.limits == .short ? .short : .long
+            let kept = meters.filter { $0.role == role }
+
+            if !kept.isEmpty {
+                subscription = .meters(kept, stale: stale, errorMark: errorMark)
+            }
+        }
+
+        return MenuBarItem(provider: provider, subscription: subscription, api: api)
     }
 }
 
@@ -182,7 +213,7 @@ enum MenuBarItemBuilder {
 
         if let shortID = descriptor.shortWindowID {
             if let window = report.windows.first(where: { $0.id == shortID }) {
-                meters.append(windowMeter(letter: "S", window: window, now: now))
+                meters.append(windowMeter(letter: "S", window: window, now: now, role: .short))
             }
         } else if let spend = report.spend, let today = todayMeter(spend: spend, now: now, calendar: calendar) {
             meters.append(today)
@@ -209,7 +240,7 @@ enum MenuBarItemBuilder {
             guard let spend = report.spend, spend.limit == nil else {
                 return nil
             }
-            return MenuBarMeter(letter: letter, text: "∞", countdown: nil, fraction: nil, tick: nil, tint: .neutral)
+            return MenuBarMeter(letter: letter, text: "∞", countdown: nil, fraction: nil, tick: nil, tint: .neutral, role: .long)
         }
 
         let countdown = window.resetsAt.map { CountdownFormatter.compact(until: $0, now: now) }
@@ -219,7 +250,7 @@ enum MenuBarItemBuilder {
             guard let limit = money.limit else {
                 return MenuBarMeter(
                     letter: letter, text: "\(spendText(money.amount))/—", countdown: countdown,
-                    fraction: nil, tick: nil, tint: .neutral
+                    fraction: nil, tick: nil, tint: .neutral, role: .long
                 )
             }
 
@@ -229,12 +260,13 @@ enum MenuBarItemBuilder {
                 countdown: countdown,
                 fraction: pacing?.fillFraction ?? min(max(window.percentUsed / 100, 0), 1),
                 tick: pacing?.tickFraction,
-                tint: pacing.map { PacingTint.forPacing($0) } ?? PacingTint.forRemaining(percentUsed: window.percentUsed)
+                tint: pacing.map { PacingTint.forPacing($0) } ?? PacingTint.forRemaining(percentUsed: window.percentUsed),
+                role: .long
             )
         }
 
         guard let pacing else {
-            return windowMeter(letter: letter, window: window, now: now)
+            return windowMeter(letter: letter, window: window, now: now, role: .long)
         }
 
         return MenuBarMeter(
@@ -243,18 +275,20 @@ enum MenuBarItemBuilder {
             countdown: countdown,
             fraction: pacing.fillFraction,
             tick: pacing.tickFraction,
-            tint: PacingTint.forPacing(pacing)
+            tint: PacingTint.forPacing(pacing),
+            role: .long
         )
     }
 
-    private static func windowMeter(letter: String, window: LimitWindow, now: Date) -> MenuBarMeter {
+    private static func windowMeter(letter: String, window: LimitWindow, now: Date, role: MenuBarMeter.Role) -> MenuBarMeter {
         MenuBarMeter(
             letter: letter,
             text: window.percentText,
             countdown: window.resetsAt.map { CountdownFormatter.compact(until: $0, now: now) },
             fraction: min(max(window.percentUsed / 100, 0), 1),
             tick: TimePacing.idealFraction(for: window, now: now),
-            tint: PacingTint.forWindow(window, now: now)
+            tint: PacingTint.forWindow(window, now: now),
+            role: role
         )
     }
 
@@ -264,7 +298,7 @@ enum MenuBarItemBuilder {
             return nil
         }
 
-        let unknown = MenuBarMeter(letter: "D", text: "—", countdown: nil, fraction: nil, tick: nil, tint: .neutral)
+        let unknown = MenuBarMeter(letter: "D", text: "—", countdown: nil, fraction: nil, tick: nil, tint: .neutral, role: .short)
 
         guard !spend.daily.isEmpty,
               let pacing = PacingCalculator.make(spend, today: now, calendar: calendar)
@@ -287,7 +321,8 @@ enum MenuBarItemBuilder {
             countdown: nil,
             fraction: fraction,
             tick: nil,
-            tint: PacingTint.forSpend(spent, budget: budget)
+            tint: PacingTint.forSpend(spent, budget: budget),
+            role: .short
         )
     }
 
@@ -308,7 +343,8 @@ enum MenuBarItemBuilder {
             countdown: nil,
             fraction: pacing.fillFraction,
             tick: pacing.tickFraction,
-            tint: PacingTint.forPacing(pacing)
+            tint: PacingTint.forPacing(pacing),
+            role: .spend
         )
     }
 
