@@ -24,10 +24,12 @@ struct MenuBarAppearance: Equatable, Codable, Sendable {
 
     var drawsText: Bool { showText }
     var drawsGraph: Bool { showGraph }
+    var drawsCountdown: Bool { countdown }
 
-    /// Ignored when it would leave the item with neither text nor graph.
+    /// Each switch is ignored when it would leave the item with no text,
+    /// countdown or graph.
     func showingText(_ shows: Bool) -> MenuBarAppearance {
-        guard shows || showGraph else {
+        guard shows || countdown || showGraph else {
             return self
         }
 
@@ -36,8 +38,18 @@ struct MenuBarAppearance: Equatable, Codable, Sendable {
         return copy
     }
 
+    func showingCountdown(_ shows: Bool) -> MenuBarAppearance {
+        guard shows || showText || showGraph else {
+            return self
+        }
+
+        var copy = self
+        copy.countdown = shows
+        return copy
+    }
+
     func showingGraph(_ shows: Bool) -> MenuBarAppearance {
-        guard shows || showText else {
+        guard shows || showText || countdown else {
             return self
         }
 

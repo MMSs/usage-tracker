@@ -176,14 +176,15 @@ struct MenuBarAppearanceRows: View {
     var body: some View {
         SettingsRow(label: "Show text") {
             SwitchToggle(isOn: binding(\.showText) { $0.showingText($1) })
-                .disabled(appearance.showText && !appearance.showGraph)
+                .disabled(appearance.showText && !appearance.countdown && !appearance.showGraph)
         }
         SettingsRow(label: "Countdown") {
-            SwitchToggle(isOn: binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
+            SwitchToggle(isOn: binding(\.countdown) { $0.showingCountdown($1) })
+                .disabled(appearance.countdown && !appearance.showText && !appearance.showGraph)
         }
         SettingsRow(label: "Show graph") {
             SwitchToggle(isOn: binding(\.showGraph) { $0.showingGraph($1) })
-                .disabled(appearance.showGraph && !appearance.showText)
+                .disabled(appearance.showGraph && !appearance.showText && !appearance.countdown)
         }
         SettingsRow(label: "Graph style") {
             Picker("Graph style", selection: binding(\.graphStyle) { var copy = $0; copy.graphStyle = $1; return copy }) {

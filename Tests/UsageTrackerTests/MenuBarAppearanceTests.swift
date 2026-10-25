@@ -13,6 +13,15 @@ import Testing
         #expect(MenuBarAppearance(showText: false, showGraph: false).showingText(true).showText == true)
     }
 
+    @Test func countdownCountsAsAVisiblePart() {
+        let countdownOnly = MenuBarAppearance(showText: false, countdown: true, showGraph: false)
+        #expect(countdownOnly.showingCountdown(false).countdown == true)
+        #expect(MenuBarAppearance(showText: true, countdown: true, showGraph: false).showingText(false).showText == false)
+        #expect(MenuBarAppearance(showText: false, countdown: true, showGraph: true).showingGraph(false).showGraph == false)
+        #expect(MenuBarAppearance(showText: true, countdown: true, showGraph: false).showingCountdown(false).countdown == false)
+        #expect(MenuBarAppearance(showText: false, countdown: false, showGraph: true).showingCountdown(true).countdown == true)
+    }
+
     @Test func defaults() {
         let appearance = MenuBarAppearance.default
         #expect(appearance.showText && appearance.showGraph)
@@ -25,5 +34,7 @@ import Testing
         #expect(MenuBarAppearance(showText: true, showGraph: false).drawsText)
         #expect(!MenuBarAppearance(showText: true, showGraph: false).drawsGraph)
         #expect(MenuBarAppearance(showText: false, showGraph: true).drawsGraph)
+        #expect(MenuBarAppearance(showText: false, countdown: true, showGraph: true).drawsCountdown)
+        #expect(!MenuBarAppearance(showText: true, countdown: false, showGraph: true).drawsCountdown)
     }
 }

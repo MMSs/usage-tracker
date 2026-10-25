@@ -17,13 +17,24 @@ enum MenuBarStatus: Equatable {
 
 struct MenuBarMeter: Equatable {
     let letter: String
-    /// "41%", "73.50/200", "73.50/—" or "∞"; the renderer appends the countdown when asked.
+    /// "41%", "73.50/200", "73.50/—" or "∞".
     let text: String
     let countdown: String?
     /// 0...1 fill; nil when unknown.
     let fraction: Double?
     let tick: Double?
     let tint: PacingTint
+
+    /// What follows the letter: the value, the countdown, or both. A
+    /// countdown-only line with no reset to count to reads "—".
+    func lineText(showsValue: Bool, showsCountdown: Bool) -> String {
+        switch (showsValue, showsCountdown ? countdown : nil) {
+        case let (true, countdown?): "\(text) · \(countdown)"
+        case (true, nil): text
+        case let (false, countdown?): countdown
+        case (false, nil): showsCountdown ? "—" : text
+        }
+    }
 }
 
 enum HalfDisplay: Equatable {

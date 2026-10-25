@@ -110,8 +110,13 @@ private struct HalfView: View {
             statusView(status)
         case let .meters(meters, stale, errorMark):
             HStack(spacing: 4) {
-                if appearance.drawsText {
-                    MenuBarText(meters: meters, countdown: appearance.countdown, palette: palette)
+                if appearance.drawsText || appearance.drawsCountdown {
+                    MenuBarText(
+                        meters: meters,
+                        showsValue: appearance.drawsText,
+                        showsCountdown: appearance.drawsCountdown,
+                        palette: palette
+                    )
                 }
 
                 if appearance.drawsGraph {
@@ -185,7 +190,8 @@ private struct ErrorMark: ViewModifier {
 /// line has the height to itself, so it uses the menu bar's own text size.
 private struct MenuBarText: View {
     let meters: [MenuBarMeter]
-    let countdown: Bool
+    let showsValue: Bool
+    let showsCountdown: Bool
     let palette: MenuBarPalette
 
     private var isSingleLine: Bool { meters.count == 1 }
@@ -200,7 +206,7 @@ private struct MenuBarText: View {
 
     private func line(_ meter: MenuBarMeter) -> some View {
         let color = palette.text(meter.tint)
-        let text = countdown && meter.countdown != nil ? "\(meter.text) · \(meter.countdown ?? "")" : meter.text
+        let text = meter.lineText(showsValue: showsValue, showsCountdown: showsCountdown)
 
         return HStack(alignment: .firstTextBaseline, spacing: isSingleLine ? 3 : 2) {
             Text(meter.letter)

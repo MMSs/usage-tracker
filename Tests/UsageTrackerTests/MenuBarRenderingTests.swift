@@ -26,17 +26,29 @@ import Testing
 
         for style in MenuBarGraphStyle.allCases {
             for text in [true, false] {
-                for graph in [true, false] where text || graph {
-                    for colored in [true, false] {
-                        let appearance = MenuBarAppearance(showText: text, countdown: text, showGraph: graph, graphStyle: style, colored: colored)
-                        let image = try #require(render(item, appearance))
+                for countdown in [true, false] {
+                    for graph in [true, false] where text || countdown || graph {
+                        for colored in [true, false] {
+                            let appearance = MenuBarAppearance(
+                                showText: text, countdown: countdown, showGraph: graph, graphStyle: style, colored: colored
+                            )
+                            let image = try #require(render(item, appearance))
 
-                        #expect(image.size.width > 0)
-                        #expect(image.isTemplate == !colored)
+                            #expect(image.size.width > 0)
+                            #expect(image.isTemplate == !colored)
+                        }
                     }
                 }
             }
         }
+    }
+
+    @Test func countdownShowsWithoutText() throws {
+        let item = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
+        let graphOnly = MenuBarAppearance(showText: false, countdown: false, showGraph: true)
+        let graphAndCountdown = MenuBarAppearance(showText: false, countdown: true, showGraph: true)
+
+        #expect(try #require(render(item, graphAndCountdown)).size.width > (try #require(render(item, graphOnly)).size.width))
     }
 
     @Test func singleMeterItemIsNarrowerThanTwoMeterItem() throws {

@@ -109,6 +109,17 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(list[0].text.hasSuffix("%"))
     }
 
+    @Test func aLineShowsTheValueTheCountdownOrBoth() {
+        let running = MenuBarMeter(letter: "S", text: "41%", countdown: "2h10", fraction: 0.41, tick: nil, tint: .onPace)
+        let closed = MenuBarMeter(letter: "S", text: "0%", countdown: nil, fraction: 0, tick: nil, tint: .onPace)
+
+        #expect(running.lineText(showsValue: true, showsCountdown: true) == "41% · 2h10")
+        #expect(running.lineText(showsValue: true, showsCountdown: false) == "41%")
+        #expect(running.lineText(showsValue: false, showsCountdown: true) == "2h10")
+        #expect(closed.lineText(showsValue: true, showsCountdown: true) == "0%")
+        #expect(closed.lineText(showsValue: false, showsCountdown: true) == "—")
+    }
+
     @Test func menuBarMoneyRoundsHalfUp() {
         #expect(MenuBarItemBuilder.spendText(Decimal(string: "2.985")!) == "2.99")
         #expect(MenuBarItemBuilder.spendText(Decimal(string: "15.345")!) == "15.35")
