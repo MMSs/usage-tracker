@@ -52,6 +52,22 @@ import Testing
         #expect(notifier.delivered.map(\.key) == ["a.1.80", "a.2.80"])
     }
 
+    @Test func theStoreIsWrittenOnlyWhenAKeyChanges() {
+        let monitor = monitor
+
+        monitor.evaluate([measure(10)], delivers: true)
+        #expect(store.writes == 0)
+
+        monitor.evaluate([measure(82)], delivers: true)
+        monitor.evaluate([measure(83)], delivers: true)
+        #expect(store.keys == ["anthropic.weekly.1.80"])
+        #expect(store.writes == 1)
+
+        monitor.evaluate([measure(50)], delivers: true)
+        #expect(store.keys.isEmpty)
+        #expect(store.writes == 2)
+    }
+
     @Test func switchedOffStillMarksSoTurningOnDoesNotFlood() {
         let monitor = monitor
 

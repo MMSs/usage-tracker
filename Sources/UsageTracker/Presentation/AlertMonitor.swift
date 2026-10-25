@@ -23,19 +23,24 @@ final class AlertMonitor {
         for measure in measures {
             let reached = AlertPolicy.thresholds.filter { measure.percent >= Double($0) }
 
-            // Falling back below a threshold re-arms it.
+            // Falling back below a threshold re-arms it. The store is only
+            // written when a key changes, not on every refresh.
             for threshold in AlertPolicy.thresholds where !reached.contains(threshold) {
-                store.clearDelivered("\(measure.id).\(threshold)")
+                let key = "\(measure.id).\(threshold)"
+                if store.hasDelivered(key) {
+                    store.clearDelivered(key)
+                }
             }
 
             guard let highest = reached.max() else {
                 continue
             }
 
-            let fresh = reached.contains { !store.hasDelivered("\(measure.id).\($0)") }
-            for threshold in reached {
-                store.markDelivered("\(measure.id).\(threshold)")
+            let unmarked = reached.map { "\(measure.id).\($0)" }.filter { !store.hasDelivered($0) }
+            for key in unmarked {
+                store.markDelivered(key)
             }
+            let fresh = !unmarked.isEmpty
 
             if fresh, delivers {
                 notifier.deliver(AlertPolicy.alert(for: measure, threshold: highest))
