@@ -7,6 +7,7 @@ struct MenuBarGraph: View {
     let style: MenuBarGraphStyle
     let meters: [MenuBarMeter]
     let palette: MenuBarPalette
+    var now: Date = Date()
 
     var body: some View {
         let size = MenuBarGraphGeometry.size(style, meterCount: meters.count)
@@ -32,6 +33,8 @@ struct MenuBarGraph: View {
             MenuBarColumns(meters: meters, palette: palette)
         case .pie:
             MenuBarPie(meters: meters, palette: palette)
+        case .sparkline:
+            MenuBarSparkline(meters: meters, palette: palette, now: now)
         case .dials:
             MenuBarDials(meters: meters, palette: palette)
         }
@@ -379,6 +382,71 @@ private struct MenuBarPie: View {
 
             path.closeSubpath()
         }
+    }
+}
+
+/// The last twelve hours as a line, the first meter solid with a dot at the
+/// live value and the second behind it at 0.45 opacity, over a hairline
+/// baseline. A tick is a short dash at the right edge.
+private struct MenuBarSparkline: View {
+    let meters: [MenuBarMeter]
+    let palette: MenuBarPalette
+    let now: Date
+
+    private let frame = MenuBarGraphGeometry.sparklineSize
+    private let lineWidth: CGFloat = 1.5
+    private let dot: CGFloat = 3
+    private let tickSize = CGSize(width: 3, height: 1.5)
+
+    /// Pulls a point in by half the line width, so the stroke and its round
+    /// caps stay inside the frame at 0% and 100%.
+    private func inset(_ point: CGPoint) -> CGPoint {
+        let half = lineWidth / 2
+
+        return CGPoint(
+            x: half + point.x * (frame.width - lineWidth) / frame.width,
+            y: half + point.y * (frame.height - lineWidth) / frame.height
+        )
+    }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            Rectangle()
+                .fill(palette.track)
+                .frame(width: frame.width, height: 0.5)
+                .offset(y: frame.height - 0.5)
+
+            ForEach(Array(meters.prefix(2).enumerated()).reversed(), id: \.offset) { index, meter in
+                let opacity = index == 0 ? 1.0 : 0.45
+                let points = MenuBarGraphGeometry.sparklinePoints(
+                    samples: meter.samples, current: meter.fraction, now: now, size: frame
+                )
+
+                if let end = points.last {
+                    Path { path in
+                        path.addLines(points.map(inset))
+                    }
+                    .stroke(palette.fill(meter.tint).opacity(opacity), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
+
+                    if index == 0 {
+                        Circle()
+                            .fill(palette.fill(meter.tint))
+                            .frame(width: dot, height: dot)
+                            .offset(x: min(inset(end).x, frame.width - dot / 2) - dot / 2, y: min(max(inset(end).y, dot / 2), frame.height - dot / 2) - dot / 2)
+                    }
+                }
+
+                if let tick = meter.tick {
+                    let y = min(max(frame.height * (1 - min(max(tick, 0), 1)), tickSize.height / 2), frame.height - tickSize.height / 2)
+
+                    Capsule()
+                        .fill(palette.tick)
+                        .frame(width: tickSize.width, height: tickSize.height)
+                        .offset(x: frame.width - tickSize.width, y: y - tickSize.height / 2)
+                }
+            }
+        }
+        .frame(width: frame.width, height: frame.height, alignment: .topLeading)
     }
 }
 

@@ -13,7 +13,8 @@ enum MenuBarItemImage {
         _ full: MenuBarItem,
         appearance: MenuBarAppearance,
         displayName: String,
-        darkMenuBar: Bool
+        darkMenuBar: Bool,
+        now: Date = Date()
     ) -> NSImage? {
         let item = full.visible(in: appearance)
         let colored = isColored(item, appearance: appearance)
@@ -21,7 +22,7 @@ enum MenuBarItemImage {
             foreground: colored && darkMenuBar ? .white : .black,
             colored: colored
         )
-        let content = MenuBarItemContent(item: item, appearance: appearance, palette: palette)
+        let content = MenuBarItemContent(item: item, appearance: appearance, palette: palette, now: now)
             .frame(height: height)
 
         let renderer = ImageRenderer(content: content)
@@ -76,6 +77,7 @@ private struct MenuBarItemContent: View {
     let item: MenuBarItem
     let appearance: MenuBarAppearance
     let palette: MenuBarPalette
+    let now: Date
 
     var body: some View {
         HStack(spacing: 4) {
@@ -84,7 +86,7 @@ private struct MenuBarItemContent: View {
                 .frame(width: 14, height: 14)
 
             if let subscription = item.subscription {
-                HalfView(display: subscription, appearance: appearance, palette: palette)
+                HalfView(display: subscription, appearance: appearance, palette: palette, now: now)
             }
 
             if item.showsDivider {
@@ -94,7 +96,7 @@ private struct MenuBarItemContent: View {
             }
 
             if let api = item.api {
-                HalfView(display: api, appearance: appearance, palette: palette)
+                HalfView(display: api, appearance: appearance, palette: palette, now: now)
             }
         }
     }
@@ -104,6 +106,7 @@ private struct HalfView: View {
     let display: HalfDisplay
     let appearance: MenuBarAppearance
     let palette: MenuBarPalette
+    let now: Date
 
     var body: some View {
         switch display {
@@ -144,7 +147,7 @@ private struct HalfView: View {
     }
 
     private func graph(_ meters: [MenuBarMeter]) -> some View {
-        MenuBarGraph(style: appearance.graphStyle, meters: meters, palette: palette)
+        MenuBarGraph(style: appearance.graphStyle, meters: meters, palette: palette, now: now)
     }
 
     private func statusView(_ status: MenuBarStatus) -> some View {

@@ -48,6 +48,80 @@ import Testing
         #expect(MenuBarGraphGeometry.size(.segments, meterCount: 1) == CGSize(width: 42.1, height: 6))
     }
 
+    private let sparkSize = CGSize(width: 40, height: 16)
+    private let sparkNow = Date(timeIntervalSince1970: 1_800_000_000)
+
+    private func sample(minutesAgo: Double, _ percent: UInt8) -> UsageSample {
+        UsageSample(date: sparkNow.addingTimeInterval(-minutesAgo * 60), percent: percent)
+    }
+
+    private func sparkline(_ samples: [UsageSample]?, current: Double?) -> [CGPoint] {
+        MenuBarGraphGeometry.sparklinePoints(samples: samples, current: current, now: sparkNow, size: sparkSize)
+    }
+
+    @Test func aSparklineEndsAtTheLiveValue() throws {
+        let points = sparkline([sample(minutesAgo: 30, 20)], current: 0.4)
+        let last = try #require(points.last)
+
+        #expect(points.count == 2)
+        #expect(abs(last.x - 40) < 1e-9)
+        #expect(abs(last.y - 16 * 0.6) < 1e-9)
+    }
+
+    @Test func aSparklineLeavesOutWhatIsOlderThanTwelveHours() {
+        let points = sparkline([sample(minutesAgo: 13 * 60, 90), sample(minutesAgo: 30, 20)], current: 0.4)
+
+        #expect(points.count == 2)
+        #expect(!points.contains { abs($0.y - 16 * 0.1) < 1e-9 })
+    }
+
+    @Test func aResetShowsAsADrop() throws {
+        let points = sparkline([sample(minutesAgo: 120, 80), sample(minutesAgo: 60, 2)], current: 0.02)
+        let high = try #require(points.firstIndex { abs($0.y - 16 * 0.2) < 1e-9 })
+        let low = try #require(points.firstIndex { abs($0.y - 16 * 0.98) < 1e-9 })
+
+        #expect(low > high)
+        #expect(points.map(\.x) == points.map(\.x).sorted())
+    }
+
+    @Test func aSparklineHasAtMostOnePointPerColumn() {
+        let samples = (0..<1_440).map { sample(minutesAgo: Double($0), UInt8($0 % 100)) }
+        let points = sparkline(samples, current: 0.5)
+        let columns = points.map { Int($0.x.rounded(.down)) }
+
+        #expect(points.count <= 41)
+        #expect(Set(columns).count == columns.count)
+        #expect(points.last == CGPoint(x: 40, y: 8))
+    }
+
+    @Test func aMeterWithoutHistoryDrawsFlat() {
+        #expect(sparkline(nil, current: 0.5) == [CGPoint(x: 0, y: 8), CGPoint(x: 40, y: 8)])
+    }
+
+    @Test func aTrackedMeterWithNoSamplesYetDrawsOnlyItsEnd() {
+        #expect(sparkline([], current: 0.5) == [CGPoint(x: 40, y: 8)])
+    }
+
+    @Test func anUnknownValueDrawsNothing() {
+        #expect(sparkline([sample(minutesAgo: 30, 20)], current: nil).isEmpty)
+        #expect(sparkline(nil, current: nil).isEmpty)
+    }
+
+    @Test func aSparklineStaysInItsBox() {
+        let points = sparkline([sample(minutesAgo: 30, 255), sample(minutesAgo: 10, 255)], current: 1.0)
+            + sparkline(nil, current: 7)
+            + sparkline([sample(minutesAgo: 30, 0)], current: -3)
+
+        for point in points {
+            #expect((0...40).contains(point.x) && (0...16).contains(point.y))
+        }
+    }
+
+    @Test func sparklineSizeIsFortyBySixteen() {
+        #expect(MenuBarGraphGeometry.size(.sparkline, meterCount: 1) == sparkSize)
+        #expect(MenuBarGraphGeometry.size(.sparkline, meterCount: 2) == sparkSize)
+    }
+
     @Test func batteryStillReadsPercentUsed() {
         let item = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
         #expect(item.visible(in: MenuBarAppearance(graphStyle: .battery)).accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 62%")
