@@ -122,25 +122,75 @@ struct SettingsPageLayout<Content: View>: View {
 }
 
 /// A titled group of rows on a soft card, the way the popover laid out its settings.
+/// With an accordion in the environment a titled section folds: its header opens it
+/// and its rows and footer show only while it is open.
 struct SettingsSection<Content: View>: View {
     /// Nil leaves the card untitled, under a tab that already names it.
     let title: String?
+    /// A caption under the card that hides with it.
+    var footer: String?
     @ViewBuilder let content: () -> Content
+
+    @Environment(\.settingsAccordion) private var accordion
+
+    private var isOpen: Bool {
+        guard let title, let accordion else {
+            return true
+        }
+
+        return accordion.wrappedValue.isOpen(title)
+    }
+
+    private var isCollapsible: Bool {
+        title != nil && accordion?.wrappedValue.isCollapsible == true
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if let title {
-                Text(title)
-                    .font(.headline)
+                header(title)
             }
 
-            VStack(alignment: .leading, spacing: 0, content: content)
-                .padding(.horizontal, 12)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.primary.opacity(0.04))
-                )
+            if isOpen {
+                VStack(alignment: .leading, spacing: 0, content: content)
+                    .padding(.horizontal, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color.primary.opacity(0.04))
+                    )
+
+                if let footer {
+                    Text(footer)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: accordion?.wrappedValue)
+    }
+
+    private func header(_ title: String) -> some View {
+        Button {
+            if isCollapsible {
+                accordion?.wrappedValue.open(title)
+            }
+        } label: {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer(minLength: 12)
+                if isCollapsible {
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(.isHeader)
     }
 }
 
@@ -287,6 +337,16 @@ struct ProviderSettingsView: View {
     let helpFieldID: String?
     /// The chosen tab; nil, or one the page lacks, shows the first.
     @Binding var tab: ProviderSettingsTab?
+    /// Which of the tab's titled sections is open; rebuilt when the tab's sections change.
+    @State private var storedAccordion = SettingsAccordion(titles: [])
+
+    private var accordion: Binding<SettingsAccordion> {
+        let titles = selectedTab.wrappedValue.sections
+        return Binding(
+            get: { storedAccordion.titles == titles ? storedAccordion : SettingsAccordion(titles: titles) },
+            set: { storedAccordion = $0 }
+        )
+    }
 
     private var settings: Binding<ProviderSettings> {
         Binding(
@@ -383,14 +443,17 @@ struct ProviderSettingsView: View {
         .labelsHidden()
         .frame(maxWidth: .infinity)
 
-        switch selectedTab.wrappedValue {
-        case .subscription:
-            credentialTab(.subscription)
-        case .api:
-            credentialTab(.api)
-        case .menuBar:
-            menuBarTab
+        Group {
+            switch selectedTab.wrappedValue {
+            case .subscription:
+                credentialTab(.subscription)
+            case .api:
+                credentialTab(.api)
+            case .menuBar:
+                menuBarTab
+            }
         }
+        .environment(\.settingsAccordion, accordion)
     }
 
     /// A half's section with the Keychain note under it.
@@ -433,25 +496,22 @@ struct ProviderSettingsView: View {
         }
     }
 
-    @ViewBuilder
     private func alertsSection(_ title: String) -> some View {
-        SettingsSection(title: title) {
+        SettingsSection(title: title, footer: appModel.alertsEnabled ? nil : "Alerts are off on the General tab.") {
             SettingsRow(label: "Alerts", isLast: true) {
                 SwitchToggle(isOn: alertsEnabled)
                     .disabled(!appModel.alertsEnabled)
             }
         }
-
-        if !appModel.alertsEnabled {
-            Text("Alerts are off on the General tab.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
     }
 
-    @ViewBuilder
     private func appearanceSection(_ title: String) -> some View {
-        SettingsSection(title: title) {
+        SettingsSection(
+            title: title,
+            footer: usesCustomAppearance.wrappedValue
+                ? "These settings apply to this provider only."
+                : "Follows the defaults on the General tab."
+        ) {
             SettingsRow(label: "Custom appearance", isLast: !usesCustomAppearance.wrappedValue) {
                 SwitchToggle(isOn: usesCustomAppearance)
             }
@@ -474,12 +534,6 @@ struct ProviderSettingsView: View {
                 )
             }
         }
-
-        Text(usesCustomAppearance.wrappedValue
-             ? "These settings apply to this provider only."
-             : "Follows the defaults on the General tab.")
-            .font(.caption)
-            .foregroundStyle(.secondary)
     }
 
     /// One half's switch and, while it is on, its credential fields. Untitled: the tab names it.
@@ -627,6 +681,7 @@ struct OpenAtLoginRows: View {
 
 struct GeneralSettingsView: View {
     @ObservedObject var appModel: AppModel
+    @State private var accordion = SettingsAccordion(titles: ["Menu bar", "Alerts", "Startup"])
 
     private var appearance: Binding<MenuBarAppearance> {
         Binding(
@@ -691,7 +746,10 @@ struct GeneralSettingsView: View {
                 MenuBarAppearanceRows(appearance: appearance, meterNames: nil, showsHalfSwitches: true)
             }
 
-            SettingsSection(title: "Alerts") {
+            SettingsSection(
+                title: "Alerts",
+                footer: "Usage thresholds notify at 80% and 95% of a limit or API budget. Session notifies when a 5-hour session resets. Refresh failures notify when a refresh fails for a reason other than the network being down."
+            ) {
                 SettingsRow(label: "Alerts") {
                     SwitchToggle(isOn: alertsEnabled)
                 }
@@ -704,10 +762,6 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            Text("Usage thresholds notify at 80% and 95% of a limit or API budget. Session notifies when a 5-hour session resets. Refresh failures notify when a refresh fails for a reason other than the network being down.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
             SettingsSection(title: "Startup") {
                 OpenAtLoginRows(loginItem: appModel.loginItem)
             }
@@ -717,5 +771,6 @@ struct GeneralSettingsView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
         }
+        .environment(\.settingsAccordion, $accordion)
     }
 }
