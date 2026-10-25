@@ -135,9 +135,9 @@ window is open and leaves when it closes.
   line under the switch shows what macOS reports, with a button to System
   Settings when it needs your approval.
 - Each provider tab: an Enabled switch (off removes the item and stops
-  fetching, credentials stay), and an optional custom appearance that overrides the defaults.
-  Each half's tab has its own refresh interval on a slider from 30 seconds to
-  1 hour (default 5 minutes).
+  fetching, credentials stay) and, on each half's tab, its own refresh interval
+  on a slider from 30 seconds to 1 hour (default 5 minutes). The Options tab can
+  give the provider its own appearance in place of the defaults.
   Refreshing pauses while the Mac is asleep or offline and resumes when both
   are back.
 - The provider tab's Options tab (called Menu bar before) holds that

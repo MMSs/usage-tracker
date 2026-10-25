@@ -402,17 +402,40 @@ struct ProviderSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            SettingsSection(title: "Refresh") {
-                SettingsRow(label: "Every", isLast: true) {
-                    RefreshIntervalSlider(interval: refreshInterval(half))
-                }
+            ForEach(ProviderSettingsTab(half).sections, id: \.self) { title in
+                section(title, half: half)
             }
         }
     }
 
-    @ViewBuilder
     private var menuBarTab: some View {
-        SettingsSection(title: "Alerts") {
+        ForEach(ProviderSettingsTab.menuBar.sections, id: \.self) { title in
+            section(title, half: nil)
+        }
+    }
+
+    /// The body of one titled section named in `ProviderSettingsTab.sections`.
+    @ViewBuilder
+    private func section(_ title: String, half: Half?) -> some View {
+        switch (title, half) {
+        case ("Refresh", let half?):
+            SettingsSection(title: title) {
+                SettingsRow(label: "Every", isLast: true) {
+                    RefreshIntervalSlider(interval: refreshInterval(half))
+                }
+            }
+        case ("Alerts", _):
+            alertsSection(title)
+        case ("Appearance", _):
+            appearanceSection(title)
+        default:
+            EmptyView()
+        }
+    }
+
+    @ViewBuilder
+    private func alertsSection(_ title: String) -> some View {
+        SettingsSection(title: title) {
             SettingsRow(label: "Notify at 80% and 95%", isLast: true) {
                 SwitchToggle(isOn: alertsEnabled)
                     .disabled(!appModel.alertsEnabled)
@@ -424,8 +447,11 @@ struct ProviderSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+    }
 
-        SettingsSection(title: "Appearance") {
+    @ViewBuilder
+    private func appearanceSection(_ title: String) -> some View {
+        SettingsSection(title: title) {
             SettingsRow(label: "Custom appearance", isLast: !usesCustomAppearance.wrappedValue) {
                 SwitchToggle(isOn: usesCustomAppearance)
             }

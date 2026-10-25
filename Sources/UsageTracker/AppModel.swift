@@ -244,9 +244,8 @@ final class AppModel: ObservableObject {
         // Turning something on should show data now, not after the next timer tick.
         // The provider coming on brings back each half that is on; otherwise only the half that came on.
         let isOn = Self.enabledFlags(provider)
-        let halves = [Half.subscription, .api].enumerated().compactMap { index, half in
-            let cameOn = wasOn[0] ? !wasOn[index + 1] && isOn[index + 1] : isOn[index + 1]
-            return cameOn ? half : nil
+        let halves = [Half.subscription, .api].filter { half in
+            wasOn.provider ? !wasOn.isOn(half) && isOn.isOn(half) : isOn.isOn(half)
         }
 
         if settings.isEnabled, !halves.isEmpty {
@@ -266,8 +265,22 @@ final class AppModel: ObservableObject {
         provider.api?.isEnabled = settings.isAPIEnabled
     }
 
-    private static func enabledFlags(_ provider: ProviderViewModel) -> [Bool] {
-        [provider.isEnabled, provider.subscription?.isEnabled ?? false, provider.api?.isEnabled ?? false]
+    private struct EnabledFlags {
+        let provider: Bool
+        let subscription: Bool
+        let api: Bool
+
+        func isOn(_ half: Half) -> Bool {
+            half == .subscription ? subscription : api
+        }
+    }
+
+    private static func enabledFlags(_ provider: ProviderViewModel) -> EnabledFlags {
+        EnabledFlags(
+            provider: provider.isEnabled,
+            subscription: provider.subscription?.isEnabled ?? false,
+            api: provider.api?.isEnabled ?? false
+        )
     }
 
     func setGlobalAppearance(_ appearance: MenuBarAppearance) {

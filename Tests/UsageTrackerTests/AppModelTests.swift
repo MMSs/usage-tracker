@@ -501,6 +501,22 @@ import Testing
         #expect(fetchers[.anthropic]?.callCount == 1)
     }
 
+    @Test func turningOnAProviderSkipsItsOffHalf() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let apiFetcher = StubReportFetcher(result: .success(makeReport(2)))
+        let model = makeModel(apiFetchers: [.anthropic: apiFetcher])
+        model.setSettings(ProviderSettings(isEnabled: false, isAPIEnabled: false), for: .anthropic)
+        await settle()
+
+        model.setSettings(ProviderSettings(isEnabled: true, isAPIEnabled: false), for: .anthropic)
+        await waitUntil { fetchers[.anthropic]?.callCount == 1 }
+        await settle()
+
+        #expect(fetchers[.anthropic]?.callCount == 1)
+        #expect(apiFetcher.callCount == 0)
+    }
+
     @Test func aDisabledHalfIsNeitherShownNorFetched() async {
         configureAll()
         let model = makeModel()
