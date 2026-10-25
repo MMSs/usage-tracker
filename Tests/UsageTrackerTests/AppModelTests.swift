@@ -346,14 +346,28 @@ import Testing
         #expect(!alertStore.isEnabled)
     }
 
-    @Test func aHalfInErrorIsNotEvaluated() async {
+    @Test func aFailedRefreshDoesNotAlertFromItsKeptReport() async {
         configureAll()
         useHotReport()
-        fetchers[.cursor]?.result = .failure(.transport)
         let model = makeModel()
+        var settings = model.settings(for: .cursor)
+        settings.alertsEnabled = false
+        model.setSettings(settings, for: .cursor)
+
+        // A hot report is kept, with its alert keys forgotten so only the
+        // status guard can keep the next pass quiet.
+        await model.refreshAll(manual: false)
+        for key in alertStore.keys {
+            alertStore.clearDelivered(key)
+        }
+        settings.alertsEnabled = true
+        model.setSettings(settings, for: .cursor)
+        fetchers[.cursor]?.result = .failure(.transport)
 
         await model.refreshAll(manual: false)
 
+        #expect(model.provider(.cursor).subscription?.report != nil)
+        #expect(model.provider(.cursor).subscription?.status != .ready)
         #expect(notifier.delivered.isEmpty)
     }
 }
