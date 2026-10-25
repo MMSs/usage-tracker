@@ -142,7 +142,7 @@ minutes, only on scheduled refreshes, and never while the credential is expired
 or erroring.
 
 The default models are `claude-haiku-5-5` for Anthropic and `gpt-6-luna` for
-OpenAI. To use another, then relaunch the app:
+OpenAI. To use another model, set it and relaunch the app:
 
 ```zsh
 defaults write com.mohabsam.usage-tracker sessionStart.model.openai <model id>
