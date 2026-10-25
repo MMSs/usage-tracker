@@ -79,6 +79,25 @@ struct OpenAIReportMapperTests {
         #expect(report.windows.map(\.isOpen) == [false, false])
     }
 
+    /// Live `wham/usage` with no session running: the reset is always a whole
+    /// window from the request, sliding forward on every fetch.
+    @Test func aWindowResettingAWholeLengthAwayHasNotStarted() {
+        let report = map(usage(
+            primary: window(18000, percent: 0, resetAt: now.addingTimeInterval(18000)),
+            secondary: window(604_800, percent: 0, resetAt: now.addingTimeInterval(604_800 + 30))
+        ))
+
+        #expect(report.windows.map(\.resetsAt) == [nil, nil])
+        #expect(report.windows.map(\.isOpen) == [false, false])
+    }
+
+    @Test func aSessionStartedAMinuteAgoIsRunning() {
+        let resetAt = now.addingTimeInterval(18000 - 61)
+        let report = map(usage(primary: window(18000, percent: 0, resetAt: resetAt)))
+
+        #expect(report.windows.map(\.resetsAt) == [resetAt])
+    }
+
     @Test func additionalLimitsBecomeChildrenOfTheMatchingWindow() {
         let report = map(usage(
             primary: window(18000),

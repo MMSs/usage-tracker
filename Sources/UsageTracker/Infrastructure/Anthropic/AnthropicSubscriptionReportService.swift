@@ -40,6 +40,6 @@ final class AnthropicSubscriptionReportService: ReportFetching, OrganizationScop
 
         let snapshot = try await service.fetchSubscription(sessionKey: sessionKey, organizationID: selectedOrganizationID)
 
-        return AnthropicReportMapper.subscription(snapshot)
+        return AnthropicReportMapper.subscription(snapshot, now: today)
     }
 }

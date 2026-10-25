@@ -8,6 +8,11 @@ struct AnthropicReportMapperTests {
 
     private let fiveHourReset = Date(timeIntervalSince1970: 1_792_000_000)
     private let weeklyReset = Date(timeIntervalSince1970: 1_792_400_000)
+    private let now = Date(timeIntervalSince1970: 1_791_990_000)
+
+    private func map(_ snapshot: AnthropicSubscriptionSnapshot) -> ProviderReport {
+        AnthropicReportMapper.subscription(snapshot, now: now)
+    }
 
     private func snapshot(
         fiveHour: Window? = nil,
@@ -36,7 +41,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func sessionAndWeeklyCarryTheirLengths() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             fiveHour: Window(utilization: 42, resetsAt: fiveHourReset),
             sevenDay: Window(utilization: 17.5, resetsAt: weeklyReset),
             planName: "Max 5x"
@@ -50,8 +55,28 @@ struct AnthropicReportMapperTests {
         ])
     }
 
+    /// The same idle shape OpenAI was seen to send: a reset a whole window
+    /// away that slides forward on every fetch.
+    @Test func aWindowResettingAWholeLengthAwayHasNotStarted() {
+        let report = map(snapshot(
+            fiveHour: Window(utilization: 0, resetsAt: now.addingTimeInterval(5 * 3600)),
+            sevenDay: Window(utilization: 0, resetsAt: now.addingTimeInterval(7 * 86400 - 30))
+        ))
+
+        #expect(report.windows.map(\.resetsAt) == [nil, nil])
+    }
+
+    @Test func aPastResetIsClosed() {
+        let report = map(snapshot(
+            fiveHour: Window(utilization: 80, resetsAt: now.addingTimeInterval(-1)),
+            sevenDay: Window(utilization: 20, resetsAt: weeklyReset)
+        ))
+
+        #expect(report.windows.map(\.resetsAt) == [nil, weeklyReset])
+    }
+
     @Test func nonFiniteOverageAmountsMapToZero() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             spendLimit: AnthropicOverageSpendLimit(
                 isEnabled: true, usedCredits: .nan, monthlyCreditLimit: .infinity, currency: nil
             ),
@@ -63,7 +88,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func hugeOverageAmountsDoNotProduceNaN() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             creditGrant: AnthropicOverageCreditGrant(granted: true, amountMinorUnits: 1e300, currency: nil)
         ))
 
@@ -71,7 +96,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func scopedLimitsBecomeChildrenOfWeekly() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             sevenDay: Window(utilization: 30, resetsAt: weeklyReset),
             limits: [
                 scoped(id: "model_b", name: "Model B", percent: 12),
@@ -90,7 +115,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func scopedLimitWithOnlyADisplayNameGetsASlugID() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             sevenDay: Window(utilization: 30, resetsAt: weeklyReset),
             limits: [
                 scoped(id: nil, name: "Fable", percent: 15),
@@ -108,7 +133,7 @@ struct AnthropicReportMapperTests {
         let url = try #require(Bundle.module.url(forResource: "anthropic-usage", withExtension: "json", subdirectory: "Fixtures"))
         let usage = try AnthropicUsageResponse.decoder().decode(AnthropicUsageResponse.self, from: Data(contentsOf: url))
 
-        let report = AnthropicReportMapper.subscription(AnthropicSubscriptionSnapshot(
+        let report = map(AnthropicSubscriptionSnapshot(
             usage: usage, planName: nil, spendLimit: nil, creditGrant: nil
         ))
 
@@ -126,12 +151,12 @@ struct AnthropicReportMapperTests {
         ]
         let sevenDay = Window(utilization: 30, resetsAt: weeklyReset)
 
-        let fallback = AnthropicReportMapper.subscription(snapshot(sevenDay: sevenDay, legacy: legacy))
+        let fallback = map(snapshot(sevenDay: sevenDay, legacy: legacy))
         #expect(fallback.windows.map(\.id) == ["weekly", "weekly:alpha", "weekly:sonnet_beta"])
         #expect(fallback.windows.map(\.label) == ["Weekly", "Alpha", "Sonnet beta"])
         #expect(fallback.children(of: "weekly").allSatisfy { $0.windowLength == 7 * 86400 })
 
-        let scopedWins = AnthropicReportMapper.subscription(snapshot(
+        let scopedWins = map(snapshot(
             sevenDay: sevenDay,
             limits: [scoped(id: "model_a", name: "Model A", percent: 8)],
             legacy: legacy
@@ -140,7 +165,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func childrenWithoutAWeeklyParentAreDropped() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             fiveHour: Window(utilization: 5, resetsAt: fiveHourReset),
             limits: [scoped(id: "model_a", name: "Model A", percent: 8)],
             legacy: ["alpha": Window(utilization: 10, resetsAt: weeklyReset)]
@@ -150,7 +175,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func disabledSpendLimitIsNotShown() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             spendLimit: AnthropicOverageSpendLimit(isEnabled: false, usedCredits: 5, monthlyCreditLimit: 50, currency: "USD")
         ))
 
@@ -158,7 +183,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func extrasAppearWhenPresent() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             spendLimit: AnthropicOverageSpendLimit(isEnabled: true, usedCredits: 12.34, monthlyCreditLimit: 50, currency: "USD"),
             creditGrant: AnthropicOverageCreditGrant(granted: true, amountMinorUnits: 1250, currency: "USD")
         ))
@@ -176,13 +201,13 @@ struct AnthropicReportMapperTests {
         AnthropicOverageCreditGrant(granted: nil, amountMinorUnits: 1250, currency: "USD"),
     ])
     func creditsAreShownOnlyWhenGrantedWithAnAmount(grant: AnthropicOverageCreditGrant) {
-        let report = AnthropicReportMapper.subscription(snapshot(creditGrant: grant))
+        let report = map(snapshot(creditGrant: grant))
 
         #expect(report.extras.isEmpty)
     }
 
     @Test func fractionalAmountsStayExact() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             spendLimit: AnthropicOverageSpendLimit(isEnabled: true, usedCredits: 12.34, monthlyCreditLimit: 0.1, currency: nil)
         ))
 
@@ -191,7 +216,7 @@ struct AnthropicReportMapperTests {
     }
 
     @Test func missingUtilizationReadsZero() {
-        let report = AnthropicReportMapper.subscription(snapshot(
+        let report = map(snapshot(
             fiveHour: Window(utilization: nil, resetsAt: fiveHourReset),
             sevenDay: Window(utilization: nil, resetsAt: weeklyReset),
             limits: [scoped(id: "model_a", name: "Model A", percent: nil)]

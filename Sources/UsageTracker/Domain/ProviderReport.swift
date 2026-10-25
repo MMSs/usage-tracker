@@ -79,6 +79,21 @@ struct LimitWindow: Codable, Equatable, Identifiable, Sendable {
 
     var isOpen: Bool { resetsAt != nil }
 
+    /// `resetsAt` while the window is running at `now`; nil once it has passed,
+    /// and nil when it lies a whole window length away, which is how a
+    /// provider reports a window nobody has started (the reset slides forward
+    /// on every fetch). The slack absorbs request latency and clock drift, so
+    /// a session started under a minute ago reads as closed until the next fetch.
+    static func runningReset(_ resetsAt: Date?, windowLength: TimeInterval, now: Date) -> Date? {
+        guard let resetsAt, resetsAt > now else {
+            return nil
+        }
+
+        return abs(resetsAt.timeIntervalSince(now) - windowLength) <= unstartedSlack ? nil : resetsAt
+    }
+
+    private static let unstartedSlack: TimeInterval = 60
+
     /// The whole percent with its sign, e.g. "53%". The value is clamped
     /// first so a bad number can never overflow the integer conversion.
     var percentText: String {

@@ -66,9 +66,10 @@ struct AnthropicSubscriptionReportServiceTests {
         let fetcher = StubFetcher(snapshot: snapshot)
         let service = makeService(fetcher)
 
-        let report = try await service.fetchReport(credentials: ["session-key": "k"], today: Date())
+        let today = Date()
+        let report = try await service.fetchReport(credentials: ["session-key": "k"], today: today)
 
-        #expect(report == AnthropicReportMapper.subscription(snapshot))
+        #expect(report == AnthropicReportMapper.subscription(snapshot, now: today))
         #expect(fetcher.sessionKeys == ["k"])
         #expect(fetcher.organizationIDs == [nil])
     }

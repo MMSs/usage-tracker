@@ -89,8 +89,9 @@ enum OpenAIReportMapper {
         label: String,
         now: Date
     ) -> LimitWindow {
-        // A reset that has passed means the window has closed.
-        let resetsAt = classified.window.resetAt.flatMap { $0 > now ? $0 : nil }
+        let resetsAt = LimitWindow.runningReset(
+            classified.window.resetAt, windowLength: TimeInterval(classified.seconds), now: now
+        )
 
         return LimitWindow(
             id: id,

@@ -5,7 +5,7 @@ enum AnthropicReportMapper {
     private static let weeklyLength: TimeInterval = 7 * 86400
     private static let weeklyID = "weekly"
 
-    static func subscription(_ snapshot: AnthropicSubscriptionSnapshot) -> ProviderReport {
+    static func subscription(_ snapshot: AnthropicSubscriptionSnapshot, now: Date) -> ProviderReport {
         let usage = snapshot.usage
         var windows: [LimitWindow] = []
 
@@ -14,7 +14,7 @@ enum AnthropicReportMapper {
                 id: "session",
                 label: "Session",
                 percentUsed: fiveHour.utilization ?? 0,
-                resetsAt: fiveHour.resetsAt,
+                resetsAt: LimitWindow.runningReset(fiveHour.resetsAt, windowLength: sessionLength, now: now),
                 parentID: nil,
                 windowLength: sessionLength
             ))
@@ -25,11 +25,11 @@ enum AnthropicReportMapper {
                 id: weeklyID,
                 label: "Weekly",
                 percentUsed: sevenDay.utilization ?? 0,
-                resetsAt: sevenDay.resetsAt,
+                resetsAt: LimitWindow.runningReset(sevenDay.resetsAt, windowLength: weeklyLength, now: now),
                 parentID: nil,
                 windowLength: weeklyLength
             ))
-            windows += modelWindows(usage)
+            windows += modelWindows(usage, now: now)
         }
 
         var extras: [MoneyRow] = []
@@ -54,7 +54,7 @@ enum AnthropicReportMapper {
         return ProviderReport(planName: snapshot.planName, windows: windows, extras: extras, spend: nil)
     }
 
-    private static func modelWindows(_ usage: AnthropicUsageResponse) -> [LimitWindow] {
+    private static func modelWindows(_ usage: AnthropicUsageResponse, now: Date) -> [LimitWindow] {
         let scopedLimits = usage.limits.filter { $0.kind == "weekly_scoped" }
         if !scopedLimits.isEmpty {
             return scopedLimits.compactMap { limit in
@@ -66,7 +66,7 @@ enum AnthropicReportMapper {
                     id: "\(weeklyID):\(key)",
                     label: name ?? key,
                     percentUsed: limit.percent ?? 0,
-                    resetsAt: limit.resetsAt,
+                    resetsAt: LimitWindow.runningReset(limit.resetsAt, windowLength: weeklyLength, now: now),
                     parentID: weeklyID,
                     windowLength: weeklyLength
                 )
@@ -84,7 +84,7 @@ enum AnthropicReportMapper {
                     id: "\(weeklyID):\(suffix)",
                     label: legacyLabel(suffix),
                     percentUsed: utilization,
-                    resetsAt: window.resetsAt,
+                    resetsAt: LimitWindow.runningReset(window.resetsAt, windowLength: weeklyLength, now: now),
                     parentID: weeklyID,
                     windowLength: weeklyLength
                 )
