@@ -68,6 +68,37 @@ struct CodexAuth: Equatable, Sendable {
         return text
     }
 
+    /// `json` pretty-printed with every string masked except the plainly
+    /// harmless ones, so a stored bundle can be shown without its secrets.
+    /// Keys the app does not know are masked too.
+    static func maskedJSON(_ json: String) -> String? {
+        guard let root = object(json),
+              let data = try? JSONSerialization.data(
+                  withJSONObject: masked(root, key: nil),
+                  options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+              )
+        else {
+            return nil
+        }
+
+        return String(data: data, encoding: .utf8)
+    }
+
+    private static let plainKeys: Set = ["auth_mode", "last_refresh"]
+
+    private static func masked(_ value: Any, key: String?) -> Any {
+        switch value {
+        case let object as [String: Any]:
+            Dictionary(uniqueKeysWithValues: object.map { ($0.key, masked($0.value, key: $0.key)) })
+        case let array as [Any]:
+            array.map { masked($0, key: key) }
+        case let text as String:
+            key.map(plainKeys.contains) == true ? text : CredentialMask(value: text)?.text(ellipsisCount: 3) ?? text
+        default:
+            value
+        }
+    }
+
     private static func object(_ json: String) -> [String: Any]? {
         try? JSONSerialization.jsonObject(with: Data(json.utf8)) as? [String: Any]
     }

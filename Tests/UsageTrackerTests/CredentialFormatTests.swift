@@ -16,12 +16,29 @@ struct CredentialFormatTests {
         #expect(CredentialFormat.plain.problem(with: "anything at all") == nil)
     }
 
-    @Test func codexAuthIsMaskedByItsRefreshToken() throws {
-        let json = #"{"auth_mode":"chatgpt","tokens":{"access_token":"eyJhbGciOi.fake","refresh_token":"rt_fakeRefresh9876"}}"#
-        let mask = try #require(CredentialFormat.codexAuthJSON.mask(of: json))
+    @Test func codexAuthIsShownAsJSONWithEverySecretMasked() throws {
+        let json = #"""
+        {"OPENAI_API_KEY":null,"auth_mode":"chatgpt","last_refresh":"2026-10-25T09:00:00.000Z",
+         "tokens":{"access_token":"eyJhbGciOiJSUzI1NiJ9.payload.sigAAAA","account_id":"acct-fake-123456",
+                   "id_token":"eyJhbGciOiJSUzI1NiJ9.idpayload.sigBBBB","refresh_token":"rt_Kp2Lq3Mr4Ns5Ot6"},
+         "future_field":"secret-looking-value"}
+        """#
+        let document = try #require(CredentialFormat.codexAuthJSON.mask(of: json)?.document)
 
-        #expect(mask.prefix == "rt_fak")
-        #expect(mask.suffix == "9876")
+        #expect(document == """
+        {
+          "auth_mode" : "chatgpt",
+          "future_field" : "secret………alue",
+          "last_refresh" : "2026-10-25T09:00:00.000Z",
+          "OPENAI_API_KEY" : null,
+          "tokens" : {
+            "access_token" : "eyJhbG………AAAA",
+            "account_id" : "acct-f………3456",
+            "id_token" : "eyJhbG………BBBB",
+            "refresh_token" : "rt_Kp2L………5Ot6"
+          }
+        }
+        """)
     }
 
     @Test func unreadableCodexAuthShowsOnlyEllipses() {
@@ -31,6 +48,7 @@ struct CredentialFormatTests {
 
     @Test func plainFormatMasksTheWholeValue() {
         #expect(CredentialFormat.plain.mask(of: "abcdefghijklmnop") == CredentialMask(value: "abcdefghijklmnop"))
+        #expect(CredentialFormat.plain.mask(of: "abcdefghijklmnop")?.document == nil)
     }
 
     @Test func openAIAuthFieldUsesTheCodexFormat() throws {

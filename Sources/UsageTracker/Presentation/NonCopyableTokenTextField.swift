@@ -19,8 +19,8 @@ final class NonCopyableTokenTextView: NSTextView {
         allowsUndo = true
         drawsBackground = true
         backgroundColor = .textBackgroundColor
-        textContainerInset = NSSize(width: 6, height: 4)
-        font = .systemFont(ofSize: NSFont.systemFontSize)
+        textContainerInset = Self.inset
+        font = Self.defaultFont
         wantsLayer = true
         layer?.borderColor = NSColor.separatorColor.cgColor
         layer?.borderWidth = 1
@@ -29,6 +29,18 @@ final class NonCopyableTokenTextView: NSTextView {
 
     required init?(coder: NSCoder) {
         nil
+    }
+
+    private static let inset = NSSize(width: 6, height: 4)
+    private static let defaultFont = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+
+    /// How tall the view must be to show `mask`'s document whole; 0 when it
+    /// has none.
+    static func height(fitting mask: CredentialMask?) -> CGFloat {
+        guard let document = mask?.document else { return 0 }
+
+        let lines = CGFloat(document.split(separator: "\n", omittingEmptySubsequences: false).count)
+        return (lines * NSLayoutManager().defaultLineHeight(for: defaultFont)).rounded(.up) + 2 * inset.height
     }
 
     /// Wraps and lifts the one-line limit for long values such as a pasted JSON file.
@@ -56,6 +68,15 @@ final class NonCopyableTokenTextView: NSTextView {
             .foregroundColor: NSColor.placeholderTextColor,
         ]
         let padding = textContainer?.lineFragmentPadding ?? 0
+
+        if let document = placeholderMask.document {
+            (document as NSString).draw(
+                in: bounds.insetBy(dx: textContainerInset.width + padding, dy: textContainerInset.height),
+                withAttributes: attributes
+            )
+            return
+        }
+
         let fixedWidth = ((placeholderMask.prefix + placeholderMask.suffix) as NSString).size(withAttributes: attributes).width
         let ellipsisWidth = (CredentialMask.ellipsis as NSString).size(withAttributes: attributes).width
         let available = bounds.width - 2 * (textContainerInset.width + padding) - fixedWidth
@@ -177,6 +198,11 @@ struct NonCopyableTokenTextField: NSViewRepresentable {
         }
 
         (textView as? NonCopyableTokenTextView)?.placeholderMask = placeholderMask
+
+        if allowsMultipleLines, textView.minSize.height != height {
+            textView.minSize = NSSize(width: 0, height: height)
+            textView.setFrameSize(NSSize(width: textView.frame.width, height: max(textView.frame.height, height)))
+        }
 
         guard textView.string != text else {
             return

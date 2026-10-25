@@ -123,9 +123,9 @@ struct CredentialFieldView: View {
             } else {
                 NonCopyableTokenTextField(
                     text: $state.draft, placeholderMask: state.mask,
-                    allowsMultipleLines: field.isMultiline, height: field.isMultiline ? 96 : 26
+                    allowsMultipleLines: field.isMultiline, height: fieldHeight
                 )
-                    .frame(height: field.isMultiline ? 96 : 26)
+                    .frame(height: fieldHeight)
                     .accessibilityLabel(field.title)
                     .onChange(of: state.draft) {
                         formatProblem = nil
@@ -249,6 +249,11 @@ struct CredentialFieldView: View {
         } catch {
             readFailed = true
         }
+    }
+
+    /// Multi-line fields grow so a masked document shows whole.
+    private var fieldHeight: CGFloat {
+        field.isMultiline ? max(96, NonCopyableTokenTextView.height(fitting: state.mask)) : 26
     }
 
     private func scheduleCommit() {

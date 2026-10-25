@@ -104,4 +104,21 @@ struct NonCopyableTokenTextViewTests {
 
         #expect(bitmap(of: masked) == bitmap(of: typed))
     }
+
+    @Test func aMaskedDocumentIsDrawnOnEveryLine() {
+        let oneLine = NonCopyableTokenTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 120))
+        oneLine.placeholderMask = CredentialMask(document: "{")
+        let fiveLines = NonCopyableTokenTextView(frame: NSRect(x: 0, y: 0, width: 200, height: 120))
+        fiveLines.placeholderMask = CredentialMask(document: "{\n  \"a\" : 1,\n  \"b\" : 2,\n  \"c\" : 3\n}")
+
+        #expect(bitmap(of: oneLine) != bitmap(of: fiveLines))
+    }
+
+    @Test func theFieldGrowsToFitAMaskedDocument() {
+        let short = NonCopyableTokenTextView.height(fitting: CredentialMask(document: "{\n}"))
+        let tall = NonCopyableTokenTextView.height(fitting: CredentialMask(document: Array(repeating: "line", count: 12).joined(separator: "\n")))
+
+        #expect(tall > short)
+        #expect(NonCopyableTokenTextView.height(fitting: CredentialMask(value: "abcdefghijklmnop")) == 0)
+    }
 }

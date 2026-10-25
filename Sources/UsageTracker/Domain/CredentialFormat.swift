@@ -16,8 +16,8 @@ enum CredentialFormat: Equatable, Sendable {
     }
 
     /// The mask shown for a stored `value`, or nil when it is empty. A Codex
-    /// bundle is masked by its refresh token, not the JSON text; one that no
-    /// longer parses shows ellipses only.
+    /// bundle is shown as its JSON with every token masked in place; one that
+    /// no longer parses shows ellipses only.
     func mask(of value: String) -> CredentialMask? {
         guard let whole = CredentialMask(value: value) else {
             return nil
@@ -27,10 +27,10 @@ enum CredentialFormat: Equatable, Sendable {
         case .plain:
             return whole
         case .codexAuthJSON:
-            guard let auth = try? CodexAuth(json: value) else {
+            guard (try? CodexAuth(json: value)) != nil, let document = CodexAuth.maskedJSON(value) else {
                 return .hidden
             }
-            return CredentialMask(value: auth.refreshToken) ?? .hidden
+            return CredentialMask(document: document)
         }
     }
 }
