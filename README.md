@@ -132,7 +132,9 @@ open closes.
 
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings, Bars, Battery, Gauge, Segments, Columns or
-  Dials. Colored tints the text and graph by remaining
+  Dials. All three can be off: the item is then just the logo (badged when a
+  half fails), and the API amount shows with Show text, or with the graph
+  when there is no budget ring. Colored tints the text and graph by remaining
   capacity or pacing. Limits picks both windows or just the short or the long
   one. Open at login registers the app as a login item; the
   line under the switch shows what macOS reports, with a button to System

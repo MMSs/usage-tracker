@@ -86,20 +86,26 @@ private struct MenuBarItemContent: View {
         HStack(spacing: 4) {
             LogoView(provider: item.provider, badged: item.logoBadge, palette: palette)
 
-            if let subscription = item.subscription {
+            if let subscription = drawn(item.subscription) {
                 HalfView(display: subscription, appearance: appearance, palette: palette)
             }
 
-            if item.showsDivider {
+            if drawn(item.subscription) != nil, drawn(item.api) != nil {
                 Rectangle()
                     .fill(palette.foreground.opacity(0.35))
                     .frame(width: 1, height: 12)
             }
 
-            if let api = item.api {
+            if let api = drawn(item.api) {
                 HalfView(display: api, appearance: appearance, palette: palette)
             }
         }
+    }
+
+    /// The half, unless it would draw nothing: then it takes no width, no
+    /// spacing and no divider.
+    private func drawn(_ half: HalfDisplay?) -> HalfDisplay? {
+        half.flatMap { HalfView.drawsSomething($0, appearance: appearance) ? $0 : nil }
     }
 }
 
@@ -147,10 +153,24 @@ private struct LogoView: View {
     }
 }
 
-private struct HalfView: View {
+struct HalfView: View {
     let display: HalfDisplay
     let appearance: MenuBarAppearance
     let palette: MenuBarPalette
+
+    /// Whether the half puts anything in the item. A status always does; the
+    /// meters need text, a countdown or a graph; money needs its amount or a
+    /// budget to draw a graph against.
+    static func drawsSomething(_ display: HalfDisplay, appearance: MenuBarAppearance) -> Bool {
+        switch display {
+        case .status:
+            true
+        case .meters:
+            appearance.drawsText || appearance.drawsCountdown || appearance.drawsGraph
+        case let .money(_, meter, _, _):
+            appearance.showsSpendAmount(hasMeter: meter != nil) || (appearance.drawsGraph && meter != nil)
+        }
+    }
 
     var body: some View {
         switch display {

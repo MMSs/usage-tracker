@@ -106,7 +106,7 @@ import Testing
         for style in MenuBarGraphStyle.allCases {
             for text in [true, false] {
                 for countdown in [true, false] {
-                    for graph in [true, false] where text || countdown || graph {
+                    for graph in [true, false] {
                         for colored in [true, false] {
                             let appearance = MenuBarAppearance(
                                 showText: text, countdown: countdown, showGraph: graph, graphStyle: style, colored: colored
@@ -136,6 +136,43 @@ import Testing
         let withoutText = MenuBarAppearance(showText: false, countdown: true, showGraph: true)
 
         #expect(try #require(render(item, withoutText)).size.width < (try #require(render(item, withText)).size.width))
+    }
+
+    private let allOff = MenuBarAppearance(showText: false, countdown: false, showGraph: false)
+
+    @Test func allOffLeavesOnlyTheLogo() throws {
+        let withBudget = MenuBarItem(provider: .openai, subscription: nil, api: money)
+        let meters = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
+
+        #expect(try #require(render(meters, allOff)).size.width == 14)
+        #expect(try #require(render(withBudget, allOff)).size.width == 14)
+    }
+
+    @Test func aStatusStillDrawsWithEverythingOff() throws {
+        let item = MenuBarItem(provider: .anthropic, subscription: .status(.error), api: nil)
+
+        #expect(try #require(render(item, allOff)).size.width > 14)
+        #expect(HalfView.drawsSomething(.status(.loading), appearance: allOff))
+    }
+
+    @Test func noDividerWhenOneHalfDrawsNothing() throws {
+        let both = MenuBarItem(provider: .cursor, subscription: twoMeters, api: money)
+        let onlyText = MenuBarAppearance(showText: true, countdown: false, showGraph: false)
+        let spendHidden = MenuBarAppearance(showText: false, countdown: true, showGraph: true)
+        let noMeterMoney = HalfDisplay.money(text: "$1", meter: nil, stale: false, errorMark: false)
+
+        #expect(HalfView.drawsSomething(twoMeters, appearance: onlyText))
+        #expect(!HalfView.drawsSomething(twoMeters, appearance: allOff))
+        #expect(HalfView.drawsSomething(money, appearance: onlyText))
+        #expect(HalfView.drawsSomething(money, appearance: spendHidden))
+        #expect(!HalfView.drawsSomething(noMeterMoney, appearance: allOff))
+        #expect(HalfView.drawsSomething(noMeterMoney, appearance: MenuBarAppearance(showText: false, countdown: false, showGraph: true)))
+
+        // Money with a budget, graph off, text off: nothing to draw, so the
+        // subscription's width must not include a divider.
+        let moneyBlank = MenuBarAppearance(showText: false, countdown: true, showGraph: false)
+        let subOnly = MenuBarItem(provider: .cursor, subscription: twoMeters, api: nil)
+        #expect(try #require(render(both, moneyBlank)).size.width == (try #require(render(subOnly, moneyBlank)).size.width))
     }
 
     @Test func singleMeterItemIsNarrowerThanTwoMeterItem() throws {

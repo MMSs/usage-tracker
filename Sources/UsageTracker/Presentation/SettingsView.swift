@@ -241,16 +241,13 @@ struct MenuBarAppearanceRows: View {
 
     var body: some View {
         SettingsRow(label: "Show text") {
-            SwitchToggle(isOn: binding(\.showText) { $0.showingText($1) })
-                .disabled(appearance.showText && !appearance.countdown && !appearance.showGraph)
+            SwitchToggle(isOn: binding(\.showText) { var copy = $0; copy.showText = $1; return copy })
         }
         SettingsRow(label: "Countdown") {
-            SwitchToggle(isOn: binding(\.countdown) { $0.showingCountdown($1) })
-                .disabled(appearance.countdown && !appearance.showText && !appearance.showGraph)
+            SwitchToggle(isOn: binding(\.countdown) { var copy = $0; copy.countdown = $1; return copy })
         }
         SettingsRow(label: "Show graph") {
-            SwitchToggle(isOn: binding(\.showGraph) { $0.showingGraph($1) })
-                .disabled(appearance.showGraph && !appearance.showText && !appearance.countdown)
+            SwitchToggle(isOn: binding(\.showGraph) { var copy = $0; copy.showGraph = $1; return copy })
         }
         SettingsRow(label: "Graph style") {
             Picker("Graph style", selection: binding(\.graphStyle) { var copy = $0; copy.graphStyle = $1; return copy }) {

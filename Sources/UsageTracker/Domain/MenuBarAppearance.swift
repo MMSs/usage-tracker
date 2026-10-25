@@ -47,42 +47,10 @@ struct MenuBarAppearance: Equatable, Codable, Sendable {
     var drawsGraph: Bool { showGraph }
     var drawsCountdown: Bool { countdown }
 
-    /// The API spend amount follows Show text, but stays when nothing else
-    /// would mark the spend: no graph drawn, or no budget to draw it against.
+    /// The API spend amount follows Show text, and also marks the spend when
+    /// the graph is on but there is no budget to draw it against.
     func showsSpendAmount(hasMeter: Bool) -> Bool {
-        showText || !(showGraph && hasMeter)
-    }
-
-    /// Each switch is ignored when it would leave the item with no text,
-    /// countdown or graph.
-    func showingText(_ shows: Bool) -> MenuBarAppearance {
-        guard shows || countdown || showGraph else {
-            return self
-        }
-
-        var copy = self
-        copy.showText = shows
-        return copy
-    }
-
-    func showingCountdown(_ shows: Bool) -> MenuBarAppearance {
-        guard shows || showText || showGraph else {
-            return self
-        }
-
-        var copy = self
-        copy.countdown = shows
-        return copy
-    }
-
-    func showingGraph(_ shows: Bool) -> MenuBarAppearance {
-        guard shows || showText || countdown else {
-            return self
-        }
-
-        var copy = self
-        copy.showGraph = shows
-        return copy
+        showText || (showGraph && !hasMeter)
     }
 }
 
