@@ -3,6 +3,8 @@ import Testing
 @testable import UsageTracker
 
 struct UsageHistoryStoreTests {
+    /// Minute-aligned (whole seconds divisible by 60): samples share a minute
+    /// by offset from here, not by where the clock happens to fall.
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func report(_ windows: [(String, Double)]) -> ProviderReport {
@@ -79,7 +81,7 @@ struct UsageHistoryStoreTests {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsUsageHistoryStore(defaults: defaults)
             let soon = start.addingTimeInterval(30)
-            let afterAMinute = soon.addingTimeInterval(60)
+            let afterAMinute = start.addingTimeInterval(61)
 
             store.record(report([("session", 41)]), provider: .anthropic, at: start)
             store.record(report([("session", 42)]), provider: .anthropic, at: soon)
@@ -94,6 +96,22 @@ struct UsageHistoryStoreTests {
                 UsageSample(date: soon, percent: 42),
                 UsageSample(date: afterAMinute, percent: 43),
             ])
+        }
+    }
+
+    @Test func aThirtySecondRefreshKeepsOneSamplePerMinute() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsUsageHistoryStore(defaults: defaults)
+
+            for index in 0..<20 {
+                store.record(report([("session", Double(index))]), provider: .anthropic, at: start.addingTimeInterval(Double(index) * 30))
+            }
+
+            let samples = store.samples(provider: .anthropic, now: start.addingTimeInterval(600))["session"]
+            let expected = (0..<10).map { minute in
+                UsageSample(date: start.addingTimeInterval(Double(minute) * 60 + 30), percent: UInt8(minute * 2 + 1))
+            }
+            #expect(samples == expected)
         }
     }
 

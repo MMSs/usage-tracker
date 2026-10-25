@@ -22,10 +22,13 @@ final class UserDefaultsUsageHistoryStore: UsageHistoryStoring {
             let percent = UInt8(clamping: Int(max(min(window.percentUsed, 1_000), -1_000).rounded()))
             var samples = history[window.id] ?? []
 
-            if let last = samples.last, date.timeIntervalSince(last.date) < Self.replacementInterval {
+            let sample = UsageSample(date: date, percent: percent)
+
+            // One sample a minute: a refresh in the same minute as the last replaces it.
+            if let last = samples.last, Self.minute(of: last.date) == Self.minute(of: sample.date) {
                 samples.removeLast()
             }
-            samples.append(UsageSample(date: date, percent: percent))
+            samples.append(sample)
             history[window.id] = samples
         }
 
@@ -66,5 +69,9 @@ final class UserDefaultsUsageHistoryStore: UsageHistoryStoring {
     }
 
     private static let retention: TimeInterval = 24 * 60 * 60
-    private static let replacementInterval: TimeInterval = 60
+
+    /// The wall-clock minute of the encoded (whole-second) date.
+    private static func minute(of date: Date) -> UInt32 {
+        UInt32(clamping: Int(date.timeIntervalSince1970)) / 60
+    }
 }
