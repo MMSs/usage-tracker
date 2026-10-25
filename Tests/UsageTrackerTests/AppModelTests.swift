@@ -674,14 +674,26 @@ import Testing
         return (model, starter)
     }
 
+    private let scheduledSubscription = RefreshTarget(provider: .anthropic, half: .subscription)
+
     @Test func aSessionResetAlertsOnce() async {
+        let clock = Clock()
+        let (model, _) = await makeEndedSessionModel(clock: clock)
+
+        await model.refresh(scheduledSubscription, manual: false)
+        await model.refresh(scheduledSubscription, manual: false)
+
+        #expect(sessionAlerts.map(\.title) == ["Anthropic session reset"])
+        #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
+    }
+
+    @Test func theLaunchRefreshAlertsAnEndedSessionToo() async {
         let clock = Clock()
         let (model, _) = await makeEndedSessionModel(clock: clock)
 
         await model.refreshAll(manual: false)
         await model.refreshAll(manual: false)
 
-        #expect(sessionAlerts.map(\.title) == ["Anthropic session reset"])
         #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
     }
 
@@ -692,7 +704,7 @@ import Testing
             starter.fetchResult = .success(self.sessionReport(open: true, at: clock.date))
         }
 
-        await model.refreshAll(manual: false)
+        await model.refresh(scheduledSubscription, manual: false)
 
         #expect(starter.startCount == 1)
         #expect(sessionAlerts.map(\.body) == ["New session started."])
@@ -702,7 +714,7 @@ import Testing
         let clock = Clock()
         let (model, starter) = await makeEndedSessionModel(autoStart: true, clock: clock)
 
-        await model.refreshAll(manual: false)
+        await model.refresh(scheduledSubscription, manual: false)
 
         #expect(starter.startCount == 1)
         #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
@@ -712,7 +724,7 @@ import Testing
         let clock = Clock()
         let (model, starter) = await makeEndedSessionModel(autoStart: true, clock: clock)
 
-        await model.refresh(RefreshTarget(provider: .anthropic, half: .subscription), manual: true)
+        await model.refresh(.anthropic, manual: true)
 
         #expect(starter.startCount == 0)
         #expect(sessionAlerts.map(\.body) == ["You're back to 0%."])
@@ -911,6 +923,20 @@ import Testing
         await model.refresh(RefreshTarget(provider: .cursor, half: .subscription), manual: true)
 
         #expect(failureAlerts.count == 2)
+    }
+
+    @Test func aProviderRefreshAlertsForEachFailingHalf() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let apiFetcher = StubReportFetcher(result: .failure(.httpStatus(500)))
+        let model = makeModel(apiFetchers: [.anthropic: apiFetcher])
+        model.setAlertKind(.failures, enabled: true)
+        fetchers[.anthropic]?.result = .failure(.unauthorized)
+
+        await model.refresh(.anthropic, manual: true)
+
+        #expect(Set(failureAlerts.map(\.key)) == ["anthropic.subscription.failure", "anthropic.api.failure"])
+        #expect(fetchers[.cursor]?.callCount == 0)
     }
 
     @Test func offlineFailuresNeverAlert() async {

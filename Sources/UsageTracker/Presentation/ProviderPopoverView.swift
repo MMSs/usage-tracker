@@ -399,7 +399,7 @@ struct ProviderPopoverView: View {
             Spacer()
 
             Button {
-                Task { await provider.refresh(manual: true) }
+                Task { await appModel.refresh(provider.id, manual: true) }
             } label: {
                 if isLoading {
                     ProgressView().controlSize(.small)

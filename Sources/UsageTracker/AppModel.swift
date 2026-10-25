@@ -158,6 +158,18 @@ final class AppModel: ObservableObject {
         finishSession(of: provider, endedAt: ended, autoStartRan: started)
     }
 
+    /// Refreshes each switched-on half of one provider together, as the
+    /// popover's Refresh button does, with the bookkeeping of a one-half refresh.
+    func refresh(_ id: Provider, manual: Bool) async {
+        let provider = provider(id)
+        let halves = [Half.subscription, .api].filter { provider.half($0)?.isEnabled == true }
+        await withTaskGroup(of: Void.self) { group in
+            for half in halves {
+                group.addTask { await self.refresh(RefreshTarget(provider: id, half: half), manual: manual) }
+            }
+        }
+    }
+
     // MARK: Session start
 
     /// Starts the provider's closed session when the user turned that on, at
