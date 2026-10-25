@@ -1,6 +1,6 @@
 import Foundation
 
-/// wham/usage answered 401: the access token expired, which renewing it fixes.
+/// The ChatGPT backend answered 401: the access token expired, which renewing it fixes.
 /// A JSON 403 stays `FetchError.unauthorized`; a new token cannot fix it.
 enum OpenAIUsageError: Error, Equatable {
     case accessTokenExpired
