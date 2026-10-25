@@ -14,6 +14,10 @@ enum MenuBarGraphGeometry {
     static let batteryBodyWidth: CGFloat = 42
     static let batteryInset: CGFloat = 2
     static let batteryNubSize = CGSize(width: 2, height: 6)
+    static let segmentCount = 10
+    static let segmentSize = CGSize(width: 3.4, height: 6)
+    static let segmentSpacing: CGFloat = 0.9
+    static let segmentRowSpacing: CGFloat = 2
     static let columnWidth: CGFloat = 4.5
     static let columnHeight: CGFloat = 16
     static let columnSpacing: CGFloat = 5
@@ -34,6 +38,13 @@ enum MenuBarGraphGeometry {
         fraction.map { 1 - $0 }
     }
 
+    /// One block per tenth started, so any use at all lights the first.
+    /// The tolerance keeps 0.3 (3.0000000000000004 once scaled) at three.
+    static func litSegments(_ fraction: Double?) -> Int {
+        guard let fraction, fraction.isFinite else { return 0 }
+        return min(max(Int((fraction * Double(segmentCount) - 1e-9).rounded(.up)), 0), segmentCount)
+    }
+
     static func size(_ style: MenuBarGraphStyle, meterCount: Int) -> CGSize {
         switch style {
         case .rings:
@@ -48,6 +59,12 @@ enum MenuBarGraphGeometry {
             return batterySize
         case .gauge:
             return gaugeSize
+        case .segments:
+            let rows = CGFloat(min(max(meterCount, 0), 2))
+            return CGSize(
+                width: segmentSize.width * CGFloat(segmentCount) + segmentSpacing * CGFloat(segmentCount - 1),
+                height: segmentSize.height * rows + segmentRowSpacing * max(rows - 1, 0)
+            )
         case .pie:
             return CGSize(width: pieDiameter, height: pieDiameter)
         case .dials:

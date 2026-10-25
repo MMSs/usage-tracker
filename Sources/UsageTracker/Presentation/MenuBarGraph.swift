@@ -26,6 +26,8 @@ struct MenuBarGraph: View {
             MenuBarBattery(meters: meters, palette: palette)
         case .gauge:
             MenuBarGauge(meters: meters, palette: palette)
+        case .segments:
+            MenuBarSegments(meters: meters, palette: palette)
         case .columns:
             MenuBarColumns(meters: meters, palette: palette)
         case .pie:
@@ -169,6 +171,48 @@ private struct MenuBarBattery: View {
                         .fill(palette.tick)
                         .frame(width: tickWidth, height: fillHeight + 2)
                         .offset(x: inset + innerWidth * (1 - tick) - tickWidth / 2, y: top - 1)
+                }
+            }
+        }
+        .frame(width: frame.width, height: frame.height, alignment: .topLeading)
+    }
+}
+
+/// Ten blocks per row, the first meter on top, lit from the left.
+private struct MenuBarSegments: View {
+    let meters: [MenuBarMeter]
+    let palette: MenuBarPalette
+
+    private let block = MenuBarGraphGeometry.segmentSize
+    private let tickWidth: CGFloat = 1.5
+
+    private var frame: CGSize { MenuBarGraphGeometry.size(.segments, meterCount: meters.count) }
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(Array(meters.prefix(2).enumerated()), id: \.offset) { index, meter in
+                let top = CGFloat(index) * (block.height + MenuBarGraphGeometry.segmentRowSpacing)
+                let lit = MenuBarGraphGeometry.litSegments(meter.fraction)
+
+                HStack(spacing: MenuBarGraphGeometry.segmentSpacing) {
+                    ForEach(0..<MenuBarGraphGeometry.segmentCount, id: \.self) { segment in
+                        RoundedRectangle(cornerRadius: 0.9)
+                            .fill(segment < lit ? palette.fill(meter.tint) : palette.track)
+                            .frame(width: block.width, height: block.height)
+                    }
+                }
+                .offset(y: top)
+
+                if let tick = meter.tick {
+                    // Two points taller than its row, clamped to stay inside the frame.
+                    let tickTop = max(top - 1, 0)
+                    let tickBottom = min(top + block.height + 1, frame.height)
+                    let center = min(max(frame.width * tick, tickWidth / 2), frame.width - tickWidth / 2)
+
+                    Capsule()
+                        .fill(palette.tick)
+                        .frame(width: tickWidth, height: tickBottom - tickTop)
+                        .offset(x: center - tickWidth / 2, y: tickTop)
                 }
             }
         }

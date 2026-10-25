@@ -32,6 +32,22 @@ import Testing
         #expect(MenuBarGraphGeometry.size(.dials, meterCount: 1).width == 16)
     }
 
+    @Test func segmentsLightOneBlockPerTenthStarted() {
+        #expect(MenuBarGraphGeometry.litSegments(0) == 0)
+        #expect(MenuBarGraphGeometry.litSegments(0.001) == 1)
+        #expect(MenuBarGraphGeometry.litSegments(0.3) == 3)
+        #expect(MenuBarGraphGeometry.litSegments(0.31) == 4)
+        #expect(MenuBarGraphGeometry.litSegments(1.4) == 10)
+        #expect(MenuBarGraphGeometry.litSegments(nil) == 0)
+        #expect(MenuBarGraphGeometry.litSegments(.nan) == 0)
+        #expect(MenuBarGraphGeometry.litSegments(-0.2) == 0)
+    }
+
+    @Test func segmentsStackTwoRowsOrDrawOne() {
+        #expect(MenuBarGraphGeometry.size(.segments, meterCount: 2) == CGSize(width: 42.1, height: 14))
+        #expect(MenuBarGraphGeometry.size(.segments, meterCount: 1) == CGSize(width: 42.1, height: 6))
+    }
+
     @Test func batteryStillReadsPercentUsed() {
         let item = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
         #expect(item.visible(in: MenuBarAppearance(graphStyle: .battery)).accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 62%")
