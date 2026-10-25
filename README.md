@@ -70,6 +70,31 @@ Without an Admin key, or with API usage switched off, only the subscription
 meters appear. Both values save shortly after you stop typing, and only to the
 login Keychain.
 
+## Setting up OpenAI
+
+The OpenAI tab takes two independent credentials. Each one switches on its
+own half, and each half has its own Enabled switch on the tab.
+
+- Codex auth.json: the contents of `~/.codex/auth.json`. Run `codex login` if
+  you have not already, then `cat ~/.codex/auth.json | pbcopy` and paste it
+  into the field. It shows your Codex subscription meters: the Session and
+  Weekly windows, each with its reset time, plus your plan name and a Credits
+  row when credits have been granted. In the menu bar they appear as `S` and
+  `W`.
+- Admin key: an `sk-admin-...` key from
+  [platform.openai.com](https://platform.openai.com/settings/organization/admin-keys)
+  (Settings, Organization, Admin keys). It shows API spend and a daily cost
+  chart, with an optional monthly API budget that drives the ring and pacing.
+
+The app refreshes the pasted Codex token when it expires and keeps the renewed
+token only in Keychain. Codex CLI and the app each hold their own copy of the
+token, so when one refreshes it the other's copy can stop working. If Codex
+asks you to log in again, or the OpenAI item shows `Expired`, run
+`codex login` and paste the new `auth.json` over the saved one.
+
+Both values save shortly after you stop typing, and only to the login
+Keychain.
+
 ## Settings
 
 Settings is its own window. Open it from the gear in any menu bar popover, or
@@ -130,7 +155,8 @@ response bodies. Organization ids in paths are shown as `{uuid}`.
 ## Status
 
 Early development. Cursor works. Anthropic is implemented but not yet verified
-against the live services. OpenAI follows in a later release.
+against the live services. OpenAI is implemented but not yet verified against
+the live services.
 
 ## Trademarks
 

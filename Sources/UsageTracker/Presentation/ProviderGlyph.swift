@@ -2,7 +2,8 @@ import SwiftUI
 
 /// The provider's mark, filled in the item's foreground colour. Cursor uses
 /// its official 2D cube; Anthropic uses an original "A\" drawing, not its
-/// trademarked logo; OpenAI is a placeholder letter until its provider lands.
+/// trademarked logo; OpenAI uses an original hexagon ring, not its
+/// trademarked logo.
 struct ProviderGlyph: Shape {
     let provider: Provider
 
@@ -13,7 +14,7 @@ struct ProviderGlyph: Shape {
         case .anthropic:
             anthropicMark(in: rect)
         case .openai:
-            letterO(in: rect)
+            openAIMark(in: rect)
         }
     }
 
@@ -49,10 +50,22 @@ struct ProviderGlyph: Shape {
         SVGPath.fit(Self.anthropicMark, viewBox: Self.anthropicViewBox, in: rect)
     }
 
-    private func letterO(in rect: CGRect) -> Path {
-        let lineWidth: CGFloat = 2.8
+    /// An original flat-topped regular hexagon ring in a 100 x 100 box centred
+    /// at (50, 50): outer circumradius 48, stroke 18 (inner circumradius
+    /// 27.2154), every corner rounded by 6 with a cubic whose controls sit two
+    /// thirds of the way to the corner. The inner contour runs the other way so
+    /// the non-zero fill leaves the hole open. It is not OpenAI's trademarked logo.
+    private static let openAIViewBox = CGSize(width: 100, height: 100)
+    private static let openAIMark = SVGPath.path(
+        "M95.00,44.80C97.00,48.27 97.00,51.73 95.00,55.20L77.00,86.37C75.00,89.84 72.00,91.57 68.00,91.57"
+            + "L32.00,91.57C28.00,91.57 25.00,89.84 23.00,86.37L5.00,55.20C3.00,51.73 3.00,48.27 5.00,44.80"
+            + "L23.00,13.63C25.00,10.16 28.00,8.43 32.00,8.43L68.00,8.43C72.00,8.43 75.00,10.16 77.00,13.63Z"
+            + "M66.61,31.63C64.61,28.16 61.61,26.43 57.61,26.43L42.39,26.43C38.39,26.43 35.39,28.16 33.39,31.63"
+            + "L25.78,44.80C23.78,48.27 23.78,51.73 25.78,55.20L33.39,68.37C35.39,71.84 38.39,73.57 42.39,73.57"
+            + "L57.61,73.57C61.61,73.57 64.61,71.84 66.61,68.37L74.22,55.20C76.22,51.73 76.22,48.27 74.22,44.80Z"
+    )
 
-        return Path(ellipseIn: rect.insetBy(dx: lineWidth / 2, dy: lineWidth / 2))
-            .strokedPath(StrokeStyle(lineWidth: lineWidth))
+    private func openAIMark(in rect: CGRect) -> Path {
+        SVGPath.fit(Self.openAIMark, viewBox: Self.openAIViewBox, in: rect)
     }
 }

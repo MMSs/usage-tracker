@@ -102,4 +102,13 @@ import Testing
         #expect(bounds.minX >= box.minX && bounds.maxX <= box.maxX)
         #expect(bounds.minY >= box.minY && bounds.maxY <= box.maxY)
     }
+
+    @Test func openAIGlyphIsAHexagonRing() {
+        let box = CGRect(x: 0, y: 0, width: 100, height: 100)
+        let path = ProviderGlyph(provider: .openai).path(in: box)
+
+        #expect(path.boundingRect.width >= box.width * 0.9)
+        #expect(!path.contains(CGPoint(x: box.midX, y: box.midY)))
+        #expect(path.contains(CGPoint(x: box.midX, y: 12)))
+    }
 }

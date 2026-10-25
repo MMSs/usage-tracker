@@ -190,10 +190,11 @@ final class AppModel: ObservableObject {
         providers.first { $0.id == id }!
     }
 
-    /// The report services behind each provider's halves. OpenAI has none yet.
+    /// The report services behind each provider's halves.
     private static func fetchers(
         for provider: Provider,
-        organizationStore: OrganizationSelectionStoring
+        organizationStore: OrganizationSelectionStoring,
+        credentialStore: CredentialStoring
     ) -> (subscription: ReportFetching?, api: ReportFetching?) {
         switch provider {
         case .cursor:
@@ -204,7 +205,14 @@ final class AppModel: ObservableObject {
                 AnthropicAPIReportService(service: AnthropicCostService())
             )
         case .openai:
-            (nil, nil)
+            (
+                OpenAISubscriptionReportService(
+                    usage: OpenAIUsageService(),
+                    tokens: OpenAITokenService(),
+                    credentialStore: credentialStore
+                ),
+                OpenAIAPIReportService(service: OpenAICostService())
+            )
         }
     }
 
@@ -218,7 +226,11 @@ final class AppModel: ObservableObject {
         let organizationStore = UserDefaultsOrganizationSelectionStore()
 
         let providers = ProviderRegistry.all.map { descriptor in
-            let fetchers = fetchers(for: descriptor.id, organizationStore: organizationStore)
+            let fetchers = fetchers(
+                for: descriptor.id,
+                organizationStore: organizationStore,
+                credentialStore: credentialStore
+            )
             return ProviderViewModel(
                 descriptor: descriptor,
                 subscriptionFetcher: fetchers.subscription,
