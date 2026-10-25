@@ -179,6 +179,22 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(model.report == makeReport())
     }
 
+    @Test func aHalfWithAReportIsRefreshingWhileAScheduledFetchRuns() async {
+        store.values[key] = "tok"
+        let model = makeModel()
+        await model.refresh(manual: true)
+        #expect(!model.isRefreshing)
+        let gate = SuspendedGate()
+        fetcher.gate = gate
+        let task = Task { await model.refresh(manual: false) }
+        await settle()
+        #expect(model.status == .ready)
+        #expect(model.isRefreshing)
+        gate.resume()
+        await task.value
+        #expect(!model.isRefreshing)
+    }
+
     @Test func throwingStoreIsAnErrorNotUnconfigured() async {
         store.values[key] = "tok"
         let model = makeModel()

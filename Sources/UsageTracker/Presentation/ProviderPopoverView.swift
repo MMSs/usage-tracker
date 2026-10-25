@@ -398,12 +398,12 @@ struct ProviderPopoverView: View {
             Spacer()
 
             Button(action: refresh) {
-                RefreshIcon(phase: feedback.displayed(at: Date()))
+                RefreshIcon(phase: refreshPhase)
             }
             .keyboardShortcut("r", modifiers: .command)
             .help("Refresh")
             .accessibilityLabel("Refresh")
-            .accessibilityValue(RefreshIcon.accessibilityValue(feedback.displayed(at: Date())))
+            .accessibilityValue(RefreshIcon.accessibilityValue(refreshPhase))
 
             Button {
                 openSettings(opensHelp: false)
@@ -424,6 +424,10 @@ struct ProviderPopoverView: View {
             .accessibilityLabel("Quit")
         }
         .buttonStyle(PopoverIconButtonStyle())
+    }
+
+    private var refreshPhase: RefreshFeedback.Phase {
+        RefreshFeedback.shown(feedback.displayed(at: Date()), fetching: [provider.subscription, provider.api].contains { $0?.isRefreshing == true })
     }
 
     /// Refreshes the provider, showing the spinner and then the result for a moment.

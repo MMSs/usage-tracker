@@ -36,4 +36,10 @@ struct RefreshFeedback: Equatable {
 
         return now >= shownUntil ? .idle : phase
     }
+
+    /// The phase to show: the spinner whenever a fetch is running, even one
+    /// nobody clicked for; a result only ever follows a click.
+    static func shown(_ displayed: Phase, fetching: Bool) -> Phase {
+        fetching ? .refreshing : displayed
+    }
 }

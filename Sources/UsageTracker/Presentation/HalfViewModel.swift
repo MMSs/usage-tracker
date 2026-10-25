@@ -45,6 +45,9 @@ final class HalfViewModel: ObservableObject {
     private let history: UsageHistoryStoring?
     private let now: () -> Date
     private var refreshGeneration = 0
+    private var fetchesInFlight = 0 { didSet { isRefreshing = fetchesInFlight > 0 } }
+    /// True while a fetch is running, whoever started it; unlike `.loading` it also covers a half that already has a report.
+    @Published private(set) var isRefreshing = false
 
     var isConfigured: Bool { status != .unconfigured }
 
@@ -160,6 +163,8 @@ final class HalfViewModel: ObservableObject {
             status = .loading
         }
 
+        fetchesInFlight += 1
+        defer { fetchesInFlight -= 1 }
         do {
             let fetched = try await fetcher.fetchReport(credentials: values, today: now())
             guard generation == refreshGeneration else {
