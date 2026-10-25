@@ -242,11 +242,19 @@ final class AppModel: ObservableObject {
         }
 
         // Turning something on should show data now, not after the next timer tick.
-        let turnedOn = zip(wasOn, Self.enabledFlags(provider)).contains { !$0 && $1 }
-        if settings.isEnabled, turnedOn {
+        // The provider coming on brings back each half that is on; otherwise only the half that came on.
+        let isOn = Self.enabledFlags(provider)
+        let halves = [Half.subscription, .api].enumerated().compactMap { index, half in
+            let cameOn = wasOn[0] ? !wasOn[index + 1] && isOn[index + 1] : isOn[index + 1]
+            return cameOn ? half : nil
+        }
+
+        if settings.isEnabled, !halves.isEmpty {
             Task {
-                for half in [Half.subscription, .api] {
-                    await refresh(RefreshTarget(provider: id, half: half), manual: false)
+                await withTaskGroup(of: Void.self) { group in
+                    for half in halves {
+                        group.addTask { await self.refresh(RefreshTarget(provider: id, half: half), manual: false) }
+                    }
                 }
             }
         }

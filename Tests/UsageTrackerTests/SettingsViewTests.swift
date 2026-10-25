@@ -7,6 +7,12 @@ import Testing
         #expect(ProviderSettingsTab.menuBar.title == "Options")
     }
 
+    @Test func eachHalfTabHasARefreshSection() {
+        #expect(ProviderSettingsTab.subscription.sections == ["Refresh"])
+        #expect(ProviderSettingsTab.api.sections == ["Refresh"])
+        #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance"])
+    }
+
     @Test func requestedProviderPageWhenListed() {
         let request = SettingsRequest(provider: .anthropic)
 

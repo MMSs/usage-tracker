@@ -467,6 +467,40 @@ import Testing
         #expect(fetchers[.cursor]?.callCount == 1, "a change while already enabled does not refetch")
     }
 
+    @Test func turningOnTheAPIHalfRefreshesOnlyIt() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let apiFetcher = StubReportFetcher(result: .success(makeReport(2)))
+        let model = makeAutoStartModel(starter: starter, clock: clock, apiFetcher: apiFetcher)
+        model.setSettings(ProviderSettings(isAPIEnabled: false, autoStartSessions: true), for: .anthropic)
+        await settle()
+
+        model.setSettings(ProviderSettings(isAPIEnabled: true, autoStartSessions: true), for: .anthropic)
+        await waitUntil { apiFetcher.callCount == 1 }
+        await settle()
+
+        #expect(apiFetcher.callCount == 1)
+        #expect(starter.fetchCount == 0)
+        #expect(starter.startCount == 0)
+    }
+
+    @Test func turningOnAProviderRefreshesBothHalves() async {
+        configureAll()
+        credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"
+        let apiFetcher = StubReportFetcher(result: .success(makeReport(2)))
+        let model = makeModel(apiFetchers: [.anthropic: apiFetcher])
+        model.setSettings(ProviderSettings(isEnabled: false), for: .anthropic)
+        await settle()
+
+        model.setSettings(ProviderSettings(isEnabled: true), for: .anthropic)
+        await waitUntil { apiFetcher.callCount == 1 && fetchers[.anthropic]?.callCount == 1 }
+
+        #expect(apiFetcher.callCount == 1)
+        #expect(fetchers[.anthropic]?.callCount == 1)
+    }
+
     @Test func aDisabledHalfIsNeitherShownNorFetched() async {
         configureAll()
         let model = makeModel()

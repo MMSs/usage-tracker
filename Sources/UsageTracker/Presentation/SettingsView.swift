@@ -50,6 +50,14 @@ enum ProviderSettingsTab: Hashable {
         }
     }
 
+    /// The titled sections the tab shows, in order. A half's untitled switch and credential section comes first.
+    var sections: [String] {
+        switch self {
+        case .subscription, .api: ["Refresh"]
+        case .menuBar: ["Alerts", "Appearance"]
+        }
+    }
+
     /// One tab per half the provider has, then Menu bar.
     @MainActor
     static func tabs(for provider: ProviderViewModel) -> [ProviderSettingsTab] {
@@ -325,14 +333,10 @@ struct ProviderSettingsView: View {
         }
     }
 
-    /// One slider for both halves until each half's tab has its own.
-    private var refreshInterval: Binding<RefreshInterval> {
+    private func refreshInterval(_ half: Half) -> Binding<RefreshInterval> {
         Binding(
-            get: { settings.wrappedValue.subscriptionRefreshInterval },
-            set: {
-                settings.wrappedValue.setRefreshInterval($0, for: .subscription)
-                settings.wrappedValue.setRefreshInterval($0, for: .api)
-            }
+            get: { settings.wrappedValue.refreshInterval(for: half) },
+            set: { settings.wrappedValue.setRefreshInterval($0, for: half) }
         )
     }
 
@@ -397,6 +401,12 @@ struct ProviderSettingsView: View {
             Text("Credentials are stored only in your login Keychain. Nothing leaves this Mac.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            SettingsSection(title: "Refresh") {
+                SettingsRow(label: "Every", isLast: true) {
+                    RefreshIntervalSlider(interval: refreshInterval(half))
+                }
+            }
         }
     }
 
@@ -413,12 +423,6 @@ struct ProviderSettingsView: View {
             Text("Alerts are off on the General tab.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-        }
-
-        SettingsSection(title: "Refresh") {
-            SettingsRow(label: "Every", isLast: true) {
-                RefreshIntervalSlider(interval: refreshInterval)
-            }
         }
 
         SettingsSection(title: "Appearance") {
@@ -668,7 +672,7 @@ struct GeneralSettingsView: View {
                 OpenAtLoginRows(loginItem: appModel.loginItem)
             }
 
-            Text("Defaults for every provider. A provider's tab can override them and sets its own refresh rate. Colored tints the item by remaining capacity or pacing. Show plan usage and Show API spend hide a half from the item; the popover still lists it.")
+            Text("Defaults for every provider. A provider's tab can override them and sets its own refresh rates. Colored tints the item by remaining capacity or pacing. Show plan usage and Show API spend hide a half from the item; the popover still lists it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
