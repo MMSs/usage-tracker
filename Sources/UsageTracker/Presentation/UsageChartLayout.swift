@@ -58,8 +58,8 @@ enum UsageChartLayout {
     }
 
     /// Percent used per calendar day of a limit window, keyed by start of day.
-    /// A day's value is its rise over the day; nil means no data (before the
-    /// first sample of this window, or after today).
+    /// A day's value is its rise over the day; nil means no data (a past day
+    /// without samples, or after today).
     static func weekDays(
         samples: [UsageSample],
         window: LimitWindow,
@@ -97,16 +97,21 @@ enum UsageChartLayout {
                 ? Date.distantFuture
                 : calendar.date(byAdding: .day, value: 1, to: dayStart) ?? .distantFuture
 
-            let before = inWindow.last { $0.date < dayStart }
+            let previousStart = calendar.date(byAdding: .day, value: -1, to: dayStart) ?? dayStart
+            let previous = inWindow.last { $0.date >= previousStart && $0.date < dayStart }
             let during = inWindow.filter { $0.date >= dayStart && $0.date < dayEnd }
 
             guard let end = during.last else {
-                // A quiet day after history began rose by nothing; before it, no data.
-                result.updateValue(before.map { _ in 0 }, forKey: dayStart)
+                // Today rose by nothing yet once history began; a past quiet day has no data.
+                let isToday = now < dayEnd
+                let began = inWindow.contains { $0.date < dayStart }
+                result.updateValue(isToday && began ? 0 : nil, forKey: dayStart)
                 continue
             }
 
-            let base = before.map { Double($0.percent) }
+            // Overnight usage counts toward the waking day, but only from a
+            // sample the day before: after a gap the day counts from its own.
+            let base = previous.map { Double($0.percent) }
                 ?? (dayStart <= start ? 0 : Double(during[0].percent))
             result.updateValue(max(Double(end.percent) - base, 0), forKey: dayStart)
         }

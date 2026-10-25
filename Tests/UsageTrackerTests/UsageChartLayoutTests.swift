@@ -147,6 +147,23 @@ private func window(resetsAt: Date, length: TimeInterval? = 7 * 86_400) -> Limit
         #expect(days[at(tuesday + 1, 0)] == .some(4))
     }
 
+    @Test func aQuietDayMidWeekIsEmpty() {
+        // Samples Tuesday and Thursday, none on Wednesday.
+        let samples = [
+            sample(at(tuesday, 10), 5), sample(at(tuesday, 23), 12),
+            sample(at(tuesday + 2, 9), 30), sample(at(tuesday + 2, 18), 36),
+        ]
+
+        let days = UsageChartLayout.weekDays(
+            samples: samples, window: window(resetsAt: at(tuesday + 6, 9)),
+            assumedLength: 7 * 86_400, now: at(tuesday + 3, 8), calendar: layoutCalendar
+        )
+
+        #expect(days[at(tuesday, 0)] == .some(7))
+        #expect(days[at(tuesday + 1, 0)] == .some(nil))
+        #expect(days[at(tuesday + 2, 0)] == .some(6))
+    }
+
     @Test func weekDaysUseTheAssumedLengthWithoutOne() {
         let days = UsageChartLayout.weekDays(
             samples: [], window: window(resetsAt: at(tuesday + 7, 9), length: nil),
