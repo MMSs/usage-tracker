@@ -103,9 +103,8 @@ Launching the app never opens it. The app appears in the Dock while the
 window is open and leaves when it closes.
 
 - General: the menu bar defaults for every provider. Show text, a countdown,
-  and a graph drawn as Rings, Bars, Battery, Gauge, Segments, Columns, Pie,
-  Sparkline or Dials. Sparkline draws the last 12 hours from a 24-hour history
-  kept in the app's settings. Colored tints the text and graph by remaining
+  and a graph drawn as Rings, Bars, Battery, Gauge, Segments, Columns or
+  Dials. Colored tints the text and graph by remaining
   capacity or pacing. Show plan usage and Show API spend hide a half from the
   item (the popover still lists it), and Limits picks both windows or just the
   short or the long one. Open at login registers the app as a login item; the

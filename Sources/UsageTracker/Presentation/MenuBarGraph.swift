@@ -7,7 +7,6 @@ struct MenuBarGraph: View {
     let style: MenuBarGraphStyle
     let meters: [MenuBarMeter]
     let palette: MenuBarPalette
-    var now: Date = Date()
 
     var body: some View {
         let size = MenuBarGraphGeometry.size(style, meterCount: meters.count)
@@ -31,10 +30,6 @@ struct MenuBarGraph: View {
             MenuBarSegments(meters: meters, palette: palette)
         case .columns:
             MenuBarColumns(meters: meters, palette: palette)
-        case .pie:
-            MenuBarPie(meters: meters, palette: palette)
-        case .sparkline:
-            MenuBarSparkline(meters: meters, palette: palette, now: now)
         case .dials:
             MenuBarDials(meters: meters, palette: palette)
         }
@@ -331,131 +326,6 @@ private struct MenuBarGauge: View {
         Path { path in
             path.addArc(center: center, radius: radius, startAngle: .degrees(180), endAngle: .degrees(180 + 180 * fraction), clockwise: false)
         }
-    }
-}
-
-/// Wedges filling clockwise from twelve over one track disk. Two meters: the
-/// last as an outer band, the first as a smaller wedge inside it.
-private struct MenuBarPie: View {
-    let meters: [MenuBarMeter]
-    let palette: MenuBarPalette
-
-    private let diameter = MenuBarGraphGeometry.pieDiameter
-
-    private var center: CGPoint { CGPoint(x: diameter / 2, y: diameter / 2) }
-
-    var body: some View {
-        let shown = Array(meters.prefix(2))
-
-        ZStack {
-            Circle()
-                .fill(palette.track)
-
-            ForEach(Array(shown.enumerated()), id: \.offset) { index, meter in
-                let band = band(index: index, count: shown.count)
-
-                if let fraction = meter.fraction, fraction > 0 {
-                    wedge(inner: band.inner, outer: band.outer, fraction: min(fraction, 1))
-                        .fill(palette.fill(meter.tint))
-                }
-
-                if let tick = meter.tick {
-                    radialTick(center: center, angle: .degrees(-90 + 360 * tick), from: band.inner, to: band.outer)
-                        .stroke(palette.tick, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
-                }
-            }
-        }
-        .frame(width: diameter, height: diameter)
-    }
-
-    private func band(index: Int, count: Int) -> (inner: CGFloat, outer: CGFloat) {
-        switch (count, index) {
-        case (2, 0): (0, MenuBarGraphGeometry.pieInnerWedgeRadius)
-        case (2, _): (MenuBarGraphGeometry.pieBandInnerRadius, diameter / 2)
-        default: (0, diameter / 2)
-        }
-    }
-
-    private func wedge(inner: CGFloat, outer: CGFloat, fraction: Double) -> Path {
-        let start = Angle.degrees(-90)
-        let end = Angle.degrees(-90 + 360 * fraction)
-
-        return Path { path in
-            path.addArc(center: center, radius: outer, startAngle: start, endAngle: end, clockwise: false)
-
-            if inner > 0 {
-                path.addArc(center: center, radius: inner, startAngle: end, endAngle: start, clockwise: true)
-            } else {
-                path.addLine(to: center)
-            }
-
-            path.closeSubpath()
-        }
-    }
-}
-
-/// The last twelve hours as a line, the first meter solid with a dot at the
-/// live value and the second behind it at 0.45 opacity, over a hairline
-/// baseline. A tick is a short dash at the right edge.
-private struct MenuBarSparkline: View {
-    let meters: [MenuBarMeter]
-    let palette: MenuBarPalette
-    let now: Date
-
-    private let frame = MenuBarGraphGeometry.sparklineSize
-    private let lineWidth: CGFloat = 1.5
-    private let dot: CGFloat = 3
-    private let tickSize = CGSize(width: 3, height: 1.5)
-
-    /// Pulls a point in by half the line width, so the stroke and its round
-    /// caps stay inside the frame at 0% and 100%.
-    private func inset(_ point: CGPoint) -> CGPoint {
-        let half = lineWidth / 2
-
-        return CGPoint(
-            x: half + point.x * (frame.width - lineWidth) / frame.width,
-            y: half + point.y * (frame.height - lineWidth) / frame.height
-        )
-    }
-
-    var body: some View {
-        ZStack(alignment: .topLeading) {
-            Rectangle()
-                .fill(palette.track)
-                .frame(width: frame.width, height: 0.5)
-                .offset(y: frame.height - 0.5)
-
-            ForEach(Array(meters.prefix(2).enumerated()).reversed(), id: \.offset) { index, meter in
-                let opacity = index == 0 ? 1.0 : 0.45
-                let points = MenuBarGraphGeometry.sparklinePoints(
-                    samples: meter.samples, current: meter.fraction, now: now, size: frame
-                )
-
-                if let end = points.last {
-                    Path { path in
-                        path.addLines(points.map(inset))
-                    }
-                    .stroke(palette.fill(meter.tint).opacity(opacity), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round))
-
-                    if index == 0 {
-                        Circle()
-                            .fill(palette.fill(meter.tint))
-                            .frame(width: dot, height: dot)
-                            .offset(x: min(inset(end).x, frame.width - dot / 2) - dot / 2, y: min(max(inset(end).y, dot / 2), frame.height - dot / 2) - dot / 2)
-                    }
-                }
-
-                if let tick = meter.tick {
-                    let y = min(max(frame.height * (1 - min(max(tick, 0), 1)), tickSize.height / 2), frame.height - tickSize.height / 2)
-
-                    Capsule()
-                        .fill(palette.tick)
-                        .frame(width: tickSize.width, height: tickSize.height)
-                        .offset(x: frame.width - tickSize.width, y: y - tickSize.height / 2)
-                }
-            }
-        }
-        .frame(width: frame.width, height: frame.height, alignment: .topLeading)
     }
 }
 

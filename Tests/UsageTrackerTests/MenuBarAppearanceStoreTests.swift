@@ -28,6 +28,14 @@ import Testing
         }
     }
 
+    @Test func aRemovedGraphStyleFallsBackToRings() {
+        withIsolatedDefaults { defaults in
+            defaults.set("pie", forKey: UserDefaultsMenuBarAppearanceStore.graphStyleKey)
+
+            #expect(UserDefaultsMenuBarAppearanceStore(defaults: defaults).appearance().graphStyle == .rings)
+        }
+    }
+
     @Test func anUnknownLimitsFallsBackToBoth() {
         withIsolatedDefaults { defaults in
             defaults.set("middle", forKey: UserDefaultsMenuBarAppearanceStore.limitsKey)

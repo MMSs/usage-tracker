@@ -76,6 +76,17 @@ import Testing
         }
     }
 
+    @Test func anOverrideWithARemovedStyleLoadsAsRings() throws {
+        withIsolatedDefaults { defaults in
+            let json = #"{"isEnabled":true,"appearanceOverride":{"showText":false,"countdown":true,"showGraph":true,"graphStyle":"sparkline","colored":true}}"#
+            defaults.set(Data(json.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .openai))
+
+            let override = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .openai).appearanceOverride
+
+            #expect(override?.graphStyle == .rings)
+        }
+    }
+
     @Test func halfFlagsRoundTripAndDefaultToOn() {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsProviderSettingsStore(defaults: defaults)

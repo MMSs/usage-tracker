@@ -61,13 +61,22 @@ import Testing
         #expect(appearance.limits == .both)
     }
 
+    @Test(arguments: ["pie", "sparkline"])
+    func aRemovedStyleLoadsAsRings(raw: String) throws {
+        let json = #"{"showText":false,"countdown":true,"showGraph":true,"graphStyle":"\#(raw)","colored":true}"#
+        let appearance = try JSONDecoder().decode(MenuBarAppearance.self, from: Data(json.utf8))
+        #expect(appearance.graphStyle == .rings)
+        #expect(!appearance.showText)
+        #expect(appearance.countdown && appearance.colored)
+    }
+
     @Test func defaults() {
         let appearance = MenuBarAppearance.default
         #expect(appearance.showText && appearance.showGraph)
         #expect(!appearance.countdown && !appearance.colored)
         #expect(appearance.graphStyle == .rings)
         #expect(appearance.showPlanUsage && appearance.showAPISpend && appearance.limits == .both)
-        #expect(MenuBarGraphStyle.allCases.map(\.title) == ["Rings", "Bars", "Battery", "Gauge", "Segments", "Columns", "Pie", "Sparkline", "Dials"])
+        #expect(MenuBarGraphStyle.allCases.map(\.title) == ["Rings", "Bars", "Battery", "Gauge", "Segments", "Columns", "Dials"])
     }
 
     @Test func drawsOnlyWhatIsShown() {
