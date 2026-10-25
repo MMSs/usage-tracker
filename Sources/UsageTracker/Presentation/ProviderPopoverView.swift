@@ -5,6 +5,9 @@ struct ProviderPopoverView: View {
     @ObservedObject var provider: ProviderViewModel
     @ObservedObject var appModel: AppModel
     @State private var escapeMonitor = EscapeMonitorState()
+    @State private var feedback = RefreshFeedback()
+    /// Bumped when a result has been shown long enough, to redraw the button.
+    @State private var feedbackTick = 0
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -71,7 +74,7 @@ struct ProviderPopoverView: View {
                 } label: {
                     Image(systemName: "power")
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PopoverIconButtonStyle())
                 .keyboardShortcut("q", modifiers: .command)
                 .help("Quit")
                 .accessibilityLabel("Quit")
@@ -386,30 +389,21 @@ struct ProviderPopoverView: View {
 
     // MARK: Footer
 
-    private var isLoading: Bool {
-        [provider.subscription, provider.api].contains { $0?.status == .loading }
-    }
-
     private var footer: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 6) {
             Text(PopoverPresentation.updatedText(provider.updatedAt))
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
 
             Spacer()
 
-            Button {
-                Task { await appModel.refresh(provider.id, manual: true) }
-            } label: {
-                if isLoading {
-                    ProgressView().controlSize(.small)
-                } else {
-                    Image(systemName: "arrow.clockwise")
-                }
+            Button(action: refresh) {
+                RefreshIcon(phase: feedback.displayed(at: Date()))
             }
             .keyboardShortcut("r", modifiers: .command)
             .help("Refresh")
             .accessibilityLabel("Refresh")
+            .accessibilityValue(RefreshIcon.accessibilityValue(feedback.displayed(at: Date())))
 
             Button {
                 openSettings(opensHelp: false)
@@ -429,7 +423,23 @@ struct ProviderPopoverView: View {
             .help("Quit")
             .accessibilityLabel("Quit")
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PopoverIconButtonStyle())
+    }
+
+    /// Refreshes the provider, showing the spinner and then the result for a moment.
+    private func refresh() {
+        guard feedback.begin() else {
+            return
+        }
+
+        let id = provider.id
+        Task {
+            let succeeded = await appModel.refresh(id, manual: true)
+            feedback.finish(succeeded: succeeded, now: Date())
+            try? await Task.sleep(for: .seconds(RefreshFeedback.resultDuration))
+            // Re-reads the clock so the result lapses to idle; a newer click keeps its own phase.
+            feedbackTick += 1
+        }
     }
 
     // MARK: - Window behaviour
@@ -464,5 +474,32 @@ struct ProviderPopoverView: View {
             NSEvent.removeMonitor(monitor)
         }
         escapeMonitor.monitor = nil
+    }
+}
+
+/// The Refresh button's icon for a phase.
+struct RefreshIcon: View {
+    let phase: RefreshFeedback.Phase
+
+    var body: some View {
+        switch phase {
+        case .idle:
+            Image(systemName: "arrow.clockwise")
+        case .refreshing:
+            ProgressView().controlSize(.small)
+        case .succeeded:
+            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+        case .failed:
+            Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.red)
+        }
+    }
+
+    static func accessibilityValue(_ phase: RefreshFeedback.Phase) -> String {
+        switch phase {
+        case .idle: ""
+        case .refreshing: "Refreshing"
+        case .succeeded: "Updated"
+        case .failed: "Refresh failed"
+        }
     }
 }

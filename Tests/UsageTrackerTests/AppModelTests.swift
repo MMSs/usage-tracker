@@ -977,6 +977,28 @@ import Testing
         notifier.delivered.filter { $0.key.hasSuffix(".failure") }
     }
 
+    @Test func aProviderRefreshReportsSuccess() async {
+        configureAll()
+        let model = makeModel()
+
+        let succeeded = await model.refresh(.cursor, manual: true)
+
+        #expect(succeeded)
+    }
+
+    @Test func aProviderRefreshReportsFailure() async {
+        configureAll()
+        let model = makeModel()
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+
+        let failed = await model.refresh(.cursor, manual: true)
+        #expect(!failed)
+
+        fetchers[.cursor]?.result = .success(makeReport(1))
+        let recovered = await model.refresh(.cursor, manual: true)
+        #expect(recovered)
+    }
+
     @Test func aFailingHalfAlertsOncePerStreak() async {
         configureAll()
         let model = makeModel()

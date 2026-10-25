@@ -164,13 +164,24 @@ final class AppModel: ObservableObject {
 
     /// Refreshes each switched-on half of one provider together, as the
     /// popover's Refresh button does, with the bookkeeping of a one-half refresh.
-    func refresh(_ id: Provider, manual: Bool) async {
+    /// True when no refreshed half ended with a failure recorded by this refresh.
+    @discardableResult
+    func refresh(_ id: Provider, manual: Bool) async -> Bool {
         let provider = provider(id)
         let halves = [Half.subscription, .api].filter { provider.half($0)?.isEnabled == true }
+        let refreshStart = now()
         await withTaskGroup(of: Void.self) { group in
             for half in halves {
                 group.addTask { await self.refresh(RefreshTarget(provider: id, half: half), manual: manual) }
             }
+        }
+
+        return !halves.contains { half in
+            guard let failure = provider.half(half)?.lastFailure else {
+                return false
+            }
+
+            return failure.date >= refreshStart
         }
     }
 
