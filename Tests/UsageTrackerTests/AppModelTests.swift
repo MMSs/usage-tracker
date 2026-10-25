@@ -81,8 +81,8 @@ import Testing
         #expect(model.provider(.openai).id == .openai)
     }
 
-    @Test func menuBarDisplayOrderIsAnthropicOpenAICursor() {
-        #expect(AppModel.menuBarDisplayOrder(Provider.allCases) == [.anthropic, .openai, .cursor])
+    @Test func menuBarDisplayOrderIsOpenAIAnthropicCursor() {
+        #expect(AppModel.menuBarDisplayOrder(Provider.allCases) == [.openai, .anthropic, .cursor])
     }
 
     @Test func theSetUpItemFallsBackToCursor() {
@@ -162,14 +162,14 @@ import Testing
 
         #expect(model.provider(.cursor).snapshot(.subscription) == nil)
         #expect(!model.provider(.cursor).hasActiveHalf)
-        #expect(model.insertedProviders == [.openai, .anthropic])
+        #expect(model.insertedProviders == [.anthropic, .openai])
         #expect(fetchers[.cursor]?.callCount == 0)
 
         model.setSettings(ProviderSettings(isSubscriptionEnabled: true), for: .cursor)
         await waitUntil { fetchers[.cursor]?.callCount == 1 }
 
         #expect(model.provider(.cursor).snapshot(.subscription) != nil)
-        #expect(model.insertedProviders == [.cursor, .openai, .anthropic])
+        #expect(model.insertedProviders == [.cursor, .anthropic, .openai])
     }
 
     @Test func disablingEveryConfiguredProviderLeavesTheMenuBarEmpty() {

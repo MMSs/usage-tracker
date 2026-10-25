@@ -4,7 +4,7 @@ import Foundation
 /// on screen. The display order, left to right, is the reverse
 /// (`AppModel.menuBarDisplayOrder`).
 enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
-    case cursor, openai, anthropic
+    case cursor, anthropic, openai
 
     var id: String { rawValue }
 }
