@@ -25,15 +25,24 @@ final class ProviderViewModel: ObservableObject, Identifiable {
     /// window is not running. A switched-off half keeps its last report, but
     /// nothing is fetched to show a start worked, so it never reads closed.
     var sessionIsClosed: Bool {
+        sessionWindow.map { !$0.isOpen } ?? false
+    }
+
+    /// The same up-to-date short window as `sessionIsClosed`, running.
+    var sessionIsOpen: Bool {
+        sessionWindow?.isOpen ?? false
+    }
+
+    /// The short window when a start could be judged from it; see `sessionIsClosed`.
+    private var sessionWindow: LimitWindow? {
         guard isEnabled, descriptor.capabilities.canStartSession,
               let shortID = descriptor.shortWindowID,
-              let subscription, subscription.isEnabled, subscription.canStartSession, subscription.status == .ready,
-              let window = subscription.report?.windows.first(where: { $0.id == shortID })
+              let subscription, subscription.isEnabled, subscription.canStartSession, subscription.status == .ready
         else {
-            return false
+            return nil
         }
 
-        return !window.isOpen
+        return subscription.report?.windows.first { $0.id == shortID }
     }
 
     func half(_ half: Half) -> HalfViewModel? {

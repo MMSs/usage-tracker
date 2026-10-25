@@ -233,6 +233,17 @@ import Testing
         #expect(!failed.sessionIsClosed)
     }
 
+    @Test func sessionIsOpenOnlyWhenReadyAndTheSessionHasAReset() async {
+        let open = await refreshed(sessionReport(resetsAt: now.addingTimeInterval(3600)))
+        #expect(open.sessionIsOpen)
+
+        let closed = await refreshed(sessionReport(resetsAt: nil))
+        #expect(!closed.sessionIsOpen)
+
+        open.subscription?.isEnabled = false
+        #expect(!open.sessionIsOpen)
+    }
+
     @Test func aSwitchedOffProviderOrHalfIsNeverClosed() async {
         let halfOff = await refreshed(sessionReport(resetsAt: nil))
         halfOff.subscription?.isEnabled = false

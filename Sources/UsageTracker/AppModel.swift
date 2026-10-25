@@ -28,8 +28,15 @@ final class AppModel: ObservableObject {
 
     /// The least time between two automatic session starts for one provider.
     static let autoStartInterval: TimeInterval = 600
+    /// Automatic starts in a row that may each leave the session closed
+    /// before auto-start pauses until a refresh sees the session open.
+    static let autoStartPauseAfter = 3
 
     private var isStarted = false
+    /// Automatic starts in a row whose next check still found the session closed.
+    private var unopenedAutoStarts: [Provider: Int] = [:]
+    /// Providers whose last automatic start has not been checked yet.
+    private var autoStartsAwaitingCheck: Set<Provider> = []
     private var providerObservers: [AnyCancellable] = []
 
     init(
@@ -103,6 +110,7 @@ final class AppModel: ObservableObject {
 
         for provider in providers where provider.isEnabled {
             evaluateAlerts(for: provider)
+            noteOpenSession(provider)
         }
 
         // A manual refresh only looks; it never starts a session.
@@ -124,6 +132,7 @@ final class AppModel: ObservableObject {
 
         await provider.refresh(manual: manual)
         evaluateAlerts(for: provider)
+        noteOpenSession(provider)
         if !manual {
             await autoStartIfNeeded(provider)
         }
@@ -135,12 +144,26 @@ final class AppModel: ObservableObject {
     /// most once per `autoStartInterval` after any start attempt, the Start
     /// session button's included. `sessionIsClosed` already requires
     /// a switched-on, up-to-date subscription half, so a switched-off, expired
-    /// or errored one is skipped.
+    /// or errored one is skipped. After `autoStartPauseAfter` starts in a row
+    /// that each left the session closed, it waits for the session to open.
     private func autoStartIfNeeded(_ provider: ProviderViewModel) async {
-        guard settings(for: provider.id).autoStartSessions,
+        let id = provider.id
+        guard settings(for: id).autoStartSessions,
               provider.sessionIsClosed,
               let subscription = provider.subscription
         else {
+            return
+        }
+
+        if autoStartsAwaitingCheck.remove(id) != nil {
+            let unopened = unopenedAutoStarts[id, default: 0] + 1
+            unopenedAutoStarts[id] = unopened
+            if unopened == Self.autoStartPauseAfter {
+                Log.refresh.notice("\(id.rawValue, privacy: .public): auto-start paused after \(unopened, privacy: .public) starts left the session closed")
+            }
+        }
+
+        guard unopenedAutoStarts[id, default: 0] < Self.autoStartPauseAfter else {
             return
         }
 
@@ -148,7 +171,19 @@ final class AppModel: ObservableObject {
             return
         }
 
+        autoStartsAwaitingCheck.insert(id)
         await subscription.startSession()
+    }
+
+    /// A running session shows starts can open it (or it was used): any
+    /// auto-start pause ends and the count starts afresh.
+    private func noteOpenSession(_ provider: ProviderViewModel) {
+        guard provider.sessionIsOpen else {
+            return
+        }
+
+        unopenedAutoStarts[provider.id] = nil
+        autoStartsAwaitingCheck.remove(provider.id)
     }
 
     // MARK: Alerts

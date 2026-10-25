@@ -189,6 +189,53 @@ import Testing
         #expect(starter.startCount == 2)
     }
 
+    @Test func autoStartPausesAfterThreeStartsLeaveTheSessionClosed() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+
+        for _ in 0..<3 {
+            await model.refreshAll(manual: false)
+            clock.date.addTimeInterval(AppModel.autoStartInterval)
+        }
+        #expect(starter.startCount == 3)
+
+        await model.refreshAll(manual: false)
+        clock.date.addTimeInterval(AppModel.autoStartInterval)
+        await model.refreshAll(manual: false)
+        #expect(model.provider(.anthropic).sessionIsClosed)
+        #expect(starter.startCount == 3)
+
+        // The Start session button still works.
+        await model.provider(.anthropic).subscription?.startSession()
+        #expect(starter.startCount == 4)
+    }
+
+    @Test func autoStartResumesOnceARefreshSeesTheSessionOpen() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+        for _ in 0..<4 {
+            await model.refreshAll(manual: false)
+            clock.date.addTimeInterval(AppModel.autoStartInterval)
+        }
+        #expect(starter.startCount == 3)
+
+        starter.fetchResult = .success(sessionReport(open: true, at: clock.date))
+        await model.refreshAll(manual: true)
+        #expect(starter.startCount == 3)
+
+        // The session ran out again: auto-start is back, with a fresh count.
+        starter.fetchResult = .success(sessionReport(open: false, at: clock.date))
+        for _ in 0..<4 {
+            clock.date.addTimeInterval(AppModel.autoStartInterval)
+            await model.refreshAll(manual: false)
+        }
+        #expect(starter.startCount == 6)
+    }
+
     @Test func autoStartSkipsHalvesThatAreNotReady() async {
         configureAll()
         let clock = Clock()
