@@ -91,7 +91,7 @@ extension OpenAIUsageResponse.Credits: Decodable {
 
         // The balance is a decimal string ("12.50"); a JSON number is accepted too.
         if let text = try? container.decodeIfPresent(String.self, forKey: .balance) {
-            balance = Decimal(string: text.trimmingCharacters(in: .whitespaces), locale: Locale(identifier: "en_US_POSIX"))
+            balance = RequestSupport.decimal(fromNumericString: text.trimmingCharacters(in: .whitespaces))
         } else {
             balance = (try? container.decodeIfPresent(Decimal.self, forKey: .balance)) ?? nil
         }

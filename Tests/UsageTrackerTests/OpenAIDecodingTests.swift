@@ -53,6 +53,14 @@ import Testing
         #expect(response.primary?.usedPercent == 5)
     }
 
+    @Test func aBalanceWithTrailingTextIsUnknown() throws {
+        let response = try usage(#"{"plan_type": "plus", "credits": {"has_credits": true, "balance": "12abc"}}"#)
+
+        #expect(response.credits?.hasCredits == true)
+        #expect(response.credits?.balance == nil)
+        #expect(try usage(#"{"credits": {"balance": " 7.25 "}}"#).credits?.balance == Decimal(string: "7.25"))
+    }
+
     @Test func missingRateLimitDecodesWithoutWindows() throws {
         let response = try usage(#"{"plan_type": "free", "rate_limit": null}"#)
 
