@@ -5,6 +5,7 @@ protocol OpenAIUsageFetching {
     func fetchUsage(auth: CodexAuth) async throws -> OpenAIUsageResponse
 }
 
+@MainActor
 final class OpenAIUsageService: OpenAIUsageFetching {
     private static let endpoint = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
 

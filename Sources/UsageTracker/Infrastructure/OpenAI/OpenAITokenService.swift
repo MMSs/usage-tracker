@@ -8,6 +8,7 @@ protocol OpenAITokenRenewing {
     func renew(refreshToken: String) async throws -> CodexTokenGrant
 }
 
+@MainActor
 final class OpenAITokenService: OpenAITokenRenewing {
     private static let endpoint = URL(string: "https://auth.openai.com/oauth/token")!
     /// The public client id of the Codex CLI, whose login this app borrows.
