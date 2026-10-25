@@ -37,6 +37,21 @@ import Testing
         }
     }
 
+    @Test func autoStartDefaultsOffForOlderRecords() {
+        withIsolatedDefaults { defaults in
+            defaults.set(Data(#"{"isEnabled":true}"#.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .openai))
+
+            let store = UserDefaultsProviderSettingsStore(defaults: defaults)
+            #expect(!store.settings(for: .openai).autoStartSessions)
+
+            var settings = ProviderSettings()
+            settings.autoStartSessions = true
+            store.setSettings(settings, for: .openai)
+
+            #expect(store.settings(for: .openai).autoStartSessions)
+        }
+    }
+
     @Test func missingAndUnknownValuesFallBackToDefaults() {
         withIsolatedDefaults { defaults in
             defaults.set(Data(#"{"isEnabled":false,"refreshInterval":"thirtyDays","appearanceOverride":{"bogus":1}}"#.utf8),

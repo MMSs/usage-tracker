@@ -315,6 +315,13 @@ struct ProviderSettingsView: View {
         )
     }
 
+    private var autoStartSessions: Binding<Bool> {
+        Binding(
+            get: { settings.wrappedValue.autoStartSessions },
+            set: { settings.wrappedValue.autoStartSessions = $0 }
+        )
+    }
+
     private var tabs: [ProviderSettingsTab] {
         ProviderSettingsTab.tabs(for: provider)
     }
@@ -406,11 +413,15 @@ struct ProviderSettingsView: View {
     }
 
     /// One half's switch and, while it is on, its credential fields. Untitled: the tab names it.
+    @ViewBuilder
     private func halfSection(_ half: Half) -> some View {
         let enabled = halfEnabled(half)
         let fields = half == .subscription ? provider.descriptor.subscriptionFields : provider.descriptor.apiFields
+        let offersAutoStart = half == .subscription
+            && provider.descriptor.capabilities.canStartSession
+            && provider.subscription?.canStartSession == true
 
-        return SettingsSection(title: nil) {
+        SettingsSection(title: nil) {
             SettingsRow(label: "Enabled", isLast: !enabled.wrappedValue) {
                 SwitchToggle(isOn: enabled)
             }
@@ -437,7 +448,20 @@ struct ProviderSettingsView: View {
                     Divider()
                     OrganizationPickerRow(half: model)
                 }
+
+                if offersAutoStart {
+                    Divider()
+                    SettingsRow(label: "Auto-start sessions", isLast: true) {
+                        SwitchToggle(isOn: autoStartSessions)
+                    }
+                }
             }
+        }
+
+        if offersAutoStart, enabled.wrappedValue {
+            Text("Sends a one-word message to start the 5-hour window as soon as the previous one ends.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
     }
 }

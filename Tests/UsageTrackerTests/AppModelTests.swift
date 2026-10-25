@@ -65,6 +65,152 @@ import Testing
         )
     }
 
+    // MARK: Auto-start
+
+    private final class Clock {
+        var date = Date(timeIntervalSince1970: 1_000_000)
+    }
+
+    private func sessionReport(open: Bool, at date: Date) -> ProviderReport {
+        ProviderReport(
+            planName: nil,
+            windows: [LimitWindow(
+                id: "session", label: "Session", percentUsed: 10,
+                resetsAt: open ? date.addingTimeInterval(3600) : nil, parentID: nil
+            )],
+            extras: [],
+            spend: nil
+        )
+    }
+
+    /// A model whose Anthropic subscription half is `starter`, with the clock `clock`.
+    private func makeAutoStartModel(starter: StubSessionFetcher, clock: Clock, autoStart: Bool = true) -> AppModel {
+        let providers = ProviderRegistry.all.map { descriptor in
+            ProviderViewModel(
+                descriptor: descriptor,
+                subscriptionFetcher: descriptor.id == .anthropic ? starter : fetchers[descriptor.id],
+                apiFetcher: nil,
+                credentialStore: credentials, cache: cache
+            )
+        }
+        let model = AppModel(
+            providers: providers,
+            credentialStore: credentials,
+            providerSettingsStore: settingsStore,
+            appearanceStore: MemoryMenuBarAppearanceStore(),
+            budgetStore: budgets,
+            loginItem: .stub(),
+            sleepObserver: ControllableSleepObserver(),
+            networkObserver: ControllableNetworkObserver(),
+            sleep: { [sleeper] duration in await sleeper.sleep(duration) },
+            now: { clock.date },
+            alertMonitor: AlertMonitor(notifier: notifier, store: alertStore)
+        )
+        model.setSettings(ProviderSettings(autoStartSessions: autoStart), for: .anthropic)
+        return model
+    }
+
+    @Test func autoStartFiresOnAScheduledRefreshWhenTheSessionIsClosed() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+
+        await model.refreshAll(manual: false)
+
+        #expect(starter.startCount == 1)
+    }
+
+    @Test func autoStartFiresOnAPeriodicRefresh() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+        model.start()
+        await sleeper.waitForSleepCount(1)
+        // The initial refresh runs without sleeping; let it finish, then drive a periodic tick.
+        await waitUntil { starter.startCount == 1 }
+        clock.date.addTimeInterval(AppModel.autoStartInterval)
+        sleeper.resume()
+        await waitUntil { starter.startCount == 2 }
+
+        #expect(starter.startCount == 2)
+    }
+
+    @Test func autoStartIsOffByDefault() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock, autoStart: false)
+
+        await model.refreshAll(manual: false)
+
+        #expect(starter.startCount == 0)
+    }
+
+    @Test func autoStartWaitsTenMinutesBetweenAttempts() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        // A failed attempt counts too.
+        starter.startResults = [.failure(FetchError.transport)]
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+
+        await model.refreshAll(manual: false)
+        #expect(starter.startCount == 1)
+
+        clock.date.addTimeInterval(9 * 60)
+        await model.refreshAll(manual: false)
+        #expect(starter.startCount == 1)
+
+        clock.date.addTimeInterval(60)
+        await model.refreshAll(manual: false)
+        #expect(starter.startCount == 2)
+    }
+
+    @Test func autoStartSkipsHalvesThatAreNotReady() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+        await model.refreshAll(manual: true)
+        #expect(starter.startCount == 0)
+
+        starter.fetchResult = .failure(.transport)
+        clock.date.addTimeInterval(3600)
+        await model.refreshAll(manual: false)
+        #expect(model.provider(.anthropic).subscription?.status == .error)
+        #expect(starter.startCount == 0)
+
+        starter.fetchResult = .failure(.unauthorized)
+        clock.date.addTimeInterval(3600)
+        await model.refreshAll(manual: false)
+        #expect(model.provider(.anthropic).subscription?.status == .expired)
+        #expect(starter.startCount == 0)
+    }
+
+    @Test func manualRefreshNeverAutoStarts() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+
+        await model.refreshAll(manual: true)
+
+        #expect(starter.startCount == 0)
+    }
+
+    @Test func anOpenSessionIsNotStarted() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: true, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+
+        await model.refreshAll(manual: false)
+
+        #expect(starter.startCount == 0)
+    }
+
     private func hotReport(_ percent: Double = 90) -> ProviderReport {
         ProviderReport(
             planName: nil,

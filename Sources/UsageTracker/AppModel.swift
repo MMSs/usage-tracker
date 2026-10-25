@@ -26,7 +26,12 @@ final class AppModel: ObservableObject {
     /// The master switch for usage alerts.
     @Published private(set) var alertsEnabled: Bool
 
+    /// The least time between two automatic session starts for one provider.
+    static let autoStartInterval: TimeInterval = 600
+
     private var isStarted = false
+    /// When each provider last had an automatic start attempted, failed or not.
+    private var lastAutoStart: [Provider: Date] = [:]
     private var providerObservers: [AnyCancellable] = []
 
     init(
@@ -101,6 +106,15 @@ final class AppModel: ObservableObject {
         for provider in providers where provider.isEnabled {
             evaluateAlerts(for: provider)
         }
+
+        // A manual refresh only looks; it never starts a session.
+        guard !manual else {
+            return
+        }
+
+        for provider in providers where provider.isEnabled {
+            await autoStartIfNeeded(provider)
+        }
     }
 
     private func refresh(_ id: Provider, manual: Bool) async {
@@ -112,6 +126,32 @@ final class AppModel: ObservableObject {
 
         await provider.refresh(manual: manual)
         evaluateAlerts(for: provider)
+        if !manual {
+            await autoStartIfNeeded(provider)
+        }
+    }
+
+    // MARK: Session start
+
+    /// Starts the provider's closed session when the user turned that on, at
+    /// most once per `autoStartInterval`. `sessionIsClosed` already requires
+    /// an up-to-date subscription half, so an expired or errored one is skipped.
+    private func autoStartIfNeeded(_ provider: ProviderViewModel) async {
+        guard settings(for: provider.id).autoStartSessions,
+              provider.sessionIsClosed,
+              let subscription = provider.subscription
+        else {
+            return
+        }
+
+        let current = now()
+        if let last = lastAutoStart[provider.id], current.timeIntervalSince(last) < Self.autoStartInterval {
+            return
+        }
+
+        // Recorded first, so a slow or failing start still counts as an attempt.
+        lastAutoStart[provider.id] = current
+        await subscription.startSession()
     }
 
     // MARK: Alerts

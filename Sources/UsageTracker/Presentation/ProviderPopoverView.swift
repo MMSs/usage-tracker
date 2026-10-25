@@ -174,6 +174,8 @@ struct ProviderPopoverView: View {
                     extraRow(extra)
                 }
 
+                sessionControls(half)
+
                 if let spend = report.spend {
                     if let pacing {
                         PacingView(pacing: pacing, unit: spend.unit, periodEnd: spend.period.end)
@@ -187,6 +189,34 @@ struct ProviderPopoverView: View {
                     }
                 }
             }
+        }
+    }
+
+    /// The Start session button while the session is closed (or a start is
+    /// running), and a note when the last start failed and it is still closed.
+    @ViewBuilder
+    private func sessionControls(_ half: HalfViewModel) -> some View {
+        let starting = half.sessionStart == .starting
+
+        if provider.sessionIsClosed || starting {
+            HStack(spacing: 8) {
+                Button("Start session") {
+                    Task { await half.startSession() }
+                }
+                .controlSize(.small)
+                .disabled(starting)
+
+                if starting {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+        }
+
+        if half.sessionStart == .failed, provider.sessionIsClosed {
+            Text("Couldn't start session")
+                .font(.caption)
+                .foregroundStyle(.red)
         }
     }
 
