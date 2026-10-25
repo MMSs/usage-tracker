@@ -56,8 +56,16 @@ enum HalfDisplay: Equatable {
         }
     }
 
+    /// The failure alone, for a half the menu bar doesn't draw.
+    fileprivate func failureText(half: Half) -> String {
+        if case .status = self {
+            return accessibilityText(half: half)
+        }
+        return "\(half.displayName): refresh failed"
+    }
+
     /// Names `half` when it failed, so VoiceOver can tell which half the error mark is on.
-    fileprivate func accessibilityText(half: Half) -> String {
+    func accessibilityText(half: Half) -> String {
         let failed = "\(half.displayName): refresh failed"
 
         switch self {
@@ -84,12 +92,21 @@ struct MenuBarItem: Equatable {
     let api: HalfDisplay?
     /// A half failed: the logo carries a "!" badge, even when that half is hidden.
     let logoBadge: Bool
+    /// What VoiceOver says about failed halves the menu bar doesn't draw.
+    let hiddenFailures: [String]
 
-    init(provider: Provider, subscription: HalfDisplay?, api: HalfDisplay?, logoBadge: Bool = false) {
+    init(
+        provider: Provider,
+        subscription: HalfDisplay?,
+        api: HalfDisplay?,
+        logoBadge: Bool = false,
+        hiddenFailures: [String] = []
+    ) {
         self.provider = provider
         self.subscription = subscription
         self.api = api
         self.logoBadge = logoBadge
+        self.hiddenFailures = hiddenFailures
     }
 
     var showsDivider: Bool { subscription != nil && api != nil }
@@ -99,7 +116,7 @@ struct MenuBarItem: Equatable {
             subscription?.accessibilityText(half: .subscription),
             api?.accessibilityText(half: .api),
         ]
-        return ([displayName] + halves.compactMap { $0 }).joined(separator: ", ")
+        return ([displayName] + halves.compactMap { $0 } + hiddenFailures).joined(separator: ", ")
     }
 }
 
@@ -118,6 +135,12 @@ extension MenuBarItem {
     func visible(in appearance: MenuBarAppearance, halves: MenuBarHalves) -> MenuBarItem {
         var subscription = halves.subscription ? subscription : nil
         let api = halves.api ? api : nil
+        let hidden = [
+            (Half.subscription, halves.subscription ? nil : self.subscription),
+            (Half.api, halves.api ? nil : self.api),
+        ].compactMap { half, display in
+            display?.isFailure == true ? display?.failureText(half: half) : nil
+        }
 
         if case let .meters(meters, stale, errorMark) = subscription, appearance.limits != .both {
             let role: MenuBarMeter.Role = appearance.limits == .short ? .short : .long
@@ -128,7 +151,7 @@ extension MenuBarItem {
             }
         }
 
-        return MenuBarItem(provider: provider, subscription: subscription, api: api, logoBadge: logoBadge)
+        return MenuBarItem(provider: provider, subscription: subscription, api: api, logoBadge: logoBadge, hiddenFailures: hidden)
     }
 }
 

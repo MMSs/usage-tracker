@@ -414,6 +414,28 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(shown.logoBadge)
     }
 
+    @Test func aHiddenFailedHalfIsStillAnnounced() throws {
+        let expired = HalfSnapshot(status: .expired, report: nil, isStale: true)
+        let item = try #require(build(.anthropic, subscription: expired, api: ready(apiReport(spent: 12))))
+        let shown = item.visible(in: MenuBarAppearance(), halves: MenuBarHalves(subscription: false, api: true))
+
+        #expect(shown.accessibilityText(displayName: "Anthropic") == "Anthropic, API $12.00, Plan usage: credential expired")
+
+        let failedAPI = HalfSnapshot(status: .error, report: apiReport(spent: 12), isStale: false)
+        let apiItem = try #require(build(.anthropic, subscription: ready(anthropicReport), api: failedAPI))
+        let apiHidden = apiItem.visible(in: MenuBarAppearance(), halves: MenuBarHalves(subscription: true, api: false))
+
+        #expect(apiHidden.accessibilityText(displayName: "Anthropic").hasSuffix("API spend: refresh failed"))
+    }
+
+    @Test func aShownFailureIsNotAnnouncedTwice() throws {
+        let expired = HalfSnapshot(status: .expired, report: nil, isStale: true)
+        let item = try #require(build(.anthropic, subscription: expired))
+        let text = item.visible(in: MenuBarAppearance(), halves: .all).accessibilityText(displayName: "Anthropic")
+
+        #expect(text == "Anthropic, Plan usage: credential expired")
+    }
+
     @Test func allHalvesShowEverything() throws {
         let item = try bothHalves()
 
