@@ -103,12 +103,13 @@ import Testing
         #expect(bounds.minY >= box.minY && bounds.maxY <= box.maxY)
     }
 
-    @Test func openAIGlyphIsAHexagonRing() {
+    @Test func openAIGlyphIsTheBlossom() {
         let box = CGRect(x: 0, y: 0, width: 100, height: 100)
         let path = ProviderGlyph(provider: .openai).path(in: box)
 
         #expect(path.boundingRect.width >= box.width * 0.9)
+        #expect(path.boundingRect.height >= box.height * 0.9)
+        // The blossom's knot leaves a hexagonal hole at its centre.
         #expect(!path.contains(CGPoint(x: box.midX, y: box.midY)))
-        #expect(path.contains(CGPoint(x: box.midX, y: 12)))
     }
 }

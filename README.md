@@ -163,9 +163,10 @@ the live services.
 Cursor, Anthropic, Claude and OpenAI are trademarks of their respective owners.
 Usage Tracker uses the names and marks only to identify which service a menu
 bar item reports on. It is not affiliated with or endorsed by any of them. The
-Cursor cube is drawn from the asset pack at <https://cursor.com/brand>. The
-Anthropic mark is an original "A\" drawing, not Anthropic's or Claude's logo.
-The OpenAI mark is an original hexagon ring, not OpenAI's logo.
+Cursor cube is drawn from the asset pack at <https://cursor.com/brand>, and the
+OpenAI blossom from the monochrome mark OpenAI publishes at
+<https://openai.com/brand>. The Anthropic mark is an original "A\" drawing, not
+Anthropic's or Claude's logo.
 
 ## Removal
 
