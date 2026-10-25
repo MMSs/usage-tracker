@@ -37,6 +37,26 @@ import Testing
         #expect(abs(remaining - 0.59) < 1e-9)
     }
 
+    @Test(arguments: [
+        (MenuBarGraphStyle.rings, CGSize(width: 18, height: 18), CGSize(width: 18, height: 18)),
+        (.bars, CGSize(width: 28, height: 3.5), CGSize(width: 28, height: 10)),
+        (.battery, CGSize(width: 44, height: 14), CGSize(width: 44, height: 14)),
+        (.gauge, CGSize(width: 24, height: 14), CGSize(width: 24, height: 14)),
+        (.segments, CGSize(width: 42.1, height: 6), CGSize(width: 42.1, height: 14)),
+        (.columns, CGSize(width: 4.5, height: 16), CGSize(width: 14, height: 16)),
+        (.pie, CGSize(width: 18, height: 18), CGSize(width: 18, height: 18)),
+        (.sparkline, CGSize(width: 40, height: 16), CGSize(width: 40, height: 16)),
+        (.dials, CGSize(width: 16, height: 16), CGSize(width: 35, height: 16)),
+    ])
+    func everyStyleKeepsTheSpecSize(style: MenuBarGraphStyle, one: CGSize, two: CGSize) {
+        for (count, expected) in [(1, one), (2, two)] {
+            let size = MenuBarGraphGeometry.size(style, meterCount: count)
+
+            #expect(abs(size.width - expected.width) < 1e-9)
+            #expect(abs(size.height - expected.height) < 1e-9)
+        }
+    }
+
     @Test func dialsAreWiderThanRingsBecauseTheySitSideBySide() {
         #expect(MenuBarGraphGeometry.size(.dials, meterCount: 2).width == 35)
         #expect(MenuBarGraphGeometry.size(.dials, meterCount: 1).width == 16)
