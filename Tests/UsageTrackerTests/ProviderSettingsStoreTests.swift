@@ -54,7 +54,7 @@ import Testing
 
     @Test func missingAndUnknownValuesFallBackToDefaults() {
         withIsolatedDefaults { defaults in
-            defaults.set(Data(#"{"isEnabled":false,"refreshInterval":"thirtyDays","appearanceOverride":{"bogus":1}}"#.utf8),
+            defaults.set(Data(#"{"isEnabled":false,"refreshInterval":"thirtyDays","appearanceOverride":{"showText":"bogus"}}"#.utf8),
                          forKey: UserDefaultsProviderSettingsStore.key(for: .openai))
 
             let settings = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .openai)
@@ -62,6 +62,17 @@ import Testing
             #expect(settings.isEnabled == false)
             #expect(settings.refreshInterval == .default)
             #expect(settings.appearanceOverride == nil)
+        }
+    }
+
+    @Test func anOverrideSavedBeforeTheVisibilityFieldsLoadsIntact() {
+        withIsolatedDefaults { defaults in
+            let json = #"{"isEnabled":true,"appearanceOverride":{"showText":false,"countdown":true,"showGraph":true,"graphStyle":"bars","colored":true}}"#
+            defaults.set(Data(json.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .openai))
+
+            let override = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .openai).appearanceOverride
+
+            #expect(override == MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: true))
         }
     }
 
