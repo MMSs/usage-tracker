@@ -1,0 +1,97 @@
+import Foundation
+
+struct UsageAlert: Equatable, Sendable {
+    /// Identifies the alert for de-duplication: the measure's id plus the threshold.
+    let key: String
+    let title: String
+    let body: String
+}
+
+/// One figure that can cross an alert threshold.
+struct AlertMeasure: Equatable, Sendable {
+    /// Stable for one window run or spend period, so a crossing alerts once.
+    let id: String
+    let percent: Double
+    /// "Anthropic weekly · Fable".
+    let subject: String
+    let detail: String
+}
+
+enum AlertPolicy {
+    static let thresholds = [80, 95]
+
+    /// The figures of one half that can alert: every open limit window, or
+    /// (api half) spend against `budget`. Subscription spend belongs to its
+    /// cycle window, so it is not measured on its own.
+    static func measures(
+        descriptor: ProviderDescriptor,
+        half: Half,
+        report: ProviderReport,
+        budget: Decimal?,
+        now: Date
+    ) -> [AlertMeasure] {
+        switch half {
+        case .subscription:
+            return report.windows.compactMap { windowMeasure($0, descriptor: descriptor, report: report, now: now) }
+        case .api:
+            return spendMeasure(descriptor: descriptor, report: report, budget: budget).map { [$0] } ?? []
+        }
+    }
+
+    static func alert(for measure: AlertMeasure, threshold: Int) -> UsageAlert {
+        UsageAlert(
+            key: "\(measure.id).\(threshold)",
+            title: "\(measure.subject) at \(Int(measure.percent.rounded(.down)))%",
+            body: measure.detail
+        )
+    }
+
+    private static func windowMeasure(
+        _ window: LimitWindow,
+        descriptor: ProviderDescriptor,
+        report: ProviderReport,
+        now: Date
+    ) -> AlertMeasure? {
+        guard let resetsAt = window.resetsAt, window.percentUsed.isFinite else {
+            return nil
+        }
+
+        let parent = window.parentID.flatMap { id in report.windows.first { $0.id == id } }
+        var subject = "\(descriptor.displayName) \((parent ?? window).label.lowercased())"
+
+        if parent != nil {
+            subject += " · \(window.label)"
+        }
+
+        let style: CountdownFormatter.ResetStyle = window.id == descriptor.shortWindowID ? .session : .long
+        let text = CountdownFormatter.resetText(resetsAt: resetsAt, now: now, style: style) ?? ""
+        // Minutes absorb the sub-second jitter providers add to a reset.
+        let minutes = Int((resetsAt.timeIntervalSince1970 / 60).rounded())
+
+        return AlertMeasure(
+            id: "\(descriptor.id.rawValue).\(window.id).\(minutes)",
+            percent: window.percentUsed,
+            subject: subject,
+            detail: text.prefix(1).uppercased() + text.dropFirst() + "."
+        )
+    }
+
+    private static func spendMeasure(
+        descriptor: ProviderDescriptor,
+        report: ProviderReport,
+        budget: Decimal?
+    ) -> AlertMeasure? {
+        guard let spend = report.spend, let budget, budget > 0 else {
+            return nil
+        }
+
+        let percent = NSDecimalNumber(decimal: spend.spent / budget * 100).doubleValue
+
+        return AlertMeasure(
+            id: "\(descriptor.id.rawValue).api.\(Int(spend.period.start.timeIntervalSince1970))",
+            percent: percent,
+            subject: "\(descriptor.displayName) API spend",
+            detail: "\(BudgetUnit.dollars.format(spend.spent)) of \(BudgetUnit.dollars.format(budget)) budget this month."
+        )
+    }
+}
