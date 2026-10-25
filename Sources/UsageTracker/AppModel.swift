@@ -25,6 +25,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var apiBudgets: [Provider: Decimal]
     /// The master switch for usage alerts.
     @Published private(set) var alertsEnabled: Bool
+    /// The alert kinds that are switched on.
+    @Published private(set) var alertKinds: Set<AlertKind>
 
     /// The least time between two automatic session starts for one provider.
     static let autoStartInterval: TimeInterval = 600
@@ -63,6 +65,7 @@ final class AppModel: ObservableObject {
         self.now = now
         self.alertMonitor = alertMonitor
         alertsEnabled = alertMonitor?.isEnabled ?? true
+        alertKinds = Set(AlertKind.allCases.filter { alertMonitor?.isEnabled($0) ?? $0.defaultEnabled })
         globalAppearance = appearanceStore.appearance()
         providerSettings = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, providerSettingsStore.settings(for: $0.id)) })
         apiBudgets = Dictionary(uniqueKeysWithValues: providers.compactMap { provider in
@@ -96,6 +99,10 @@ final class AppModel: ObservableObject {
 
         isStarted = true
         scheduler.start()
+
+        if alertsEnabled, !alertKinds.isEmpty {
+            alertMonitor?.requestAuthorization()
+        }
     }
 
     /// Refreshes every enabled provider; disabled ones keep their last report untouched.
@@ -197,6 +204,24 @@ final class AppModel: ObservableObject {
     func setAlertsEnabled(_ enabled: Bool) {
         alertMonitor?.isEnabled = enabled
         alertsEnabled = alertMonitor?.isEnabled ?? enabled
+
+        if alertsEnabled, !alertKinds.isEmpty {
+            alertMonitor?.requestAuthorization()
+        }
+    }
+
+    func setAlertKind(_ kind: AlertKind, enabled: Bool) {
+        alertMonitor?.setEnabled(enabled, for: kind)
+
+        if enabled {
+            alertKinds.insert(kind)
+        } else {
+            alertKinds.remove(kind)
+        }
+
+        if enabled, alertsEnabled {
+            alertMonitor?.requestAuthorization()
+        }
     }
 
     /// Checks each enabled, ready half against the alert thresholds. A half
@@ -207,7 +232,7 @@ final class AppModel: ObservableObject {
             return
         }
 
-        let delivers = alertsEnabled && settings(for: provider.id).alertsEnabled
+        let delivers = alertsEnabled && alertKinds.contains(.usage) && settings(for: provider.id).alertsEnabled
 
         for model in [provider.subscription, provider.api].compactMap({ $0 }) where halves.contains(model.half) && model.isEnabled && model.status == .ready {
             guard let report = model.report else {

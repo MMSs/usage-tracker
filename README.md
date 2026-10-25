@@ -151,9 +151,10 @@ an API budget reaches 80% and again at 95%. Each threshold alerts once per
 window. A new reset, or usage falling back under the threshold, re-arms it. If
 usage jumps past both at once, only the 95% alert is sent.
 
-Alerts are on by default. macOS asks for notification permission when the first
-alert is due. Turn them all off with General, Alerts, Usage alerts, or one
-provider off with its Options tab, Alerts, Notify at 80% and 95%.
+Alerts are on by default, and macOS asks for notification permission when the
+app launches. Turn them all off with General, Alerts, or pick the kinds
+(Usage thresholds, Session, Refresh failures; the last is off by default) in
+the rows below it. One provider can be turned off with its Options tab, Alerts.
 
 ## Session start
 

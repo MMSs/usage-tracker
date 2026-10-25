@@ -688,6 +688,62 @@ import Testing
         #expect(!alertStore.isEnabled)
     }
 
+    @Test func startAsksForPermissionWhenAlertsAreOn() {
+        let model = makeModel()
+
+        model.start()
+
+        #expect(notifier.authorizationRequests == 1)
+    }
+
+    @Test func startDoesNotAskWhenEveryKindIsOff() {
+        for kind in AlertKind.allCases {
+            alertStore.setEnabled(false, for: kind)
+        }
+        let model = makeModel()
+
+        model.start()
+
+        #expect(notifier.authorizationRequests == 0)
+    }
+
+    @Test func startDoesNotAskWhenTheMasterIsOff() {
+        alertStore.isEnabled = false
+        let model = makeModel()
+
+        model.start()
+
+        #expect(notifier.authorizationRequests == 0)
+    }
+
+    @Test func turningAKindOnAsks() {
+        alertStore.setEnabled(false, for: .failures)
+        let model = makeModel()
+
+        model.setAlertKind(.failures, enabled: true)
+
+        #expect(model.alertKinds.contains(.failures))
+        #expect(alertStore.isEnabled(.failures))
+        #expect(notifier.authorizationRequests == 1)
+    }
+
+    @Test func usageAlertsFollowTheirKind() async {
+        configureAll()
+        useHotReport()
+        let model = makeModel()
+        model.setAlertKind(.usage, enabled: false)
+
+        await model.refreshAll(manual: false)
+
+        #expect(notifier.delivered.isEmpty)
+        #expect(!alertStore.keys.isEmpty)
+
+        model.setAlertKind(.usage, enabled: true)
+        await model.refreshAll(manual: false)
+
+        #expect(notifier.delivered.isEmpty)
+    }
+
     @Test func aSwitchedOffHalfDoesNotAlertFromItsKeptReport() async {
         configureAll()
         useHotReport()

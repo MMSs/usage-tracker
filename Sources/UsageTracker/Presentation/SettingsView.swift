@@ -436,7 +436,7 @@ struct ProviderSettingsView: View {
     @ViewBuilder
     private func alertsSection(_ title: String) -> some View {
         SettingsSection(title: title) {
-            SettingsRow(label: "Notify at 80% and 95%", isLast: true) {
+            SettingsRow(label: "Alerts", isLast: true) {
                 SwitchToggle(isOn: alertsEnabled)
                     .disabled(!appModel.alertsEnabled)
             }
@@ -635,6 +635,13 @@ struct GeneralSettingsView: View {
         )
     }
 
+    private func alertKind(_ kind: AlertKind) -> Binding<Bool> {
+        Binding(
+            get: { appModel.alertKinds.contains(kind) },
+            set: { appModel.setAlertKind(kind, enabled: $0) }
+        )
+    }
+
     private var alertsEnabled: Binding<Bool> {
         Binding(
             get: { appModel.alertsEnabled },
@@ -685,12 +692,19 @@ struct GeneralSettingsView: View {
             }
 
             SettingsSection(title: "Alerts") {
-                SettingsRow(label: "Usage alerts", isLast: true) {
+                SettingsRow(label: "Alerts") {
                     SwitchToggle(isOn: alertsEnabled)
+                }
+
+                ForEach(AlertKind.allCases, id: \.self) { kind in
+                    SettingsRow(label: kind.title, isLast: kind == AlertKind.allCases.last) {
+                        SwitchToggle(isOn: alertKind(kind))
+                            .disabled(!appModel.alertsEnabled)
+                    }
                 }
             }
 
-            Text("Notifies when a limit or an API budget reaches 80% and 95%.")
+            Text("Usage thresholds notify at 80% and 95% of a limit or API budget. Session notifies when a 5-hour session resets. Refresh failures notify when a refresh fails for a reason other than the network being down.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 

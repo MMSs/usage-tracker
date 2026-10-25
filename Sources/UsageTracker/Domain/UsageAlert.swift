@@ -17,6 +17,28 @@ struct AlertMeasure: Equatable, Sendable {
     let detail: String
 }
 
+/// What an alert is about. Each kind has its own switch under the master one.
+enum AlertKind: String, CaseIterable, Sendable {
+    case usage
+    case session
+    case failures
+
+    var title: String {
+        switch self {
+        case .usage: "Usage thresholds"
+        case .session: "Session"
+        case .failures: "Refresh failures"
+        }
+    }
+
+    var defaultEnabled: Bool {
+        switch self {
+        case .usage, .session: true
+        case .failures: false
+        }
+    }
+}
+
 enum AlertPolicy {
     static let thresholds = [80, 95]
 

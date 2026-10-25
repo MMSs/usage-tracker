@@ -17,6 +17,18 @@ final class AlertMonitor {
         set { store.isEnabled = newValue }
     }
 
+    func isEnabled(_ kind: AlertKind) -> Bool {
+        store.isEnabled(kind)
+    }
+
+    func setEnabled(_ enabled: Bool, for kind: AlertKind) {
+        store.setEnabled(enabled, for: kind)
+    }
+
+    func requestAuthorization() {
+        notifier.requestAuthorization()
+    }
+
     /// Always records crossings, even when `delivers` is false, so turning
     /// alerts on does not flood with everything already over a threshold.
     func evaluate(_ measures: [AlertMeasure], delivers: Bool) {

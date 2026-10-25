@@ -4,10 +4,13 @@ import Foundation
 @MainActor
 protocol UsageNotifying {
     func deliver(_ alert: UsageAlert)
+    /// Asks macOS for permission to post alerts, which lists the app in
+    /// System Settings › Notifications. Safe to call again.
+    func requestAuthorization()
 }
 
 /// Posts alerts through the notification center. Authorization is requested
-/// lazily on the first delivery.
+/// at launch and again before each delivery.
 @MainActor
 final class SystemUsageNotifier: NSObject, UsageNotifying, UNUserNotificationCenterDelegate {
     private let center = UNUserNotificationCenter.current()
@@ -15,6 +18,10 @@ final class SystemUsageNotifier: NSObject, UsageNotifying, UNUserNotificationCen
     override init() {
         super.init()
         center.delegate = self
+    }
+
+    func requestAuthorization() {
+        center.requestAuthorization(options: [.alert, .sound]) { _, _ in }
     }
 
     func deliver(_ alert: UsageAlert) {
@@ -43,9 +50,12 @@ final class SystemUsageNotifier: NSObject, UsageNotifying, UNUserNotificationCen
     }
 }
 
-/// The master alert switch and the keys of alerts already delivered.
+/// The master alert switch, the switch of each kind, and the keys of alerts
+/// already delivered.
 protocol AlertStateStoring: AnyObject {
     var isEnabled: Bool { get set }
+    func isEnabled(_ kind: AlertKind) -> Bool
+    func setEnabled(_ enabled: Bool, for kind: AlertKind)
     func hasDelivered(_ key: String) -> Bool
     func markDelivered(_ key: String)
     func clearDelivered(_ key: String)
@@ -66,6 +76,18 @@ final class UserDefaultsAlertStateStore: AlertStateStoring {
     var isEnabled: Bool {
         get { defaults.object(forKey: Self.enabledKey) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Self.enabledKey) }
+    }
+
+    func isEnabled(_ kind: AlertKind) -> Bool {
+        defaults.object(forKey: Self.kindKey(kind)) as? Bool ?? kind.defaultEnabled
+    }
+
+    func setEnabled(_ enabled: Bool, for kind: AlertKind) {
+        defaults.set(enabled, forKey: Self.kindKey(kind))
+    }
+
+    private static func kindKey(_ kind: AlertKind) -> String {
+        "alerts.kind.\(kind.rawValue)"
     }
 
     func hasDelivered(_ key: String) -> Bool {

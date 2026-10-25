@@ -15,6 +15,30 @@ struct AlertStateStoreTests {
         }
     }
 
+    @Test func alertKindsDefaultToUsageAndSessionOn() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsAlertStateStore(defaults: defaults)
+
+            #expect(store.isEnabled(.usage))
+            #expect(store.isEnabled(.session))
+            #expect(!store.isEnabled(.failures))
+        }
+    }
+
+    @Test func alertKindsPersist() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsAlertStateStore(defaults: defaults)
+            store.setEnabled(false, for: .usage)
+            store.setEnabled(true, for: .failures)
+
+            let reopened = UserDefaultsAlertStateStore(defaults: defaults)
+
+            #expect(!reopened.isEnabled(.usage))
+            #expect(reopened.isEnabled(.session))
+            #expect(reopened.isEnabled(.failures))
+        }
+    }
+
     @Test func deliveredKeysOutliveTheMonitor() {
         withIsolatedDefaults { defaults in
             UserDefaultsAlertStateStore(defaults: defaults).markDelivered("a.80")
