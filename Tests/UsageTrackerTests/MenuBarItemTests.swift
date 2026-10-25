@@ -383,6 +383,37 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         #expect(shown.provider == item.provider)
     }
 
+    @Test func eachFailureBadgesTheLogo() throws {
+        let expired = HalfSnapshot(status: .expired, report: nil, isStale: true)
+        let failed = HalfSnapshot(status: .error, report: nil, isStale: true)
+        let staleFailed = HalfSnapshot(status: .error, report: anthropicReport, isStale: false)
+        let apiFailed = HalfSnapshot(status: .error, report: apiReport(spent: 12), isStale: false)
+
+        #expect(try #require(build(.anthropic, subscription: expired)).logoBadge)
+        #expect(try #require(build(.anthropic, subscription: failed)).logoBadge)
+        #expect(try #require(build(.anthropic, subscription: staleFailed)).logoBadge)
+        #expect(try #require(build(.anthropic, subscription: nil, api: apiFailed)).logoBadge)
+        #expect(try #require(build(.anthropic, subscription: ready(anthropicReport))).logoBadge == false)
+    }
+
+    @Test func setupStatesDoNotBadge() throws {
+        let waiting = HalfSnapshot(status: .needsOrganization, report: nil, isStale: true)
+        let loading = HalfSnapshot(status: .loading, report: nil, isStale: true)
+
+        #expect(try #require(build(.anthropic, subscription: waiting)).logoBadge == false)
+        #expect(try #require(build(.anthropic, subscription: loading)).logoBadge == false)
+        #expect(MenuBarItem(provider: .cursor, subscription: .status(.setUp), api: nil).logoBadge == false)
+    }
+
+    @Test func aHiddenFailedHalfStillBadges() throws {
+        let failed = HalfSnapshot(status: .error, report: anthropicReport, isStale: false)
+        let item = try #require(build(.anthropic, subscription: failed, api: ready(apiReport(spent: 12))))
+        let shown = item.visible(in: MenuBarAppearance(), halves: MenuBarHalves(subscription: false, api: true))
+
+        #expect(shown.subscription == nil)
+        #expect(shown.logoBadge)
+    }
+
     @Test func allHalvesShowEverything() throws {
         let item = try bothHalves()
 

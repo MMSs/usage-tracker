@@ -43,6 +43,10 @@ enum MenuBarItemImage {
             return false
         }
 
+        if item.logoBadge {
+            return true
+        }
+
         return [item.subscription, item.api].contains { half in
             switch half {
             case .meters, .money:
@@ -80,9 +84,7 @@ private struct MenuBarItemContent: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            ProviderGlyph(provider: item.provider)
-                .fill(palette.foreground)
-                .frame(width: 14, height: 14)
+            LogoView(provider: item.provider, badged: item.logoBadge, palette: palette)
 
             if let subscription = item.subscription {
                 HalfView(display: subscription, appearance: appearance, palette: palette)
@@ -98,6 +100,50 @@ private struct MenuBarItemContent: View {
                 HalfView(display: api, appearance: appearance, palette: palette)
             }
         }
+    }
+}
+
+/// The provider glyph; a badge cuts a gap out of its bottom-right corner and
+/// puts an exclamation mark in it. The frame stays 14x14.
+private struct LogoView: View {
+    let provider: Provider
+    let badged: Bool
+    let palette: MenuBarPalette
+
+    private let size: CGFloat = 14
+    private let badgeDiameter: CGFloat = 7
+    private let gap: CGFloat = 1
+
+    private var center: CGFloat { size - badgeDiameter / 2 }
+
+    var body: some View {
+        ProviderGlyph(provider: provider)
+            .fill(palette.foreground)
+            .mask {
+                if badged {
+                    Rectangle()
+                        .overlay {
+                            Circle()
+                                .frame(width: badgeDiameter + 2 * gap, height: badgeDiameter + 2 * gap)
+                                .position(x: center, y: center)
+                                .blendMode(.destinationOut)
+                        }
+                        .compositingGroup()
+                } else {
+                    Rectangle()
+                }
+            }
+            .overlay {
+                if badged {
+                    VStack(spacing: 0.6) {
+                        Capsule().frame(width: 2, height: 3.8)
+                        Circle().frame(width: 2, height: 2)
+                    }
+                    .foregroundStyle(palette.error)
+                    .position(x: center, y: center)
+                }
+            }
+            .frame(width: size, height: size)
     }
 }
 

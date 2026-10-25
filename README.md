@@ -211,7 +211,8 @@ fails, the error shows under the switch and in the log
 
 ## Troubleshooting
 
-When a refresh fails, the menu bar item shows an error mark and the popover
+When a refresh fails, the menu bar item shows an error mark and a "!" badge cuts into the
+provider logo (the badge stays when that half is hidden from the menu bar), and the popover
 says which half failed (Plan usage or API spend), why, and how to fix it. The
 last successful report stays on screen, dimmed. When a service is rate
 limiting requests, the popover says when the app will retry; scheduled

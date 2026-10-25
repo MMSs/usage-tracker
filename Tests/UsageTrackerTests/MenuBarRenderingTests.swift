@@ -190,6 +190,28 @@ import Testing
         #expect(try #require(render(expired, colored)).isTemplate == false)
     }
 
+    @Test func theBadgeDoesNotWidenTheItem() throws {
+        let plain = MenuBarItem(provider: .cursor, subscription: twoMeters, api: nil)
+        let badged = MenuBarItem(provider: .cursor, subscription: twoMeters, api: nil, logoBadge: true)
+
+        #expect(try #require(render(badged)).size.width == (try #require(render(plain)).size.width))
+    }
+
+    @Test func aBadgedLogoIsColoredWhenColoredIsOn() throws {
+        let badged = MenuBarItem(provider: .cursor, subscription: nil, api: nil, logoBadge: true)
+        let colored = MenuBarAppearance(colored: true)
+
+        #expect(MenuBarItemImage.isColored(badged, appearance: colored))
+        #expect(try #require(render(badged, colored)).isTemplate == false)
+    }
+
+    @Test func aBadgedLogoIsTemplateOtherwise() throws {
+        let badged = MenuBarItem(provider: .cursor, subscription: nil, api: nil, logoBadge: true)
+
+        #expect(MenuBarItemImage.isColored(badged, appearance: MenuBarAppearance(colored: false)) == false)
+        #expect(try #require(render(badged, MenuBarAppearance(colored: false))).isTemplate)
+    }
+
     @Test func staleAndErrorMarkRender() throws {
         let plain = MenuBarItem(provider: .cursor, subscription: .meters([meter("S", "41%")], stale: false, errorMark: false), api: nil)
         let marked = MenuBarItem(provider: .cursor, subscription: .meters([meter("S", "41%")], stale: true, errorMark: true), api: nil)

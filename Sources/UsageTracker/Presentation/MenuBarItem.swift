@@ -48,6 +48,14 @@ enum HalfDisplay: Equatable {
     case meters([MenuBarMeter], stale: Bool, errorMark: Bool)
     case money(text: String, meter: MenuBarMeter?, stale: Bool, errorMark: Bool)
 
+    /// Expired, errored, or showing an old report after a failed refresh.
+    var isFailure: Bool {
+        switch self {
+        case let .status(status): status == .expired || status == .error
+        case let .meters(_, _, errorMark), let .money(_, _, _, errorMark): errorMark
+        }
+    }
+
     /// Names `half` when it failed, so VoiceOver can tell which half the error mark is on.
     fileprivate func accessibilityText(half: Half) -> String {
         let failed = "\(half.displayName): refresh failed"
@@ -74,6 +82,15 @@ struct MenuBarItem: Equatable {
     let provider: Provider
     let subscription: HalfDisplay?
     let api: HalfDisplay?
+    /// A half failed: the logo carries a "!" badge, even when that half is hidden.
+    let logoBadge: Bool
+
+    init(provider: Provider, subscription: HalfDisplay?, api: HalfDisplay?, logoBadge: Bool = false) {
+        self.provider = provider
+        self.subscription = subscription
+        self.api = api
+        self.logoBadge = logoBadge
+    }
 
     var showsDivider: Bool { subscription != nil && api != nil }
 
@@ -111,7 +128,7 @@ extension MenuBarItem {
             }
         }
 
-        return MenuBarItem(provider: provider, subscription: subscription, api: api)
+        return MenuBarItem(provider: provider, subscription: subscription, api: api, logoBadge: logoBadge)
     }
 }
 
@@ -164,7 +181,9 @@ enum MenuBarItemBuilder {
             return nil
         }
 
-        return MenuBarItem(provider: descriptor.id, subscription: subscriptionDisplay, api: apiDisplay)
+        let failed = [subscriptionDisplay, apiDisplay].contains { $0?.isFailure == true }
+
+        return MenuBarItem(provider: descriptor.id, subscription: subscriptionDisplay, api: apiDisplay, logoBadge: failed)
     }
 
     private enum Content {
