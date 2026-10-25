@@ -33,6 +33,9 @@ final class HalfViewModel: ObservableObject {
     @Published private(set) var selectedOrganizationID: String?
     /// Progress of the last "start the session" request.
     @Published private(set) var sessionStart: SessionStartState = .idle
+    /// When a start was last attempted, from the button or automatically,
+    /// failed or not; the automatic start waits on it.
+    private(set) var lastSessionStartAttempt: Date?
 
     private let provider: Provider
     private let credentialFieldIDs: [String]
@@ -203,6 +206,7 @@ final class HalfViewModel: ObservableObject {
 
         let name = logName
         sessionStart = .starting
+        lastSessionStartAttempt = now()
         do {
             let values = try readValues()
             guard isConfigured(values) else {

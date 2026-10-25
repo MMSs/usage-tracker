@@ -90,7 +90,7 @@ import Testing
                 descriptor: descriptor,
                 subscriptionFetcher: descriptor.id == .anthropic ? starter : fetchers[descriptor.id],
                 apiFetcher: nil,
-                credentialStore: credentials, cache: cache
+                credentialStore: credentials, cache: cache, now: { clock.date }
             )
         }
         let model = AppModel(
@@ -164,6 +164,27 @@ import Testing
         #expect(starter.startCount == 1)
 
         clock.date.addTimeInterval(60)
+        await model.refreshAll(manual: false)
+        #expect(starter.startCount == 2)
+    }
+
+    @Test func aManualStartCountsTowardTheAutoStartWait() async {
+        configureAll()
+        let clock = Clock()
+        let starter = StubSessionFetcher(fetchResult: .success(sessionReport(open: false, at: clock.date)))
+        let model = makeAutoStartModel(starter: starter, clock: clock)
+        await model.refreshAll(manual: true)
+
+        // The popover's Start session button.
+        await model.provider(.anthropic).subscription?.startSession()
+        #expect(starter.startCount == 1)
+
+        clock.date.addTimeInterval(5 * 60)
+        await model.refreshAll(manual: false)
+        #expect(model.provider(.anthropic).sessionIsClosed)
+        #expect(starter.startCount == 1)
+
+        clock.date.addTimeInterval(5 * 60)
         await model.refreshAll(manual: false)
         #expect(starter.startCount == 2)
     }

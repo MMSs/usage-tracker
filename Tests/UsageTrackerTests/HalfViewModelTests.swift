@@ -909,6 +909,18 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(model.sessionStart == .idle)
     }
 
+    @Test func everyStartAttemptIsTimed() async {
+        store.values[key] = "sk"
+        fetcher.startResults = [.failure(FetchError.transport)]
+        let model = makeModel()
+        #expect(model.lastSessionStartAttempt == nil)
+
+        await model.startSession()
+
+        #expect(model.sessionStart == .failed)
+        #expect(model.lastSessionStartAttempt == now)
+    }
+
     @Test func aSwitchedOffHalfSendsNothing() async {
         store.values[key] = "sk"
         let model = makeModel()
@@ -917,6 +929,7 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(await !model.startSession())
         #expect(model.sessionStart == .idle)
         #expect(fetcher.startCount == 0)
+        #expect(model.lastSessionStartAttempt == nil)
     }
 
     @Test func aHalfThatCannotStartReturnsFalse() async {

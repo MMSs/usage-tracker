@@ -30,8 +30,6 @@ final class AppModel: ObservableObject {
     static let autoStartInterval: TimeInterval = 600
 
     private var isStarted = false
-    /// When each provider last had an automatic start attempted, failed or not.
-    private var lastAutoStart: [Provider: Date] = [:]
     private var providerObservers: [AnyCancellable] = []
 
     init(
@@ -134,7 +132,8 @@ final class AppModel: ObservableObject {
     // MARK: Session start
 
     /// Starts the provider's closed session when the user turned that on, at
-    /// most once per `autoStartInterval`. `sessionIsClosed` already requires
+    /// most once per `autoStartInterval` after any start attempt, the Start
+    /// session button's included. `sessionIsClosed` already requires
     /// a switched-on, up-to-date subscription half, so a switched-off, expired
     /// or errored one is skipped.
     private func autoStartIfNeeded(_ provider: ProviderViewModel) async {
@@ -145,13 +144,10 @@ final class AppModel: ObservableObject {
             return
         }
 
-        let current = now()
-        if let last = lastAutoStart[provider.id], current.timeIntervalSince(last) < Self.autoStartInterval {
+        if let last = subscription.lastSessionStartAttempt, now().timeIntervalSince(last) < Self.autoStartInterval {
             return
         }
 
-        // Recorded first, so a slow or failing start still counts as an attempt.
-        lastAutoStart[provider.id] = current
         await subscription.startSession()
     }
 
