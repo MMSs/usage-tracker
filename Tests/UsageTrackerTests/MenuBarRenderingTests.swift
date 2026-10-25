@@ -21,6 +21,17 @@ import Testing
         MenuBarItemImage.render(item, appearance: appearance, displayName: "Cursor", darkMenuBar: true)
     }
 
+    @Test func batteryShowsWhatRemains() {
+        #expect(abs(MenuBarGraphGeometry.batteryFill(0.41)! - 0.59) < 1e-9)
+        #expect(MenuBarGraphGeometry.batteryFill(1) == 0)
+        #expect(MenuBarGraphGeometry.batteryFill(nil) == nil)
+    }
+
+    @Test func batteryStillReadsPercentUsed() {
+        let item = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
+        #expect(item.visible(in: MenuBarAppearance(graphStyle: .battery)).accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 62%")
+    }
+
     @Test func everyGraphStyleDrawsAtItsOwnWidth() throws {
         for style in MenuBarGraphStyle.allCases {
             for count in [1, 2] {

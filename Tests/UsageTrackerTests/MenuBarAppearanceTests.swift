@@ -67,7 +67,7 @@ import Testing
         #expect(!appearance.countdown && !appearance.colored)
         #expect(appearance.graphStyle == .rings)
         #expect(appearance.showPlanUsage && appearance.showAPISpend && appearance.limits == .both)
-        #expect(MenuBarGraphStyle.allCases.map(\.title) == ["Rings", "Bars"])
+        #expect(MenuBarGraphStyle.allCases.map(\.title) == ["Rings", "Bars", "Battery", "Columns"])
     }
 
     @Test func drawsOnlyWhatIsShown() {
