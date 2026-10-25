@@ -943,11 +943,22 @@ import Testing
         configureAll()
         let model = makeModel()
         model.setAlertKind(.failures, enabled: true)
-        fetchers[.cursor]?.result = .failure(.transport)
+        fetchers[.cursor]?.result = .failure(.offline)
 
         await model.refreshAll(manual: false)
 
         #expect(failureAlerts.isEmpty)
+    }
+
+    @Test func aTimeoutAlerts() async {
+        configureAll()
+        let model = makeModel()
+        model.setAlertKind(.failures, enabled: true)
+        fetchers[.cursor]?.result = .failure(.transport)
+
+        await model.refreshAll(manual: false)
+
+        #expect(failureAlerts.map(\.body) == ["Couldn't reach the server."])
     }
 
     @Test func goingOfflineDoesNotEndAStreak() async {
@@ -957,7 +968,7 @@ import Testing
         let target = RefreshTarget(provider: .cursor, half: .subscription)
         fetchers[.cursor]?.result = .failure(.unauthorized)
         await model.refresh(target, manual: true)
-        fetchers[.cursor]?.result = .failure(.transport)
+        fetchers[.cursor]?.result = .failure(.offline)
         await model.refresh(target, manual: true)
         fetchers[.cursor]?.result = .failure(.unauthorized)
         await model.refresh(target, manual: true)

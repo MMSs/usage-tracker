@@ -28,8 +28,19 @@ struct HTTPResponseHandlerTests {
         }
     }
 
-    @Test func offlineTransportFailureIsTransport() async {
-        let client = ThrowingHTTPClient(error: URLError(.notConnectedToInternet))
+    @Test(arguments: [URLError.Code.notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff])
+    func aLostConnectionIsOffline(code: URLError.Code) async {
+        let client = ThrowingHTTPClient(error: URLError(code))
+
+        await #expect(throws: FetchError.offline) {
+            try await HTTPResponseHandler.data(for: request, client: client)
+        }
+    }
+
+    /// The connection is up but the server could not be reached or trusted.
+    @Test(arguments: [URLError.Code.timedOut, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .secureConnectionFailed, .serverCertificateUntrusted])
+    func aServerThatCannotBeReachedIsTransport(code: URLError.Code) async {
+        let client = ThrowingHTTPClient(error: URLError(code))
 
         await #expect(throws: FetchError.transport) {
             try await HTTPResponseHandler.data(for: request, client: client)

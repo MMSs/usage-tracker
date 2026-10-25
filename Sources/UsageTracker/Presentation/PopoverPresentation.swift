@@ -257,7 +257,7 @@ enum PopoverPresentation {
         uses24Hour: Bool
     ) -> (text: String, fix: String?, severity: HalfErrorMessage.Severity) {
         switch failure {
-        case .transport:
+        case .transport, .offline:
             ("Couldn't reach \(service.host).", "Check your connection; it retries automatically.", .warning)
         case .challenge:
             ("\(service.host) asked for a browser check.", "Open \(service.host) in your browser, then Refresh.", .warning)

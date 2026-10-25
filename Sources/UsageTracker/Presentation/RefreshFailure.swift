@@ -3,8 +3,10 @@ import Foundation
 /// Why a half's last refresh failed. Holds no credential, URL, or response
 /// body, so it is safe to show and to log.
 enum RefreshFailure: Equatable, Sendable {
-    /// No response: offline, DNS, TLS, or a timeout.
+    /// No response from the server: DNS, TLS, or a timeout.
     case transport
+    /// No response because the connection is down.
+    case offline
     /// An HTML 403 from bot protection.
     case challenge
     case unauthorized
@@ -23,6 +25,7 @@ enum RefreshFailure: Equatable, Sendable {
     init(_ error: any Error) {
         switch error as? FetchError {
         case .transport: self = .transport
+        case .offline: self = .offline
         case .challenge: self = .challenge
         case .unauthorized: self = .unauthorized
         case let .httpStatus(code): self = .httpStatus(code)
@@ -38,6 +41,7 @@ extension RefreshFailure: CustomStringConvertible {
     var description: String {
         switch self {
         case .transport: "transport"
+        case .offline: "offline"
         case .challenge: "challenge"
         case .unauthorized: "unauthorized"
         case let .httpStatus(code): "http \(code)"
@@ -51,10 +55,10 @@ extension RefreshFailure: CustomStringConvertible {
 }
 
 extension RefreshFailure {
-    /// False when there was no response: the connection is down, which is not
-    /// the provider's failure, so it neither alerts nor ends a streak.
+    /// False when the connection is down, which is not the provider's
+    /// failure, so it neither alerts nor ends a streak.
     var alertsAsFailure: Bool {
-        self != .transport
+        self != .offline
     }
 
     /// The cause in a failure alert: a fixed phrase, never a header, body or URL.
@@ -68,7 +72,8 @@ extension RefreshFailure {
         case .keychain: "couldn't read Keychain"
         case .needsOrganization: "choose an organization in Settings"
         case .unexpected: "unexpected error"
-        case .transport: "network unavailable"
+        case .transport: "couldn't reach the server"
+        case .offline: "network unavailable"
         }
     }
 }

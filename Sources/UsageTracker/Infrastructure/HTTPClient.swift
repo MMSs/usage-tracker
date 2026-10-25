@@ -8,7 +8,10 @@ enum FetchError: Error, Equatable {
     case challenge
     case invalidResponse
     case decoding
+    /// No response from a server that is down, unknown, untrusted or slow.
     case transport
+    /// No response because the Mac has no connection.
+    case offline
     /// The credential sees several organizations and none listed is chosen.
     case needsOrganizationChoice
 }

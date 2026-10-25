@@ -182,12 +182,13 @@ struct AlertPolicyTests {
         #expect(started == UsageAlert(key: "anthropic.session.\(minutes)", title: "Anthropic session reset", body: "New session started."))
     }
 
-    @Test func transportNeverAlertsButEveryOtherCauseDoes() {
+    @Test func offlineNeverAlertsButEveryOtherCauseDoes() {
         let others: [RefreshFailure] = [
-            .challenge, .unauthorized, .httpStatus(500), .rateLimited(until: nil), .decoding, .keychain, .needsOrganization, .unexpected,
+            .transport, .challenge, .unauthorized, .httpStatus(500), .rateLimited(until: nil), .decoding, .keychain,
+            .needsOrganization, .unexpected,
         ]
 
-        #expect(!RefreshFailure.transport.alertsAsFailure)
+        #expect(!RefreshFailure.offline.alertsAsFailure)
         #expect(others.allSatisfy { $0.alertsAsFailure })
     }
 
@@ -200,7 +201,8 @@ struct AlertPolicyTests {
         #expect(RefreshFailure.keychain.alertCause == "couldn't read Keychain")
         #expect(RefreshFailure.needsOrganization.alertCause == "choose an organization in Settings")
         #expect(RefreshFailure.unexpected.alertCause == "unexpected error")
-        #expect(RefreshFailure.transport.alertCause == "network unavailable")
+        #expect(RefreshFailure.transport.alertCause == "couldn't reach the server")
+        #expect(RefreshFailure.offline.alertCause == "network unavailable")
     }
 
     @Test func aFailureAlertNamesTheHalfAndTheCause() {

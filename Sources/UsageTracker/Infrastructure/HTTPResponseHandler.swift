@@ -3,6 +3,11 @@ import os
 
 /// Status and transport mapping shared by every provider's services.
 enum HTTPResponseHandler {
+    /// The errors that mean the Mac has no connection, not that the server failed.
+    private static let offlineCodes: Set<URLError.Code> = [
+        .notConnectedToInternet, .networkConnectionLost, .dataNotAllowed, .internationalRoamingOff,
+    ]
+
     /// `overrides` replaces the shared error for a status, for a service that
     /// must tell it apart from the statuses mapped alongside it.
     @MainActor
@@ -26,6 +31,9 @@ enum HTTPResponseHandler {
 
             let code = (error as? URLError).map { "URLError \($0.code.rawValue)" } ?? String(describing: type(of: error))
             Log.http.notice("\(method, privacy: .public) \(endpoint, privacy: .public) transport error \(code, privacy: .public)")
+            if let urlError = error as? URLError, offlineCodes.contains(urlError.code) {
+                throw FetchError.offline
+            }
             throw FetchError.transport
         }
 

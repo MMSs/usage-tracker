@@ -138,7 +138,7 @@ struct CursorUsageServiceTests {
     }
 
     @Test func otherRequestFailureIsTransport() async {
-        let service = CursorUsageService(client: ThrowingHTTPClient(error: URLError(.notConnectedToInternet)))
+        let service = CursorUsageService(client: ThrowingHTTPClient(error: URLError(.timedOut)))
 
         await #expect(throws: FetchError.transport) {
             try await service.fetchUsage(token: "session-token")

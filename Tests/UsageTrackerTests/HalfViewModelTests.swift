@@ -280,7 +280,7 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(fetcher.callCount == 2)
     }
 
-    @Test(arguments: [FetchError.transport, .httpStatus(503), .rateLimited(until: nil)])
+    @Test(arguments: [FetchError.transport, .offline, .httpStatus(503), .rateLimited(until: nil)])
     func aFailureReplacingExpiredRetriesOnSchedule(error: FetchError) async {
         store.values[key] = "tok"
         fetcher.result = .failure(.unauthorized)
@@ -368,6 +368,7 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
 
     @Test(arguments: [
         (FetchError.transport, RefreshFailure.transport),
+        (.offline, .offline),
         (.challenge, .challenge),
         (.httpStatus(429), .httpStatus(429)),
         (.decoding, .decoding),

@@ -110,6 +110,10 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
+    @Test func offlineReadsAsTransport() {
+        #expect(error(.offline, half: .api, service: Self.console) == error(.transport, half: .api, service: Self.console))
+    }
+
     @Test func challengeSendsTheUserToTheBrowser() {
         #expect(error(.challenge) == HalfErrorMessage(
             text: "Plan usage: claude.ai asked for a browser check.",
