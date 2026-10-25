@@ -1,7 +1,7 @@
 import Foundation
 
 enum MenuBarGraphStyle: String, CaseIterable, Identifiable, Codable, Sendable {
-    case rings, bars, battery, columns
+    case rings, bars, battery, gauge, columns, pie, dials
 
     var id: String { rawValue }
 
@@ -10,7 +10,10 @@ enum MenuBarGraphStyle: String, CaseIterable, Identifiable, Codable, Sendable {
         case .rings: "Rings"
         case .bars: "Bars"
         case .battery: "Battery"
+        case .gauge: "Gauge"
         case .columns: "Columns"
+        case .pie: "Pie"
+        case .dials: "Dials"
         }
     }
 }

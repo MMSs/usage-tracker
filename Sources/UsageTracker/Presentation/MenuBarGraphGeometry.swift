@@ -18,6 +18,17 @@ enum MenuBarGraphGeometry {
     static let columnHeight: CGFloat = 16
     static let columnSpacing: CGFloat = 5
 
+    static let gaugeSize = CGSize(width: 24, height: 14)
+    static let gaugeStroke: CGFloat = 2.5
+    /// The outer arc's outer edge, measured from the arc's centre.
+    static let gaugeOuterRadius: CGFloat = 12
+    static let gaugeArcSpacing: CGFloat = 4
+    static let pieDiameter: CGFloat = 18
+    static let pieInnerWedgeRadius: CGFloat = 4.5
+    static let pieBandInnerRadius: CGFloat = 6
+    static let dialDiameter: CGFloat = 16
+    static let dialSpacing: CGFloat = 3
+
     /// The battery shows what remains, so it fills as the meter empties.
     static func batteryFill(_ fraction: Double?) -> Double? {
         fraction.map { 1 - $0 }
@@ -35,6 +46,16 @@ enum MenuBarGraphGeometry {
             )
         case .battery:
             return batterySize
+        case .gauge:
+            return gaugeSize
+        case .pie:
+            return CGSize(width: pieDiameter, height: pieDiameter)
+        case .dials:
+            let count = CGFloat(max(meterCount, 0))
+            return CGSize(
+                width: dialDiameter * count + dialSpacing * max(count - 1, 0),
+                height: dialDiameter
+            )
         case .columns:
             let count = CGFloat(max(meterCount, 0))
             return CGSize(

@@ -27,6 +27,11 @@ import Testing
         #expect(MenuBarGraphGeometry.batteryFill(nil) == nil)
     }
 
+    @Test func dialsAreWiderThanRingsBecauseTheySitSideBySide() {
+        #expect(MenuBarGraphGeometry.size(.dials, meterCount: 2).width == 35)
+        #expect(MenuBarGraphGeometry.size(.dials, meterCount: 1).width == 16)
+    }
+
     @Test func batteryStillReadsPercentUsed() {
         let item = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil)
         #expect(item.visible(in: MenuBarAppearance(graphStyle: .battery)).accessibilityText(displayName: "Anthropic") == "Anthropic, S 41%, W 62%")

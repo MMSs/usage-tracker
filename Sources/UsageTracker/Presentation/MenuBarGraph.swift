@@ -24,8 +24,14 @@ struct MenuBarGraph: View {
             MenuBarBars(meters: meters, palette: palette)
         case .battery:
             MenuBarBattery(meters: meters, palette: palette)
+        case .gauge:
+            MenuBarGauge(meters: meters, palette: palette)
         case .columns:
             MenuBarColumns(meters: meters, palette: palette)
+        case .pie:
+            MenuBarPie(meters: meters, palette: palette)
+        case .dials:
+            MenuBarDials(meters: meters, palette: palette)
         }
     }
 }
@@ -214,5 +220,169 @@ private struct MenuBarColumns: View {
                     .offset(x: -before, y: -(center - tickThickness / 2))
             }
         }
+    }
+}
+
+/// A radial line across a band, kept inside the band's radii.
+private func radialTick(center: CGPoint, angle: Angle, from inner: CGFloat, to outer: CGFloat) -> Path {
+    let width: CGFloat = 1.5
+    let direction = CGPoint(x: cos(angle.radians), y: sin(angle.radians))
+
+    return Path { path in
+        path.move(to: CGPoint(x: center.x + direction.x * (inner + width / 2), y: center.y + direction.y * (inner + width / 2)))
+        path.addLine(to: CGPoint(x: center.x + direction.x * (outer - width / 2), y: center.y + direction.y * (outer - width / 2)))
+    }
+}
+
+/// Half-arcs from nine o'clock over twelve to three, the last meter outermost
+/// and the first four points in. The arcs share a centre one stroke-half above
+/// the bottom edge, so strokes and caps stay inside the frame.
+private struct MenuBarGauge: View {
+    let meters: [MenuBarMeter]
+    let palette: MenuBarPalette
+
+    private let frame = MenuBarGraphGeometry.gaugeSize
+    private let stroke = MenuBarGraphGeometry.gaugeStroke
+    private let tickWidth: CGFloat = 1.5
+
+    private var center: CGPoint { CGPoint(x: frame.width / 2, y: frame.height - stroke / 2) }
+
+    var body: some View {
+        ZStack {
+            ForEach(Array(meters.prefix(2).enumerated()), id: \.offset) { index, meter in
+                let depth = CGFloat(min(meters.count, 2) - 1 - index)
+                let radius = MenuBarGraphGeometry.gaugeOuterRadius - stroke / 2 - depth * MenuBarGraphGeometry.gaugeArcSpacing
+
+                arc(radius: radius, fraction: 1)
+                    .stroke(palette.track, style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+
+                if let fraction = meter.fraction, fraction > 0 {
+                    arc(radius: radius, fraction: min(fraction, 1))
+                        .stroke(palette.fill(meter.tint), style: StrokeStyle(lineWidth: stroke, lineCap: .round))
+                }
+
+                if let tick = meter.tick {
+                    radialTick(center: center, angle: .degrees(180 + 180 * tick), from: radius - stroke / 2 - 1, to: radius + stroke / 2)
+                        .stroke(palette.tick, style: StrokeStyle(lineWidth: tickWidth, lineCap: .round))
+                }
+            }
+        }
+        .frame(width: frame.width, height: frame.height)
+    }
+
+    /// SwiftUI's y axis points down, so increasing angles run clockwise on screen.
+    private func arc(radius: CGFloat, fraction: Double) -> Path {
+        Path { path in
+            path.addArc(center: center, radius: radius, startAngle: .degrees(180), endAngle: .degrees(180 + 180 * fraction), clockwise: false)
+        }
+    }
+}
+
+/// Wedges filling clockwise from twelve over one track disk. Two meters: the
+/// last as an outer band, the first as a smaller wedge inside it.
+private struct MenuBarPie: View {
+    let meters: [MenuBarMeter]
+    let palette: MenuBarPalette
+
+    private let diameter = MenuBarGraphGeometry.pieDiameter
+
+    private var center: CGPoint { CGPoint(x: diameter / 2, y: diameter / 2) }
+
+    var body: some View {
+        let shown = Array(meters.prefix(2))
+
+        ZStack {
+            Circle()
+                .fill(palette.track)
+
+            ForEach(Array(shown.enumerated()), id: \.offset) { index, meter in
+                let band = band(index: index, count: shown.count)
+
+                if let fraction = meter.fraction, fraction > 0 {
+                    wedge(inner: band.inner, outer: band.outer, fraction: min(fraction, 1))
+                        .fill(palette.fill(meter.tint))
+                }
+
+                if let tick = meter.tick {
+                    radialTick(center: center, angle: .degrees(-90 + 360 * tick), from: band.inner, to: band.outer)
+                        .stroke(palette.tick, style: StrokeStyle(lineWidth: 1.5, lineCap: .round))
+                }
+            }
+        }
+        .frame(width: diameter, height: diameter)
+    }
+
+    private func band(index: Int, count: Int) -> (inner: CGFloat, outer: CGFloat) {
+        switch (count, index) {
+        case (2, 0): (0, MenuBarGraphGeometry.pieInnerWedgeRadius)
+        case (2, _): (MenuBarGraphGeometry.pieBandInnerRadius, diameter / 2)
+        default: (0, diameter / 2)
+        }
+    }
+
+    private func wedge(inner: CGFloat, outer: CGFloat, fraction: Double) -> Path {
+        let start = Angle.degrees(-90)
+        let end = Angle.degrees(-90 + 360 * fraction)
+
+        return Path { path in
+            path.addArc(center: center, radius: outer, startAngle: start, endAngle: end, clockwise: false)
+
+            if inner > 0 {
+                path.addArc(center: center, radius: inner, startAngle: end, endAngle: start, clockwise: true)
+            } else {
+                path.addLine(to: center)
+            }
+
+            path.closeSubpath()
+        }
+    }
+}
+
+/// Short on the left; each a small ring filling clockwise from twelve with
+/// its letter in the middle. A meter with a tick draws it as Rings does.
+private struct MenuBarDials: View {
+    let meters: [MenuBarMeter]
+    let palette: MenuBarPalette
+
+    private let diameter = MenuBarGraphGeometry.dialDiameter
+    private let lineWidth: CGFloat = 2
+    private let tickWidth: CGFloat = 1.5
+
+    var body: some View {
+        HStack(spacing: MenuBarGraphGeometry.dialSpacing) {
+            ForEach(Array(meters.enumerated()), id: \.offset) { _, meter in
+                dial(meter)
+            }
+        }
+    }
+
+    private func dial(_ meter: MenuBarMeter) -> some View {
+        ZStack {
+            Circle()
+                .inset(by: lineWidth / 2)
+                .stroke(palette.track, lineWidth: lineWidth)
+
+            if let fraction = meter.fraction, fraction > 0 {
+                Circle()
+                    .inset(by: lineWidth / 2)
+                    .trim(from: 0, to: min(fraction, 1))
+                    .stroke(palette.fill(meter.tint), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
+
+            Text(meter.letter)
+                .font(.system(size: 7, weight: .bold))
+                .foregroundStyle(palette.text(meter.tint))
+
+            if let tick = meter.tick {
+                // Crosses its ring and pokes into the space inside it.
+                Capsule()
+                    .fill(palette.tick)
+                    .frame(width: tickWidth, height: lineWidth + 2)
+                    .offset(y: -(diameter / 2 - (lineWidth + 2) / 2))
+                    .rotationEffect(.degrees(tick * 360))
+            }
+        }
+        .frame(width: diameter, height: diameter)
     }
 }
