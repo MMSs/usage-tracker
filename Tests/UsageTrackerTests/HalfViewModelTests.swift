@@ -340,6 +340,13 @@ func makeReport(_ percent: Double = 10) -> ProviderReport {
         #expect(RefreshFailure(error) == cause)
     }
 
+    /// A fetcher that reads Keychain itself, as the Codex renewal does, fails
+    /// the way the model's own read does.
+    @Test(arguments: [KeychainCredentialStoreError.unexpectedStatus(-25293), .invalidValue])
+    func keychainErrorsFromAFetcherAreKeychain(error: KeychainCredentialStoreError) {
+        #expect(RefreshFailure(error) == .keychain)
+    }
+
     @Test func otherErrorsAreUnexpected() {
         struct Odd: Error {}
         #expect(RefreshFailure(Odd()) == .unexpected)

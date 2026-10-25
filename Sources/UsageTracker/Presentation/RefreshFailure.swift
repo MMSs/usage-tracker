@@ -29,7 +29,7 @@ enum RefreshFailure: Equatable, Sendable {
         case let .rateLimited(until): self = .rateLimited(until: until)
         case .decoding, .invalidResponse: self = .decoding
         case .needsOrganizationChoice: self = .needsOrganization
-        case nil: self = .unexpected
+        case nil: self = error is KeychainCredentialStoreError ? .keychain : .unexpected
         }
     }
 }
