@@ -21,6 +21,25 @@ import Testing
         MenuBarItemImage.render(item, appearance: appearance, displayName: "Cursor", darkMenuBar: true)
     }
 
+    @Test func everyGraphStyleDrawsAtItsOwnWidth() throws {
+        for style in MenuBarGraphStyle.allCases {
+            for count in [1, 2] {
+                for tick in [nil, 0.5] as [Double?] {
+                    for colored in [true, false] {
+                        let meters = Array([meter("S", "41%", tick: tick, role: .short), meter("W", "62%", tick: tick, role: .long)].prefix(count))
+                        let item = MenuBarItem(provider: .anthropic, subscription: .meters(meters, stale: false, errorMark: false), api: nil)
+                        let appearance = MenuBarAppearance(showText: false, countdown: false, showGraph: true, graphStyle: style, colored: colored)
+                        let image = try #require(render(item, appearance))
+                        // Glyph 14, spacing 4, then the graph alone.
+                        let size = MenuBarGraphGeometry.size(style, meterCount: count)
+                        #expect(abs(image.size.width - (18 + size.width)) < 0.5, "\(style) with \(count) meters")
+                        #expect(size.height <= 18)
+                    }
+                }
+            }
+        }
+    }
+
     @Test func everyCombinationRenders() throws {
         let item = MenuBarItem(provider: .cursor, subscription: twoMeters, api: money)
 
