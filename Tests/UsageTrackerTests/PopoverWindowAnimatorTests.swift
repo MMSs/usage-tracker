@@ -35,6 +35,20 @@ struct PopoverWindowAnimatorTests {
         return true
     }
 
+    /// Samples `condition` every 10 ms for `duration` and returns whether it
+    /// held the whole time, so a late stale completion can't slip past.
+    private func hold(
+        _ condition: @MainActor () -> Bool,
+        for duration: Duration = .milliseconds(300)
+    ) async throws -> Bool {
+        let deadline = ContinuousClock.now + duration
+        while ContinuousClock.now < deadline {
+            if !condition() { return false }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        return condition()
+    }
+
     /// Clicking from one item straight to another closes the first panel while
     /// the second opens, which must not leave the first one up but invisible.
     @Test func openingAnotherPanelWhileOneClosesStillClosesIt() async throws {
@@ -78,6 +92,8 @@ struct PopoverWindowAnimatorTests {
         panel.makeKeyAndOrderFront(nil)
         let reopened = try await wait { panel.isVisible && panel.alphaValue == 1 }
         #expect(reopened, "panel is visible and fully opaque after the reopen")
+        let held = try await hold { panel.isVisible && panel.alphaValue == 1 }
+        #expect(held, "panel stays visible and opaque after a stale close could fire")
         #expect(panel.isVisible)
         #expect(panel.alphaValue == 1)
         #expect(!panel.ignoresMouseEvents)
