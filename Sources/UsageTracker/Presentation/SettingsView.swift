@@ -146,12 +146,15 @@ struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             if let title {
                 header(title)
             }
 
-            if isOpen {
+            // A closed section folds to zero height under a clip rather than
+            // leaving the view tree: a removed card would fade out in place
+            // while the sections below it slid up over it.
+            VStack(alignment: .leading, spacing: 8) {
                 VStack(alignment: .leading, spacing: 0, content: content)
                     .padding(.horizontal, 12)
                     .background(
@@ -166,8 +169,13 @@ struct SettingsSection<Content: View>: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
+            .padding(.top, title != nil && isOpen ? 8 : 0)
+            .frame(maxHeight: isOpen ? nil : 0, alignment: .top)
+            .clipped()
+            .opacity(isOpen ? 1 : 0)
+            .disabled(!isOpen)
+            .accessibilityHidden(!isOpen)
         }
-        .animation(.easeInOut(duration: 0.2), value: accordion?.wrappedValue)
     }
 
     /// A button that opens the section when it folds; otherwise a plain heading.
@@ -175,7 +183,10 @@ struct SettingsSection<Content: View>: View {
     private func header(_ title: String) -> some View {
         if isCollapsible {
             Button {
-                accordion?.wrappedValue.open(title)
+                // One transaction for the whole page, so every section moves together.
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    accordion?.wrappedValue.open(title)
+                }
             } label: {
                 HStack {
                     Text(title)
