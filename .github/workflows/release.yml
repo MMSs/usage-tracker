@@ -22,12 +22,29 @@ jobs:
   plan:
     if: github.ref == 'refs/heads/main'
     runs-on: macos-26
+    permissions:
+      contents: read
+      actions: read
     outputs:
       version: ${{ steps.plan.outputs.version }}
       sha: ${{ steps.plan.outputs.sha }}
       notes_md: ${{ steps.plan.outputs.notes_md }}
       notes_html: ${{ steps.plan.outputs.notes_html }}
     steps:
+      # Only a commit that passed CI gets released.
+      - name: Check CI passed for the commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="$GITHUB_SHA"
+          latest="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ci.yml --commit "$sha" --limit 1 \
+            --json status,conclusion \
+            --jq 'if length == 0 then "none" else .[0].status + "/" + .[0].conclusion end')"
+          if [[ "$latest" != "completed/success" ]]; then
+            echo "CI hasn't passed for $sha (latest CI run: $latest); wait for the CI run on main, then start the release again." >&2
+            exit 1
+          fi
+          echo "CI passed for $sha"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
