@@ -734,7 +734,7 @@ struct UpdatesSection: View {
             }
 
             Button(updates.versionText) {
-                // Task 5 opens the About panel here.
+                AboutPanel.show()
             }
             .buttonStyle(.link)
             .font(.caption)

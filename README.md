@@ -148,7 +148,8 @@ by opening the app again from Applications or Spotlight while it is running.
 Launching the app never opens it. The app appears in the Dock while the
 window is open and leaves when it closes. Each page folds its titled sections
 like an accordion: click a section's header to open it, and the one that was
-open closes.
+open closes. The version under Updates opens About Usage Tracker, as does the
+app menu while Settings is open.
 
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings, Bars, Battery, Gauge, Segments, Columns or
