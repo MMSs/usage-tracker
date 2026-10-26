@@ -276,6 +276,20 @@ sends a real message (`ping`) on your account. Nothing else is sent.
 Checking for updates fetches the update feed from github.com; it sends nothing
 about you or your usage.
 
+## Use at your own risk
+
+The admin keys use each provider's official API. The subscription meters do
+not: they read the private endpoints behind the Cursor dashboard, claude.ai
+and Codex, signed in with the cookie or token you paste. Those endpoints are
+undocumented, can change without notice, and may not be allowed by the
+provider's terms of service. Session start goes further and sends a real
+message on your account. A provider could limit or suspend an account used
+this way. Decide whether that risk is acceptable for your account before you
+paste a session credential or turn on session start.
+
+Usage Tracker is provided as is, without warranty of any kind, under the MIT
+License.
+
 ## Status
 
 Cursor, Anthropic and OpenAI all work against their live services.
