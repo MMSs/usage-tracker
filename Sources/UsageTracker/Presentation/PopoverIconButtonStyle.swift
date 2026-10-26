@@ -16,7 +16,7 @@ struct PopoverIconButtonStyle: ButtonStyle {
                 .frame(width: 22, height: 22)
                 .background(
                     RoundedRectangle(cornerRadius: 6)
-                        .fill(.primary.opacity(configuration.isPressed ? 0.16 : hovering ? 0.08 : 0))
+                        .fill(.primary.opacity(configuration.isPressed ? 0.22 : hovering ? 0.14 : 0))
                 )
                 .contentShape(RoundedRectangle(cornerRadius: 6))
                 .scaleEffect(configuration.isPressed ? 0.94 : 1)
