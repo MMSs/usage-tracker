@@ -3,12 +3,25 @@
 A native macOS 26+ menu-bar app that shows AI usage and spend across Cursor,
 Anthropic, and OpenAI in one place.
 
+## Install
+
+With Homebrew:
+```zsh
+brew install --cask MMSs/tap/usage-tracker
+```
+
+Or download `Usage-Tracker-<version>.zip` from the latest
+[GitHub Release](https://github.com/MMSs/usage-tracker/releases/latest), unzip
+it, and move the app to Applications.
+
+It requires macOS 26 on Apple Silicon.
+
 ## Requirements
 
 - macOS 26
 - Xcode Command Line Tools
 
-## Build and install
+## Build from source
 
 Build the app:
 ```zsh
@@ -245,17 +258,22 @@ log show --last 1h --predicate 'subsystem == "com.mohabsam.usage-tracker"'
 The log never contains credentials, cookies, headers, query strings, or
 response bodies. Organization ids in paths are shown as `{uuid}`.
 
+Switching between a build from source and a release asks once per stored
+credential for Keychain access, because they are signed differently. Click
+**Always Allow**.
+
 ## Privacy
 
 Usage Tracker reads usage and spend from Cursor, Anthropic, and OpenAI using
 the credentials you paste. Session start, manual or auto, is the one thing that
 sends a real message (`ping`) on your account. Nothing else is sent.
 
+Checking for updates fetches the update feed from github.com; it sends nothing
+about you or your usage.
+
 ## Status
 
-Early development. Cursor works. Anthropic is implemented but not yet verified
-against the live services. OpenAI is implemented but not yet verified against
-the live services.
+Cursor, Anthropic and OpenAI all work against their live services.
 
 ## Trademarks
 
