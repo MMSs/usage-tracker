@@ -19,6 +19,11 @@ import Testing
         #expect(GeneralSettingsView.sectionTitles == ["Menu bar", "Alerts", "Startup", "Updates"])
     }
 
+    /// One button says what it does; no row label repeating it.
+    @Test func updatesHasASingleCheckNowButton() {
+        #expect(UpdatesSection.checkNowTitle == "Check Now")
+    }
+
     @Test func requestedProviderPageWhenListed() {
         let request = SettingsRequest(provider: .anthropic)
 

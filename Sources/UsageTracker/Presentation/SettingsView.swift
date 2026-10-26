@@ -714,6 +714,7 @@ struct OpenAtLoginRows: View {
 
 struct UpdatesSection: View {
     @ObservedObject var updates: UpdatesModel
+    static let checkNowTitle = "Check Now"
 
     private var isAutomatic: Binding<Bool> {
         Binding(get: { updates.isAutomatic }, set: { updates.setAutomatic($0) })
@@ -726,11 +727,15 @@ struct UpdatesSection: View {
                     SwitchToggle(isOn: isAutomatic)
                 }
 
-                SettingsRow(label: "Check now", isLast: true) {
-                    Button("Check") { updates.checkNow() }
+                // The button names itself, so it sits under the switch
+                // without a row label repeating it.
+                HStack {
+                    Spacer()
+                    Button(Self.checkNowTitle) { updates.checkNow() }
                         .controlSize(.small)
                         .disabled(!updates.canCheck)
                 }
+                .frame(minHeight: 34)
             }
 
             Button(updates.versionText) {
