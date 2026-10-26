@@ -7,6 +7,7 @@ import AppKit
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     let model: AppModel
     private let settingsWindow: SettingsWindowController
+    private var aboutObserver: AboutPanel.MenuTrackingObserver?
 
     override init() {
         model = AppModel.live()
@@ -18,11 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.loginItem.reconcileAtLaunch()
         AboutPanel.replaceAboutItem(in: NSApp.mainMenu)
-    }
-
-    /// The app menu appears (or is rebuilt) once the app is active, e.g. while Settings is open.
-    func applicationDidBecomeActive(_ notification: Notification) {
-        AboutPanel.replaceAboutItem(in: NSApp.mainMenu)
+        aboutObserver = AboutPanel.MenuTrackingObserver { NSApp.mainMenu }
     }
 
     /// Finder, Spotlight or the Dock icon: bring Settings forward without changing the page.

@@ -56,4 +56,21 @@ struct AboutPanelTests {
         #expect(about.target is AboutPanel.Responder)
         #expect(quit.action == #selector(NSApplication.terminate(_:)))
     }
+
+    @Test func aMenuRebuiltLaterIsRetargetedWhenItOpens() {
+        let center = NotificationCenter()
+        let main = NSMenu()
+        let host = NSMenuItem()
+        host.submenu = NSMenu()
+        main.addItem(host)
+        let observer = AboutPanel.MenuTrackingObserver(center: center) { main }
+
+        // The menu is rebuilt after launch with the standard item again.
+        let about = NSMenuItem(title: "About Usage Tracker", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        host.submenu?.addItem(about)
+        center.post(name: NSMenu.didBeginTrackingNotification, object: main)
+
+        #expect(about.action == #selector(AboutPanel.Responder.showAbout(_:)))
+        observer.stop()
+    }
 }

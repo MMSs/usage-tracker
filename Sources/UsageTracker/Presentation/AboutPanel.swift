@@ -65,4 +65,31 @@ enum AboutPanel {
             }
         }
     }
+
+    /// Retargets the About item each time a menu starts tracking, so a menu
+    /// rebuilt after launch (activation policy changes, Settings opening) is
+    /// fixed before the user sees it.
+    @MainActor
+    final class MenuTrackingObserver {
+        private var token: NSObjectProtocol?
+        private let center: NotificationCenter
+
+        init(center: NotificationCenter = .default, mainMenu: @escaping @MainActor @Sendable () -> NSMenu?) {
+            self.center = center
+            token = center.addObserver(
+                forName: NSMenu.didBeginTrackingNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                MainActor.assumeIsolated {
+                    AboutPanel.replaceAboutItem(in: mainMenu())
+                }
+            }
+        }
+
+        func stop() {
+            if let token { center.removeObserver(token) }
+            token = nil
+        }
+    }
 }
