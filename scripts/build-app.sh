@@ -8,6 +8,18 @@ swift build --configuration release --package-path "$root"
 rm -rf "$bundle"
 mkdir -p "$bundle/Contents/MacOS" "$bundle/Contents/Resources"
 cp "$root/Resources/Info.plist" "$bundle/Contents/Info.plist"
+
+# Stamp the release version on the bundle's copy; the source Info.plist stays
+# versionless so a plain build reads as a source build ("Version dev").
+if [[ -n "${USAGE_TRACKER_VERSION:-}" ]]; then
+  if [[ ! "$USAGE_TRACKER_VERSION" =~ '^[0-9]+\.[0-9]+\.[0-9]+$' ]]; then
+    echo "USAGE_TRACKER_VERSION must look like 1.2.3, got: $USAGE_TRACKER_VERSION" >&2
+    exit 1
+  fi
+  plutil -replace CFBundleShortVersionString -string "$USAGE_TRACKER_VERSION" "$bundle/Contents/Info.plist"
+  plutil -replace CFBundleVersion -string "$USAGE_TRACKER_VERSION" "$bundle/Contents/Info.plist"
+fi
+
 cp "$root/Resources/AppIcon.icns" "$bundle/Contents/Resources/AppIcon.icns"
 cp "$root/.build/release/UsageTracker" "$bundle/Contents/MacOS/UsageTracker"
 touch "$bundle"
