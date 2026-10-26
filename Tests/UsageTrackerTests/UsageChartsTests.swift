@@ -22,10 +22,13 @@ private func chartDay(_ day: Int, hour: Int = 0) -> Date {
         [CGPoint(x: 0.5, y: 1), CGPoint(x: 1, y: 0.6)],
     ]
 
-    private let bars = (0..<7).map { offset in
-        DayBar(
-            day: chartDay(20 + offset), value: offset < 5 ? Double(offset * 4) : nil,
-            heightFraction: Double(offset) / 8, tint: offset == 3 ? .overBudget : .onPace,
+    // Typed in pieces: older compilers time out checking it as one expression.
+    private let bars: [DayBar] = (0..<7).map { (offset: Int) -> DayBar in
+        let value: Double? = offset < 5 ? Double(offset * 4) : nil
+        let heightFraction: Double = Double(offset) / 8
+        let tint: PacingTint = offset == 3 ? .overBudget : .onPace
+        return DayBar(
+            day: chartDay(20 + offset), value: value, heightFraction: heightFraction, tint: tint,
             isToday: offset == 4, isFuture: offset > 4
         )
     }

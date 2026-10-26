@@ -106,7 +106,8 @@ private func window(resetsAt: Date, length: TimeInterval? = 7 * 86_400) -> Limit
             values: values, period: period, share: 14.3, today: at(tuesday + 2, 12), calendar: layoutCalendar
         )
 
-        #expect(bars.map(\.heightFraction) == [12 / 28.6, 18 / 28.6, 1])
+        let fractions: [Double] = [12 / 28.6, 18 / 28.6, 1]
+        #expect(bars.map(\.heightFraction) == fractions)
         #expect(bars.map(\.tint) == [.onPace, .overBudget, .overBudget])
     }
 
