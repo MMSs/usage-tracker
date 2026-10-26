@@ -1,0 +1,318 @@
+name: Release
+
+# Started by hand from main (Actions tab, or `gh workflow run release.yml`).
+# plan works out the version and notes without secrets; ship waits for the
+# owner's approval, then builds, notarizes and publishes exactly the commit
+# plan reported; cask opens the tap PR and can be rerun on its own.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash --noprofile --norc -euo pipefail {0}
+
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+      sha: ${{ steps.plan.outputs.sha }}
+      notes_md: ${{ steps.plan.outputs.notes_md }}
+      notes_html: ${{ steps.plan.outputs.notes_html }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      # A cold cache once failed to resolve and then resolved on a rerun.
+      - run: swift package resolve || swift package resolve
+      - run: swift build -c release --product release-tool
+      - name: Plan the release
+        id: plan
+        run: |
+          sha="$GITHUB_SHA"
+          prev="$(git describe --tags --abbrev=0 --match 'v*' "$sha" 2>/dev/null || true)"
+          # With no tag yet the whole history goes in; the first release
+          # ignores it and uses the first-release summary instead.
+          if [[ -n "$prev" ]]; then range="$prev..$sha"; else range="$sha"; fi
+          work="$RUNNER_TEMP/plan"
+          mkdir -p "$work"
+          git log --reverse --format='%s%x1f%b%x1e' "$range" > "$work/log.txt"
+
+          tool="$(swift build -c release --show-bin-path)/release-tool"
+          if ! out="$("$tool" plan \
+            --previous-tag "$prev" \
+            --repository MMSs/usage-tracker \
+            --first-release-summary scripts/release/first-release.md \
+            --notes-md "$work/notes.md" \
+            --notes-html "$work/notes.html" \
+            < "$work/log.txt" 2> "$work/skipped.txt")"; then
+            cat "$work/skipped.txt" >&2
+            exit 1
+          fi
+          re='^version=([0-9]+\.[0-9]+\.[0-9]+)?$'
+          if [[ ! "$out" =~ $re ]]; then
+            echo "Unexpected output from release-tool plan: $out" >&2
+            exit 1
+          fi
+          version="${out#version=}"
+          echo "version=${version} sha=${sha} previous=${prev:-none}"
+
+          delimiter="EOF_$(openssl rand -hex 16)"
+          {
+            echo "version=$version"
+            echo "sha=$sha"
+            if [[ -n "$version" ]]; then
+              echo "notes_md<<$delimiter"
+              printf '%s\n' "$(cat "$work/notes.md")"
+              echo "$delimiter"
+              echo "notes_html<<$delimiter"
+              printf '%s\n' "$(cat "$work/notes.html")"
+              echo "$delimiter"
+            fi
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            if [[ -n "$version" ]]; then
+              echo "# Release $version"
+              echo
+              echo "- Commit: \`$sha\`"
+              echo "- Previous tag: ${prev:-none}"
+              echo
+              cat "$work/notes.md"
+              echo
+            else
+              echo "Nothing to release since ${prev:-the first commit}."
+            fi
+            if [[ -s "$work/skipped.txt" ]]; then
+              echo
+              echo "<details><summary>Commits left out of the notes: $(wc -l < "$work/skipped.txt" | tr -d ' ')</summary>"
+              echo
+              echo '~~~text'
+              cat "$work/skipped.txt"
+              echo '~~~'
+              echo
+              echo '</details>'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ship:
+    needs: plan
+    if: needs.plan.outputs.version != ''
+    runs-on: macos-26
+    environment: release
+    permissions:
+      contents: write
+    outputs:
+      sha256: ${{ steps.publish.outputs.sha256 }}
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      SHA: ${{ needs.plan.outputs.sha }}
+      APP: build/Usage Tracker.app
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - name: Check the commit is the planned one
+        run: |
+          head="$(git rev-parse HEAD)"
+          if [[ "$head" != "$SHA" ]]; then
+            echo "Checked out $head, but plan reported $SHA" >&2
+            exit 1
+          fi
+      # A cold cache once failed to resolve and then resolved on a rerun.
+      - run: swift package resolve || swift package resolve
+      - name: Write the release notes
+        env:
+          NOTES_MD: ${{ needs.plan.outputs.notes_md }}
+          NOTES_HTML: ${{ needs.plan.outputs.notes_html }}
+        run: |
+          printf '%s\n' "$NOTES_MD" > "$RUNNER_TEMP/notes.md"
+          printf '%s\n' "$NOTES_HTML" > "$RUNNER_TEMP/notes.html"
+      - name: Import the Developer ID certificate
+        env:
+          DEVELOPER_ID_CERT_P12: ${{ secrets.DEVELOPER_ID_CERT_P12 }}
+          DEVELOPER_ID_CERT_PASSWORD: ${{ secrets.DEVELOPER_ID_CERT_PASSWORD }}
+        run: |
+          umask 077
+          keychain="$RUNNER_TEMP/release.keychain-db"
+          password="$(openssl rand -hex 32)"
+          echo "::add-mask::$password"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+
+          p12="$RUNNER_TEMP/developer-id.p12"
+          printf '%s' "$DEVELOPER_ID_CERT_P12" | base64 --decode > "$p12"
+          security import "$p12" -k "$keychain" -f pkcs12 -P "$DEVELOPER_ID_CERT_PASSWORD" -T /usr/bin/codesign
+          rm -f "$p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+
+          # Prepend the job's keychain to the user search list so codesign
+          # finds the identity.
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          security find-identity -v -p codesigning "$keychain"
+      - name: Build and sign the app
+        env:
+          USAGE_TRACKER_VERSION: ${{ needs.plan.outputs.version }}
+          USAGE_TRACKER_SIGNING_IDENTITY: "Developer ID Application: Mohammad Mohab Al Samman (8W45S9762S)"
+        run: |
+          scripts/build-app.sh
+          codesign --verify --deep --strict --verbose=2 "$APP"
+      - name: Notarize the app
+        env:
+          NOTARY_KEY_P8: ${{ secrets.NOTARY_KEY_P8 }}
+          NOTARY_KEY_ID: ${{ secrets.NOTARY_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.NOTARY_ISSUER_ID }}
+        run: |
+          umask 077
+          key="$RUNNER_TEMP/notary-key.p8"
+          printf '%s\n' "$NOTARY_KEY_P8" > "$key"
+          upload="$RUNNER_TEMP/notarize.zip"
+          ditto -c -k --keepParent "$APP" "$upload"
+
+          result="$RUNNER_TEMP/notary-result.json"
+          submitted=0
+          xcrun notarytool submit "$upload" \
+            --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" \
+            --wait --output-format json > "$result" || submitted=$?
+          cat "$result"
+          echo
+          status="$(plutil -extract status raw -o - "$result" 2>/dev/null || true)"
+          id="$(plutil -extract id raw -o - "$result" 2>/dev/null || true)"
+          if [[ "$status" != "Accepted" ]]; then
+            echo "Notarization ended with status '${status:-unknown}' (notarytool exit $submitted)" >&2
+            if [[ -n "$id" ]]; then
+              xcrun notarytool log "$id" \
+                --key "$key" --key-id "$NOTARY_KEY_ID" --issuer "$NOTARY_ISSUER_ID" || true
+            fi
+            exit 1
+          fi
+      - name: Staple and check Gatekeeper
+        run: |
+          xcrun stapler staple "$APP"
+          xcrun stapler validate "$APP"
+          spctl --status || true
+          spctl -a -vv -t exec "$APP" 2>&1 | tee "$RUNNER_TEMP/spctl.txt"
+          if ! grep -q 'source=Notarized Developer ID' "$RUNNER_TEMP/spctl.txt"; then
+            echo "Gatekeeper did not accept the app as notarized Developer ID" >&2
+            exit 1
+          fi
+      - name: Zip and sign the update
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/dist"
+          zip="$RUNNER_TEMP/dist/Usage-Tracker-$VERSION.zip"
+          rm -f "$zip"
+          ditto -c -k --keepParent "$APP" "$zip"
+
+          sign_update="$(find .build/artifacts -path '*Sparkle/bin/sign_update' -print -quit)"
+          if [[ ! -x "$sign_update" ]]; then
+            echo "Sparkle's sign_update is missing from .build/artifacts" >&2
+            exit 1
+          fi
+          # printf is a builtin and the pipe never touches disk, unlike a
+          # here-string, which older bash writes to a temporary file.
+          signature="$(printf '%s\n' "$SPARKLE_PRIVATE_KEY" | "$sign_update" -p --ed-key-file - "$zip")"
+          if [[ -z "$signature" ]]; then
+            echo "sign_update printed no signature" >&2
+            exit 1
+          fi
+          length="$(stat -f%z "$zip")"
+
+          swift build -c release --product release-tool
+          tool="$(swift build -c release --show-bin-path)/release-tool"
+          "$tool" appcast \
+            --version "$VERSION" \
+            --url "https://github.com/MMSs/usage-tracker/releases/download/v$VERSION/Usage-Tracker-$VERSION.zip" \
+            --length "$length" \
+            --signature "$signature" \
+            --notes-html "$RUNNER_TEMP/notes.html" \
+            > "$RUNNER_TEMP/dist/appcast.xml"
+          cat "$RUNNER_TEMP/dist/appcast.xml"
+      - name: Publish the release
+        id: publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          zip="$RUNNER_TEMP/dist/Usage-Tracker-$VERSION.zip"
+          sha256="$(shasum -a 256 "$zip" | cut -d ' ' -f 1)"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          # Creates tag v$VERSION on the planned commit, so no tag exists
+          # unless everything before this succeeded.
+          gh release create "v$VERSION" "$zip" "$RUNNER_TEMP/dist/appcast.xml" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SHA" \
+            --title "Usage Tracker $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md"
+      - name: Remove the keychain and key files
+        if: always()
+        run: |
+          security delete-keychain "$RUNNER_TEMP/release.keychain-db" 2>/dev/null || true
+          rm -f "$RUNNER_TEMP/developer-id.p12" "$RUNNER_TEMP/notary-key.p8"
+
+  # Separate from ship so a failure here can be rerun without publishing
+  # again; rerunning updates the same branch and pull request.
+  cask:
+    needs: [plan, ship]
+    if: needs.plan.outputs.version != ''
+    runs-on: macos-26
+    environment: release
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      SHA256: ${{ needs.ship.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          persist-credentials: false
+      - name: Open the cask pull request
+        env:
+          GH_TOKEN: ${{ secrets.TAP_TOKEN }}
+        run: |
+          re='^[0-9]+\.[0-9]+\.[0-9]+$'
+          [[ "$VERSION" =~ $re ]] || { echo "Bad version: $VERSION" >&2; exit 1; }
+          re='^[0-9a-f]{64}$'
+          [[ "$SHA256" =~ $re ]] || { echo "Bad sha256: $SHA256" >&2; exit 1; }
+
+          template="$GITHUB_WORKSPACE/scripts/release/usage-tracker.rb.template"
+          tap="$RUNNER_TEMP/homebrew-tap"
+          rm -rf "$tap"
+          gh repo clone MMSs/homebrew-tap "$tap"
+          cd "$tap"
+          # Push with the tap token through gh rather than a token in the URL.
+          git config credential.https://github.com.helper ''
+          git config --add credential.https://github.com.helper '!gh auth git-credential'
+
+          branch="usage-tracker-$VERSION"
+          git checkout -B "$branch"
+          mkdir -p Casks
+          sed -e "s/__VERSION__/$VERSION/g" -e "s/__SHA256__/$SHA256/g" "$template" > Casks/usage-tracker.rb
+          git add Casks/usage-tracker.rb
+          if git diff --cached --quiet; then
+            echo "The tap's default branch already has usage-tracker $VERSION."
+            exit 0
+          fi
+          git -c user.name='github-actions[bot]' \
+            -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+            commit -m "usage-tracker $VERSION"
+          git push --force origin "$branch"
+
+          pr="$(gh pr list -R MMSs/homebrew-tap --head "$branch" --state open --json url --jq '.[0].url // empty')"
+          if [[ -n "$pr" ]]; then
+            echo "Updated $pr"
+          else
+            gh pr create -R MMSs/homebrew-tap --head "$branch" \
+              --title "usage-tracker $VERSION" \
+              --body "Release https://github.com/MMSs/usage-tracker/releases/tag/v$VERSION"
+          fi
