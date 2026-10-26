@@ -18,5 +18,8 @@ let package = Package(
             dependencies: ["UsageTracker"],
             resources: [.copy("Fixtures")]
         ),
+        .target(name: "ReleaseTools"),
+        .executableTarget(name: "release-tool", dependencies: ["ReleaseTools"]),
+        .testTarget(name: "ReleaseToolsTests", dependencies: ["ReleaseTools"]),
     ]
 )
