@@ -53,7 +53,7 @@ enum ProviderSettingsTab: Hashable {
     /// The titled sections the tab shows, in order. A half's untitled switch and credential section comes first.
     var sections: [String] {
         switch self {
-        case .subscription, .api: ["Menu bar", "Refresh"]
+        case .subscription, .api: ["Refresh"]
         case .menuBar: ["Alerts", "Appearance"]
         }
     }
@@ -480,16 +480,6 @@ struct ProviderSettingsView: View {
     @ViewBuilder
     private func section(_ title: String, half: Half?) -> some View {
         switch (title, half) {
-        case ("Menu bar", let half?):
-            SettingsSection(
-                title: title,
-                footer: "Hides this half from the menu bar item. It is still fetched, alerts, and shows in the panel."
-            ) {
-                SettingsRow(label: "Show in menu bar", isLast: true) {
-                    SwitchToggle(isOn: showsInMenuBar(half))
-                        .disabled(!settings.wrappedValue.isEnabled(half))
-                }
-            }
         case ("Refresh", let half?):
             SettingsSection(title: title) {
                 SettingsRow(label: "Every", isLast: true) {
@@ -545,7 +535,7 @@ struct ProviderSettingsView: View {
         }
     }
 
-    /// One half's switch and, while it is on, its credential fields. Untitled: the tab names it.
+    /// One half's switches and, while it is on, its credential fields. Untitled: the tab names it.
     @ViewBuilder
     private func halfSection(_ half: Half) -> some View {
         let enabled = halfEnabled(half)
@@ -560,6 +550,11 @@ struct ProviderSettingsView: View {
             }
 
             if enabled.wrappedValue {
+                // A hidden half is still fetched, still alerts and still shows in the panel.
+                SettingsRow(label: "Show in menu bar") {
+                    SwitchToggle(isOn: showsInMenuBar(half))
+                }
+
                 ForEach(fields) { field in
                     CredentialFieldView(
                         field: field,
