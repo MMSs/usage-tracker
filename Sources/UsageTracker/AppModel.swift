@@ -14,6 +14,7 @@ final class AppModel: ObservableObject {
     private let alertMonitor: AlertMonitor?
     private let now: () -> Date
     let loginItem: LoginItemModel
+    let updates: UpdatesModel
     private(set) var scheduler: RefreshScheduler!
     /// Set by the app delegate; opens the Settings window. A no-op until then.
     var presentSettings: (SettingsRequest) -> Void = { _ in }
@@ -52,6 +53,7 @@ final class AppModel: ObservableObject {
         appearanceStore: MenuBarAppearanceStoring,
         budgetStore: APIBudgetStoring,
         loginItem: LoginItemModel,
+        updates: UpdatesModel = UpdatesModel(updater: nil, build: BuildInfo(infoDictionary: nil)),
         sleepObserver: SystemSleepObserving,
         networkObserver: NetworkReachabilityObserving,
         sleep: @escaping RefreshScheduler.Sleep = { duration in
@@ -66,6 +68,7 @@ final class AppModel: ObservableObject {
         self.appearanceStore = appearanceStore
         self.budgetStore = budgetStore
         self.loginItem = loginItem
+        self.updates = updates
         self.now = now
         self.alertMonitor = alertMonitor
         alertsEnabled = alertMonitor?.isEnabled ?? true
@@ -575,6 +578,10 @@ final class AppModel: ObservableObject {
             )
         }
 
+        // Sparkle shows a "failed to start" alert without a feed, so builds made from source get no updater.
+        let build = BuildInfo.main
+        let updater: SoftwareUpdating? = build.feedURL != nil ? SparkleUpdater() : nil
+
         return AppModel(
             providers: providers,
             credentialStore: credentialStore,
@@ -582,6 +589,7 @@ final class AppModel: ObservableObject {
             appearanceStore: UserDefaultsMenuBarAppearanceStore(),
             budgetStore: UserDefaultsAPIBudgetStore(),
             loginItem: LoginItemModel(manager: LoginItemManager(), store: UserDefaultsLoginItemPreferenceStore()),
+            updates: UpdatesModel(updater: updater, build: build),
             sleepObserver: SystemSleepObserver(),
             networkObserver: NetworkReachabilityObserver(),
             alertMonitor: AlertMonitor(notifier: SystemUsageNotifier(), store: UserDefaultsAlertStateStore())

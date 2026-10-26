@@ -159,6 +159,10 @@ open closes.
   picks both windows or just the short or the long one. Open at login
   registers the app as a login item; the line under the switch shows what
   macOS reports, with a button to System Settings when it needs your approval.
+- Updates: release copies check for updates automatically. The Check
+  automatically switch in General > Updates turns that off, and Check now looks
+  straight away. Updates install in place and keep Keychain access. Builds
+  made from source don't update, and the section says so.
 - Each provider tab: an Enabled switch (off removes the item and stops
   fetching, credentials stay) and, on each half's tab, a Show in menu bar
   switch under that half's Enabled switch (off hides that half from the item;

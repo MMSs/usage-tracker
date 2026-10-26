@@ -712,9 +712,42 @@ struct OpenAtLoginRows: View {
     }
 }
 
+struct UpdatesSection: View {
+    @ObservedObject var updates: UpdatesModel
+
+    private var isAutomatic: Binding<Bool> {
+        Binding(get: { updates.isAutomatic }, set: { updates.setAutomatic($0) })
+    }
+
+    var body: some View {
+        SettingsSection(title: "Updates", footer: updates.message) {
+            if updates.isAvailable {
+                SettingsRow(label: "Check automatically") {
+                    SwitchToggle(isOn: isAutomatic)
+                }
+
+                SettingsRow(label: "Check now", isLast: true) {
+                    Button("Check") { updates.checkNow() }
+                        .controlSize(.small)
+                        .disabled(!updates.canCheck)
+                }
+            }
+
+            Button(updates.versionText) {
+                // Task 5 opens the About panel here.
+            }
+            .buttonStyle(.link)
+            .font(.caption)
+            .padding(.vertical, 8)
+        }
+    }
+}
+
 struct GeneralSettingsView: View {
     @ObservedObject var appModel: AppModel
-    @State private var accordion = SettingsAccordion(titles: ["Menu bar", "Alerts", "Startup"])
+    static let sectionTitles = ["Menu bar", "Alerts", "Startup", "Updates"]
+
+    @State private var accordion = SettingsAccordion(titles: GeneralSettingsView.sectionTitles)
 
     private var appearance: Binding<MenuBarAppearance> {
         Binding(
@@ -802,6 +835,8 @@ struct GeneralSettingsView: View {
             SettingsSection(title: "Startup") {
                 OpenAtLoginRows(loginItem: appModel.loginItem)
             }
+
+            UpdatesSection(updates: appModel.updates)
         }
         .environment(\.settingsAccordion, $accordion)
     }

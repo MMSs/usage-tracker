@@ -15,6 +15,10 @@ import Testing
         #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance"])
     }
 
+    @Test func theGeneralPageEndsWithUpdates() {
+        #expect(GeneralSettingsView.sectionTitles == ["Menu bar", "Alerts", "Startup", "Updates"])
+    }
+
     @Test func requestedProviderPageWhenListed() {
         let request = SettingsRequest(provider: .anthropic)
 
