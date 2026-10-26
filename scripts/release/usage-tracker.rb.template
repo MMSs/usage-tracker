@@ -18,6 +18,8 @@ cask "usage-tracker" do
 
   app "Usage Tracker.app"
 
+  uninstall quit: "com.mohabsam.usage-tracker"
+
   zap trash: [
     "~/Library/Caches/com.mohabsam.usage-tracker",
     "~/Library/HTTPStorages/com.mohabsam.usage-tracker",
