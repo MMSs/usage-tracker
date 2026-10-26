@@ -1,0 +1,29 @@
+name: PR title
+
+# Squash merges make the PR title the commit subject on main, and the release
+# workflow reads the version bump and the notes from those subjects.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-title-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-title:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # A cold cache once failed to resolve and then resolved on a rerun.
+      - run: swift package resolve || swift package resolve
+      # The title is untrusted text, so it reaches the script only through
+      # the environment, never spliced into the command.
+      - env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: swift run -q release-tool check-title "$TITLE"
