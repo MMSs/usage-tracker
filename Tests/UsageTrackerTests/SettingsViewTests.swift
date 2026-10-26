@@ -7,10 +7,11 @@ import Testing
         #expect(ProviderSettingsTab.menuBar.title == "Options")
     }
 
-    /// Show in menu bar sits under the half's Enabled switch, not in a section of its own.
-    @Test func eachHalfTabHasOnlyARefreshSection() {
-        #expect(ProviderSettingsTab.subscription.sections == ["Refresh"])
-        #expect(ProviderSettingsTab.api.sections == ["Refresh"])
+    /// Show in menu bar sits under the half's Enabled switch; refresh and
+    /// auto-start share one section.
+    @Test func eachHalfTabHasOnlyAScheduleSection() {
+        #expect(ProviderSettingsTab.subscription.sections == ["Schedule"])
+        #expect(ProviderSettingsTab.api.sections == ["Schedule"])
         #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance"])
     }
 

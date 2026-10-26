@@ -53,7 +53,7 @@ enum ProviderSettingsTab: Hashable {
     /// The titled sections the tab shows, in order. A half's untitled switch and credential section comes first.
     var sections: [String] {
         switch self {
-        case .subscription, .api: ["Refresh"]
+        case .subscription, .api: ["Schedule"]
         case .menuBar: ["Alerts", "Appearance"]
         }
     }
@@ -480,11 +480,25 @@ struct ProviderSettingsView: View {
     @ViewBuilder
     private func section(_ title: String, half: Half?) -> some View {
         switch (title, half) {
-        case ("Refresh", let half?):
-            SettingsSection(title: title) {
-                SettingsRow(label: "Every", isLast: true) {
+        case ("Schedule", let half?):
+            let autoStarts = offersAutoStart(half)
+
+            SettingsSection(
+                title: title,
+                footer: autoStarts
+                    ? "Auto-start sends a one-word message to start the 5-hour window as soon as the previous one ends."
+                    : nil
+            ) {
+                SettingsRow(label: "Refresh every", isLast: !autoStarts) {
                     RefreshIntervalSlider(interval: refreshInterval(half))
                         .disabled(!settings.wrappedValue.isEnabled(half))
+                }
+
+                if autoStarts {
+                    SettingsRow(label: "Auto-start sessions", isLast: true) {
+                        SwitchToggle(isOn: autoStartSessions)
+                            .disabled(!settings.wrappedValue.isEnabled(half))
+                    }
                 }
             }
         case ("Alerts", _):
@@ -540,9 +554,6 @@ struct ProviderSettingsView: View {
     private func halfSection(_ half: Half) -> some View {
         let enabled = halfEnabled(half)
         let fields = half == .subscription ? provider.descriptor.subscriptionFields : provider.descriptor.apiFields
-        let offersAutoStart = half == .subscription
-            && provider.descriptor.capabilities.canStartSession
-            && provider.subscription?.canStartSession == true
 
         SettingsSection(title: nil) {
             SettingsRow(label: "Enabled", isLast: !enabled.wrappedValue) {
@@ -577,20 +588,15 @@ struct ProviderSettingsView: View {
                     OrganizationPickerRow(half: model)
                 }
 
-                if offersAutoStart {
-                    Divider()
-                    SettingsRow(label: "Auto-start sessions", isLast: true) {
-                        SwitchToggle(isOn: autoStartSessions)
-                    }
-                }
             }
         }
+    }
 
-        if offersAutoStart, enabled.wrappedValue {
-            Text("Sends a one-word message to start the 5-hour window as soon as the previous one ends.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
+    /// Only a plan-usage half whose provider and fetcher can start a session offers auto-start.
+    private func offersAutoStart(_ half: Half) -> Bool {
+        half == .subscription
+            && provider.descriptor.capabilities.canStartSession
+            && provider.subscription?.canStartSession == true
     }
 }
 

@@ -186,8 +186,8 @@ cheapest model to begin the window, then refreshes. Anthropic creates a
 claude.ai chat, sends the message, and deletes the chat; OpenAI makes one Codex
 request.
 
-Auto-start sessions, on the provider's Subscription tab, does the same as soon
-as the previous window ends. It is off by default, runs at most once per 10
+Auto-start sessions, in the Schedule section of the provider's Subscription
+tab, does the same as soon as the previous window ends. It is off by default, runs at most once per 10
 minutes after any start (Start session included), only on scheduled refreshes,
 and never while the credential is expired or erroring or the Subscription half
 is switched off. After three starts in a row that leave the session closed, it
