@@ -146,35 +146,32 @@ struct SettingsSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 8) {
             if let title {
                 header(title)
             }
 
-            // A closed section folds to zero height under a clip rather than
-            // leaving the view tree: a removed card would fade out in place
-            // while the sections below it slid up over it.
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 0, content: content)
-                    .padding(.horizontal, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.primary.opacity(0.04))
-                    )
+            // Layout never animates: the window snaps to the new height on
+            // the next turn, and sections sliding meanwhile would fight it.
+            // Only the opened section's rows fade in.
+            if isOpen {
+                VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 0, content: content)
+                        .padding(.horizontal, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Color.primary.opacity(0.04))
+                        )
 
-                if let footer {
-                    Text(footer)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let footer {
+                        Text(footer)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
+                .modifier(FadesIn(enabled: isCollapsible))
             }
-            .padding(.top, title != nil && isOpen ? 8 : 0)
-            .frame(maxHeight: isOpen ? nil : 0, alignment: .top)
-            .clipped()
-            .opacity(isOpen ? 1 : 0)
-            .disabled(!isOpen)
-            .accessibilityHidden(!isOpen)
         }
     }
 
@@ -183,10 +180,7 @@ struct SettingsSection<Content: View>: View {
     private func header(_ title: String) -> some View {
         if isCollapsible {
             Button {
-                // One transaction for the whole page, so every section moves together.
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    accordion?.wrappedValue.open(title)
-                }
+                accordion?.wrappedValue.open(title)
             } label: {
                 HStack {
                     Text(title)
@@ -195,7 +189,8 @@ struct SettingsSection<Content: View>: View {
                     Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
-                        .rotationEffect(.degrees(isOpen ? 90 : 0))
+                        // Scoped to the turn, so the chevron never animates its position.
+                        .animation(.easeInOut(duration: 0.2)) { $0.rotationEffect(.degrees(isOpen ? 90 : 0)) }
                         .accessibilityHidden(true)
                 }
                 .contentShape(Rectangle())
@@ -208,6 +203,23 @@ struct SettingsSection<Content: View>: View {
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
         }
+    }
+}
+
+/// Fades a section's rows in when it opens. Opacity only, so nothing the
+/// window's height follows ever moves.
+private struct FadesIn: ViewModifier {
+    let enabled: Bool
+    @State private var shown = false
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(!enabled || shown ? 1 : 0)
+            .onAppear {
+                withAnimation(.easeOut(duration: 0.15)) {
+                    shown = true
+                }
+            }
     }
 }
 
