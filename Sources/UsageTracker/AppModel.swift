@@ -439,6 +439,13 @@ final class AppModel: ObservableObject {
         appearanceStore.setAppearance(appearance)
     }
 
+    /// Drops the provider's custom appearance so it follows the global one again.
+    func useDefaultAppearance(for provider: Provider) {
+        var settings = settings(for: provider)
+        settings.appearanceOverride = nil
+        setSettings(settings, for: provider)
+    }
+
     /// The provider's override when it has one, else the global appearance.
     func appearance(for provider: Provider) -> MenuBarAppearance {
         settings(for: provider).appearanceOverride ?? globalAppearance

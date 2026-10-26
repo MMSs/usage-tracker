@@ -10,6 +10,8 @@ final class SettingsSelection: ObservableObject {
     @Published var helpProvider: Provider?
     /// The tab each provider page shows; absent means its first tab. Kept for one window.
     @Published var tabs: [Provider: ProviderSettingsTab] = [:]
+    /// The titled section open on each provider page's tab; absent means its first.
+    @Published var openSections: [Provider: String] = [:]
 
     func apply(_ request: SettingsRequest, listed: [Provider]) {
         page = SettingsPage.resolve(request, listed: listed)
@@ -22,12 +24,22 @@ final class SettingsSelection: ObservableObject {
         }
     }
 
-    /// The user picked a tab; the help requested for that page stays closed from here on.
+    /// The user picked a tab; it opens on its first section, and the help
+    /// requested for that page stays closed from here on.
     func selectTab(_ tab: ProviderSettingsTab, for provider: Provider) {
         tabs[provider] = tab
+        openSections[provider] = nil
         if helpProvider == provider {
             helpProvider = nil
         }
+    }
+
+    /// The provider's page on the tab holding its Custom appearance switch, with that section open.
+    func showAppearance(of provider: Provider) {
+        page = .provider(provider)
+        helpProvider = nil
+        tabs[provider] = .menuBar
+        openSections[provider] = "Appearance"
     }
 }
 
@@ -245,6 +257,34 @@ struct SettingsRow<Control: View>: View {
     }
 }
 
+/// A provider listed under General's appearance defaults because it has its
+/// own: the name opens its appearance settings, Use Defaults drops them.
+struct CustomAppearanceRow: View {
+    let name: String
+    var isLast = false
+    let show: () -> Void
+    let useDefaults: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                Button(name, action: show)
+                    .buttonStyle(.link)
+                    .help("Open \(name)'s appearance settings")
+                Text("uses a custom appearance")
+                Spacer(minLength: 12)
+                Button("Use Defaults", action: useDefaults)
+                    .controlSize(.small)
+            }
+            .frame(minHeight: 34)
+
+            if !isLast {
+                Divider()
+            }
+        }
+    }
+}
+
 struct SwitchToggle: View {
     @Binding var isOn: Bool
 
@@ -352,14 +392,14 @@ struct ProviderSettingsView: View {
     let helpFieldID: String?
     /// The chosen tab; nil, or one the page lacks, shows the first.
     @Binding var tab: ProviderSettingsTab?
-    /// Which of the tab's titled sections is open; rebuilt when the tab's sections change.
-    @State private var storedAccordion = SettingsAccordion(titles: [])
+    /// Which of the tab's titled sections is open; nil, or one the tab lacks, opens its first.
+    @Binding var openSection: String?
 
     private var accordion: Binding<SettingsAccordion> {
         let titles = selectedTab.wrappedValue.sections
         return Binding(
-            get: { storedAccordion.titles == titles ? storedAccordion : SettingsAccordion(titles: titles) },
-            set: { storedAccordion = $0 }
+            get: { SettingsAccordion(titles: titles, open: openSection) },
+            set: { openSection = $0.open }
         )
     }
 
@@ -750,7 +790,9 @@ struct UpdatesSection: View {
 
 struct GeneralSettingsView: View {
     @ObservedObject var appModel: AppModel
-    static let sectionTitles = ["Menu bar", "Alerts", "Startup", "Updates"]
+    static let sectionTitles = ["Menu bar appearance", "Alerts", "Startup", "Updates"]
+    /// Opens a listed provider's own appearance settings.
+    var showAppearance: (Provider) -> Void = { _ in }
 
     @State private var accordion = SettingsAccordion(titles: GeneralSettingsView.sectionTitles)
 
@@ -786,6 +828,19 @@ struct GeneralSettingsView: View {
         return AppModel.menuBarDisplayOrder(appModel.insertedProviders).map(appModel.provider)
     }
 
+    /// The previewed items whose provider has its own appearance, in the same
+    /// order, so the defaults above don't silently skip them.
+    static func customAppearanceProviders(in appModel: AppModel) -> [ProviderViewModel] {
+        previewProviders(in: appModel).filter { appModel.settings(for: $0.id).appearanceOverride != nil }
+    }
+
+    static func appearanceFooter(listsCustom: Bool) -> String {
+        let scope = listsCustom
+            ? "Defaults for every provider except those listed above. A provider's tab sets its own refresh rates."
+            : "Defaults for every provider. A provider's tab can override them and sets its own refresh rates."
+        return scope + " Colored tints the item by remaining capacity or pacing."
+    }
+
     /// Each item as the menu bar draws it, with its provider's override if it has one.
     private var previewEntries: [MenuBarPreviewStrip.Entry] {
         Self.previewProviders(in: appModel).map { provider in
@@ -806,6 +861,7 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         let entries = previewEntries
+        let custom = Self.customAppearanceProviders(in: appModel)
 
         VStack(alignment: .leading, spacing: 16) {
             MenuBarPreviewStrip(
@@ -815,10 +871,23 @@ struct GeneralSettingsView: View {
             )
 
             SettingsSection(
-                title: "Menu bar",
-                footer: "Defaults for every provider. A provider's tab can override them and sets its own refresh rates. Colored tints the item by remaining capacity or pacing."
+                title: "Menu bar appearance",
+                footer: Self.appearanceFooter(listsCustom: !custom.isEmpty)
             ) {
                 MenuBarAppearanceRows(appearance: appearance, meterNames: nil)
+
+                if !custom.isEmpty {
+                    Divider()
+
+                    ForEach(custom, id: \.id) { provider in
+                        CustomAppearanceRow(
+                            name: provider.descriptor.displayName,
+                            isLast: provider.id == custom.last?.id,
+                            show: { showAppearance(provider.id) },
+                            useDefaults: { appModel.useDefaultAppearance(for: provider.id) }
+                        )
+                    }
+                }
             }
 
             SettingsSection(
