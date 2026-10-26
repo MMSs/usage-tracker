@@ -109,7 +109,9 @@ jobs:
             else
               echo "Nothing to release since ${prev:-the first commit}."
             fi
-            if [[ -s "$work/skipped.txt" ]]; then
+            # The first release's notes are the summary, not the history, so
+            # listing every earlier commit as left out would only be noise.
+            if [[ -n "$prev" && -s "$work/skipped.txt" ]]; then
               echo
               echo "<details><summary>Commits left out of the notes: $(wc -l < "$work/skipped.txt" | tr -d ' ')</summary>"
               echo
