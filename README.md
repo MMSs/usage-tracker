@@ -121,6 +121,13 @@ top of that bar:
 Hover a day's bar to see its date and amount. Per-model rows, Extra usage and
 Credits keep their plain bars.
 
+The buttons along the bottom (Refresh, Settings, Quit) light up on hover and
+darken while pressed. Refresh (Command-R) turns into a spinner while any of
+the provider's fetches runs, scheduled ones included. After a click it then
+shows a green check when every half refreshed, or a red mark when one failed,
+for a second and a half. A click while the spinner shows does nothing, and
+closing the popover does not stop a refresh you started.
+
 ## Settings
 
 Settings is its own window. Open it from the gear in any menu bar popover, or
@@ -133,12 +140,12 @@ open closes.
 - General: the menu bar defaults for every provider. Show text, a countdown,
   and a graph drawn as Rings, Bars, Battery, Gauge, Segments, Columns or
   Dials. All three can be off: the item is then just the logo (badged when a
-  half fails), and the API amount shows with Show text, or with the graph
-  when there is no budget ring. Colored tints the text and graph by remaining
-  capacity or pacing. Limits picks both windows or just the short or the long
-  one. Open at login registers the app as a login item; the
-  line under the switch shows what macOS reports, with a button to System
-  Settings when it needs your approval.
+  half fails) unless a half is loading, needs setup or has failed, and the API
+  amount shows with Show text, or with the graph when there is no budget ring.
+  Colored tints the text and graph by remaining capacity or pacing. Limits
+  picks both windows or just the short or the long one. Open at login
+  registers the app as a login item; the line under the switch shows what
+  macOS reports, with a button to System Settings when it needs your approval.
 - Each provider tab: an Enabled switch (off removes the item and stops
   fetching, credentials stay) and, on each half's tab, a Show in menu bar
   switch (off hides that half from the item; it is still fetched, alerts and
@@ -215,10 +222,11 @@ fails, the error shows under the switch and in the log
 
 When a refresh fails, the menu bar item shows an error mark, and a "!" badge
 is cut into the provider logo (the badge stays when that half is hidden from
-the menu bar). The popover says which half failed (Plan usage or API spend), why, and how to fix it. The
-last successful report stays on screen, dimmed. When a service is rate
-limiting requests, the popover says when the app will retry; scheduled
-refreshes of that half wait until then, while Refresh still asks right away.
+the menu bar). The popover says which half failed (Plan usage or API spend),
+why, and how to fix it. The last successful report stays on screen, dimmed.
+When a service is rate limiting requests, the popover says when the app will
+retry; scheduled refreshes of that half wait until then, while Refresh still
+asks right away.
 
 The app writes refreshes, HTTP responses, and scheduling to the system log
 under the subsystem `com.mohabsam.usage-tracker`. Watch it live:

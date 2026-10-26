@@ -531,3 +531,19 @@ private func apiReport(spent: Decimal) -> ProviderReport {
     )
     #expect(item == MenuBarItem(provider: .cursor, subscription: .status(.setUp), api: nil))
 }
+
+@Test func theForcedSetUpItemIgnoresTheMenuBarSwitches() throws {
+    let item = try #require(MenuBarItemBuilder.make(
+        descriptor: ProviderRegistry.descriptor(for: .cursor),
+        subscription: HalfSnapshot(status: .unconfigured, report: nil, isStale: true),
+        api: nil,
+        apiBudget: nil,
+        now: now,
+        calendar: calendar,
+        forceSetUp: true
+    ))
+
+    let shown = item.visible(in: MenuBarAppearance(), halves: MenuBarHalves(subscription: false, api: false))
+
+    #expect(shown.subscription == .status(.setUp))
+}

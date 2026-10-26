@@ -24,10 +24,11 @@ final class RefreshButtonModel: ObservableObject {
     }
 
     /// Starts `refresh`, then shows its result for a moment; false (and
-    /// nothing runs) while a clicked refresh is still running.
+    /// nothing runs) while a clicked refresh, or any fetch (`fetching`), is
+    /// still running.
     @discardableResult
-    func click(_ refresh: @escaping @MainActor () async -> Bool) -> Bool {
-        guard feedback.begin() else {
+    func click(fetching: Bool, _ refresh: @escaping @MainActor () async -> Bool) -> Bool {
+        guard !fetching, feedback.begin() else {
             return false
         }
 

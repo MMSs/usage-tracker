@@ -428,13 +428,18 @@ struct ProviderPopoverView: View {
     }
 
     private var refreshPhase: RefreshFeedback.Phase {
-        RefreshFeedback.shown(refreshButton.feedback.displayed(at: Date()), fetching: [provider.subscription, provider.api].contains { $0?.isRefreshing == true })
+        RefreshFeedback.shown(refreshButton.feedback.displayed(at: Date()), fetching: isFetching)
     }
 
-    /// Refreshes the provider, showing the spinner and then the result for a moment.
+    private var isFetching: Bool {
+        [provider.subscription, provider.api].contains { $0?.isRefreshing == true }
+    }
+
+    /// Refreshes the provider, showing the spinner and then the result for a
+    /// moment. A click while any fetch shows the spinner does nothing.
     private func refresh() {
         let id = provider.id
-        refreshButton.click { [appModel] in
+        refreshButton.click(fetching: isFetching) { [appModel] in
             await appModel.refresh(id, manual: true)
         }
     }

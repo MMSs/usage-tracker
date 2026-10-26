@@ -29,7 +29,7 @@ import Testing
         var finished = false
         var cancelled = false
 
-        model.click {
+        model.click(fetching: false) {
             await gate.wait()
             cancelled = Task.isCancelled
             finished = true
@@ -49,7 +49,7 @@ import Testing
     @Test func theResultLapsesAfterItsTime() async {
         let model = makeModel()
 
-        model.click { false }
+        model.click(fetching: false) { false }
         await sleeper.waitForSleepCount(1)
 
         #expect(model.feedback.phase == .failed)
@@ -65,7 +65,7 @@ import Testing
     @Test func closingThePanelStopsTheLapseTimer() async {
         let model = makeModel()
 
-        model.click { true }
+        model.click(fetching: false) { true }
         await sleeper.waitForSleepCount(1)
         model.panelClosed()
         clock.date.addTimeInterval(RefreshFeedback.resultDuration)
@@ -84,12 +84,12 @@ import Testing
         let gate = SuspendedGate()
         var calls = 0
 
-        let first = model.click {
+        let first = model.click(fetching: false) {
             calls += 1
             await gate.wait()
             return true
         }
-        let second = model.click {
+        let second = model.click(fetching: false) {
             calls += 1
             return true
         }
@@ -101,5 +101,20 @@ import Testing
         await waitUntil { model.feedback.phase == .succeeded }
         #expect(calls == 1)
         sleeper.resume()
+    }
+
+    @Test func aClickWhileAScheduledFetchRunsIsIgnored() async {
+        let model = makeModel()
+        var calls = 0
+
+        let clicked = model.click(fetching: true) {
+            calls += 1
+            return true
+        }
+        await Task.yield()
+
+        #expect(!clicked)
+        #expect(calls == 0)
+        #expect(model.feedback.phase == .idle)
     }
 }

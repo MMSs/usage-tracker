@@ -129,10 +129,12 @@ struct MenuBarHalves: Equatable, Sendable {
 extension MenuBarItem {
     /// What the appearance and the provider's half switches let the item
     /// draw. With both halves hidden only the logo is left; a Limits choice
-    /// with no matching meter keeps all.
+    /// with no matching meter keeps all. The set-up item, all there is to
+    /// click while nothing is configured, is never hidden.
     func visible(in appearance: MenuBarAppearance, halves: MenuBarHalves) -> MenuBarItem {
-        var subscription = halves.subscription ? subscription : nil
-        let api = halves.api ? api : nil
+        let setUp = HalfDisplay.status(.setUp)
+        var subscription = halves.subscription || subscription == setUp ? subscription : nil
+        let api = halves.api || api == setUp ? api : nil
         let hidden = [
             (Half.subscription, halves.subscription ? nil : self.subscription),
             (Half.api, halves.api ? nil : self.api),

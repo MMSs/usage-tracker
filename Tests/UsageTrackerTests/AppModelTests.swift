@@ -1056,6 +1056,45 @@ import Testing
         #expect(recovered)
     }
 
+    @Test func aProviderRefreshIgnoresAnOldFailure() async {
+        configureAll()
+        let clock = Clock()
+        let providers = ProviderRegistry.all.map { descriptor in
+            ProviderViewModel(
+                descriptor: descriptor,
+                subscriptionFetcher: fetchers[descriptor.id],
+                apiFetcher: nil,
+                credentialStore: credentials, cache: cache, now: { clock.date }
+            )
+        }
+        let model = AppModel(
+            providers: providers,
+            credentialStore: credentials,
+            providerSettingsStore: settingsStore,
+            appearanceStore: MemoryMenuBarAppearanceStore(),
+            budgetStore: budgets,
+            loginItem: .stub(),
+            sleepObserver: ControllableSleepObserver(),
+            networkObserver: ControllableNetworkObserver(),
+            sleep: { [sleeper] duration in await sleeper.sleep(duration) },
+            now: { clock.date }
+        )
+        fetchers[.cursor]?.result = .failure(.unauthorized)
+        await model.refresh(.cursor, manual: true)
+
+        // A cancelled fetch keeps the earlier failure, which this refresh did not record.
+        clock.date.addTimeInterval(60)
+        fetchers[.cursor]?.thrownError = CancellationError()
+        let ignored = await model.refresh(.cursor, manual: true)
+        #expect(model.provider(.cursor).subscription?.lastFailure != nil)
+        #expect(ignored)
+
+        fetchers[.cursor]?.thrownError = nil
+        clock.date.addTimeInterval(60)
+        let failed = await model.refresh(.cursor, manual: true)
+        #expect(!failed)
+    }
+
     @Test func aFailingHalfAlertsOncePerStreak() async {
         configureAll()
         let model = makeModel()
