@@ -31,6 +31,11 @@ jobs:
       notes_md: ${{ steps.plan.outputs.notes_md }}
       notes_html: ${{ steps.plan.outputs.notes_html }}
     steps:
+      # Not pinned; printed so a runner image change shows in the logs.
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          swift --version
       # Only a commit that passed CI gets released.
       - name: Check CI passed for the commit
         env:
@@ -137,6 +142,11 @@ jobs:
       SHA: ${{ needs.plan.outputs.sha }}
       APP: build/Usage Tracker.app
     steps:
+      # Not pinned; printed so a runner image change shows in the logs.
+      - name: Show the toolchain
+        run: |
+          xcodebuild -version
+          swift --version
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.plan.outputs.sha }}
