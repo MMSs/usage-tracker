@@ -6,6 +6,7 @@ import Testing
 private final class AnimatedTestPanel: NSPanel {}
 
 @MainActor
+@Suite(.serialized)
 struct PopoverWindowAnimatorTests {
     private func makePanel() -> NSPanel {
         let panel = AnimatedTestPanel(
@@ -18,9 +19,20 @@ struct PopoverWindowAnimatorTests {
         return panel
     }
 
-    /// Lets the fades finish.
-    private func settle() async throws {
-        try await Task.sleep(for: .milliseconds(400))
+    /// Polls `condition` in 10 ms steps, yielding to the main run loop so the
+    /// fades' completion handlers can run, until it holds or `timeout` passes.
+    /// Returns whether it held, so a state that never arrives fails the
+    /// `#expect` that names it instead of hanging.
+    private func wait(
+        until condition: @MainActor () -> Bool,
+        timeout: Duration = .seconds(2)
+    ) async throws -> Bool {
+        let deadline = ContinuousClock.now + timeout
+        while !condition() {
+            if ContinuousClock.now >= deadline { return false }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        return true
     }
 
     /// Clicking from one item straight to another closes the first panel while
@@ -34,19 +46,22 @@ struct PopoverWindowAnimatorTests {
         }
         PopoverWindowAnimator.install(on: first)
         first.makeKeyAndOrderFront(nil)
-        try await settle()
+        let firstOpened = try await wait { first.isVisible && first.alphaValue == 1 }
+        #expect(firstOpened, "first panel never finished opening")
 
         first.orderOut(nil)
         second.makeKeyAndOrderFront(nil)
-        try await settle()
-
+        let swapped = try await wait {
+            !first.isVisible && second.isVisible && second.alphaValue == 1
+        }
+        #expect(swapped, "first is ordered out, second is fully opaque")
         #expect(!first.isVisible)
         #expect(second.isVisible)
         #expect(second.alphaValue == 1)
 
         first.makeKeyAndOrderFront(nil)
-        try await settle()
-
+        let firstReopened = try await wait { first.isVisible && first.alphaValue == 1 }
+        #expect(firstReopened, "first is visible and fully opaque again")
         #expect(first.isVisible)
         #expect(first.alphaValue == 1)
     }
@@ -56,12 +71,13 @@ struct PopoverWindowAnimatorTests {
         defer { panel.orderOut(nil) }
         PopoverWindowAnimator.install(on: panel)
         panel.makeKeyAndOrderFront(nil)
-        try await settle()
+        let opened = try await wait { panel.isVisible && panel.alphaValue == 1 }
+        #expect(opened, "panel never finished opening")
 
         panel.orderOut(nil)
         panel.makeKeyAndOrderFront(nil)
-        try await settle()
-
+        let reopened = try await wait { panel.isVisible && panel.alphaValue == 1 }
+        #expect(reopened, "panel is visible and fully opaque after the reopen")
         #expect(panel.isVisible)
         #expect(panel.alphaValue == 1)
         #expect(!panel.ignoresMouseEvents)
