@@ -51,7 +51,7 @@ touch "$bundle"
 # to - for ad hoc. A real identity also gets the hardened runtime and a secure
 # timestamp, which notarization requires.
 identity="${USAGE_TRACKER_SIGNING_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"')}"
+  | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"' || true)}"
 identity="${identity:--}"
 sign=(codesign --force --sign "$identity")
 if [[ "$identity" != "-" ]]; then
