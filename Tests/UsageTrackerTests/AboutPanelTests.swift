@@ -22,7 +22,7 @@ struct AboutPanelTests {
         #expect(options[.applicationVersion] as? String == "dev")
     }
 
-    @Test func creditsLinkTheRepo() throws {
+    @Test func creditsLinkTheRepo() {
         let credits = AboutPanel.credits()
         let text = credits.string as NSString
         #expect(text.contains("github.com/MMSs/usage-tracker"))
@@ -31,6 +31,23 @@ struct AboutPanelTests {
         let repo = text.range(of: "github.com/MMSs/usage-tracker")
         #expect(credits.attribute(.link, at: repo.location, effectiveRange: nil) as? URL
             == URL(string: "https://github.com/MMSs/usage-tracker"))
+    }
+
+    /// Sparkle's MIT license asks for its notice in every copy; the full text
+    /// ships in the bundle and the panel says so.
+    @Test func creditsNameSparklesLicense() throws {
+        let credits = AboutPanel.credits()
+        let text = credits.string as NSString
+        #expect(text.contains("Includes Sparkle, MIT License."))
+
+        let sparkle = text.range(of: "Sparkle")
+        try #require(sparkle.location != NSNotFound)
+        #expect(credits.attribute(.link, at: sparkle.location, effectiveRange: nil) as? URL
+            == URL(string: "https://sparkle-project.org"))
+    }
+
+    @Test func creditsUseOnlyLabelColours() throws {
+        let credits = AboutPanel.credits()
 
         let labels: [NSColor] = [.labelColor, .secondaryLabelColor]
         for index in 0..<credits.length {

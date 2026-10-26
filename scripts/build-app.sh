@@ -39,6 +39,15 @@ cp "$bin/UsageTracker" "$bundle/Contents/MacOS/UsageTracker"
 # Embed Sparkle and point the executable at it.
 mkdir -p "$bundle/Contents/Frameworks"
 ditto "$bin/Sparkle.framework" "$bundle/Contents/Frameworks/Sparkle.framework"
+
+# Sparkle's MIT license asks for its notice in every copy, and the framework
+# doesn't carry one, so ship the text from the downloaded release.
+sparkle_license="$root/.build/artifacts/sparkle/Sparkle/LICENSE"
+if [[ ! -f "$sparkle_license" ]]; then
+  echo "Missing Sparkle's license at $sparkle_license" >&2
+  exit 1
+fi
+cp "$sparkle_license" "$bundle/Contents/Resources/Sparkle-LICENSE.txt"
 if ! otool -l "$bundle/Contents/MacOS/UsageTracker" | grep -q '@executable_path/../Frameworks'; then
   install_name_tool -add_rpath @executable_path/../Frameworks "$bundle/Contents/MacOS/UsageTracker"
 fi

@@ -7,6 +7,7 @@ enum AboutPanel {
     static let copyright = "© 2026 Mohab. MIT License."
     private static let repoLine = "github.com/MMSs/usage-tracker"
     private static let repoURL = URL(string: "https://github.com/MMSs/usage-tracker")!
+    private static let sparkleURL = URL(string: "https://sparkle-project.org")!
 
     static func options(build: BuildInfo) -> [NSApplication.AboutPanelOptionKey: Any] {
         [
@@ -32,6 +33,10 @@ enum AboutPanel {
 
         let credits = NSMutableAttributedString()
         credits.append(NSAttributedString(string: repoLine + "\n", attributes: attributes(.labelColor, link: repoURL)))
+        // Sparkle's full license ships in the bundle as Sparkle-LICENSE.txt.
+        credits.append(NSAttributedString(string: "Includes ", attributes: attributes(.labelColor)))
+        credits.append(NSAttributedString(string: "Sparkle", attributes: attributes(.labelColor, link: sparkleURL)))
+        credits.append(NSAttributedString(string: ", MIT License.\n", attributes: attributes(.labelColor)))
         credits.append(NSAttributedString(
             string: "Not affiliated with Cursor, Anthropic or OpenAI.",
             attributes: attributes(.secondaryLabelColor)

@@ -304,6 +304,12 @@ OpenAI blossom from the monochrome mark OpenAI publishes at
 <https://openai.com/brand>. The Anthropic mark is an original "A\" drawing, not
 Anthropic's or Claude's logo.
 
+## Third-party software
+
+Usage Tracker includes [Sparkle](https://sparkle-project.org) for updates,
+under the MIT License. Its full license text ships inside the app at
+`Contents/Resources/Sparkle-LICENSE.txt`.
+
 ## Removal
 
 1. Quit Usage Tracker.
