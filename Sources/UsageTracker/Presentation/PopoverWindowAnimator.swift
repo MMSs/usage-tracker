@@ -12,7 +12,10 @@ enum PopoverWindowAnimator {
 
     private static var hookedClasses: Set<ObjectIdentifier> = []
     private static var closeGeneration = 0
-    private static var isClosing = false
+    /// Each popover fading out, by window, with its close's generation. Every
+    /// provider has its own popover, and opening one while another fades out
+    /// must not cancel that other close.
+    private static var closing: [ObjectIdentifier: Int] = [:]
 
     static func install(on window: NSWindow) {
         guard let windowClass = hookableClass(of: window),
@@ -60,7 +63,7 @@ enum PopoverWindowAnimator {
         let original = unsafeBitCast(method_getImplementation(method), to: OrderFront.self)
         let replacement: @convention(block) (NSWindow, AnyObject?) -> Void = { window, sender in
             MainActor.assumeIsolated {
-                let wasVisible = window.isVisible && !isClosing
+                let wasVisible = window.isVisible && !isClosing(window)
                 cancelClose(window)
                 // Transparent before it reaches the screen, so the first frame
                 // never flashes at full opacity.
@@ -80,6 +83,10 @@ enum PopoverWindowAnimator {
         }
     }
 
+    private static func isClosing(_ window: NSWindow) -> Bool {
+        closing[ObjectIdentifier(window)] != nil
+    }
+
     private static var reduceMotion: Bool {
         NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
     }
@@ -94,19 +101,20 @@ enum PopoverWindowAnimator {
     }
 
     private static func playClose(_ window: NSWindow, orderOut: @escaping () -> Void) {
-        guard !reduceMotion, !isClosing, window.isVisible else {
-            if !isClosing { orderOut() }
+        guard !reduceMotion, !isClosing(window), window.isVisible else {
+            if !isClosing(window) { orderOut() }
             return
         }
 
-        isClosing = true
+        let id = ObjectIdentifier(window)
         closeGeneration += 1
         let generation = closeGeneration
+        closing[id] = generation
         window.ignoresMouseEvents = true
 
         fade(window, to: 0) {
-            guard generation == closeGeneration, isClosing else { return }
-            isClosing = false
+            guard closing[id] == generation else { return }
+            closing[id] = nil
             orderOut()
             reset(window)
         }
@@ -114,10 +122,8 @@ enum PopoverWindowAnimator {
 
     /// A reopen during the close animation keeps the window up instead.
     private static func cancelClose(_ window: NSWindow) {
-        guard isClosing else { return }
+        guard closing.removeValue(forKey: ObjectIdentifier(window)) != nil else { return }
 
-        isClosing = false
-        closeGeneration += 1
         window.ignoresMouseEvents = false
     }
 
