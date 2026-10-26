@@ -53,7 +53,12 @@ case "plan":
     let log = String(decoding: FileHandle.standardInput.readDataToEndOfFile(), as: UTF8.self)
 
     let commits = ReleaseCommit.parseLog(log)
-    let plan = ReleasePlanner.plan(commits: commits, previousTag: previous.isEmpty ? nil : previous)
+    let plan: ReleasePlan?
+    do {
+        plan = try ReleasePlanner.plan(commits: commits, previousTag: previous.isEmpty ? nil : previous)
+    } catch {
+        fail("\(error)")
+    }
     for subject in ReleasePlanner.ignoredSubjects(in: commits) {
         FileHandle.standardError.write(Data("skipped: \(subject)\n".utf8))
     }

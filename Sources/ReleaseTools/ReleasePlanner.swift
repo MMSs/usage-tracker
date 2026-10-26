@@ -61,13 +61,35 @@ public struct ReleasePlan: Equatable, Sendable {
     }
 }
 
+/// Why a release could not be planned.
+public enum ReleasePlanError: Error, Equatable, CustomStringConvertible {
+    /// The previous tag is not `vX.Y.Z`, so no next version can be derived.
+    case previousTagIsNotAVersion(String)
+
+    public var description: String {
+        switch self {
+        case let .previousTagIsNotAVersion(tag): "previous tag \"\(tag)\" is not vX.Y.Z"
+        }
+    }
+}
+
 /// Decides the next version and sorts commits into note sections.
 public enum ReleasePlanner {
     /// Plans a release. The first release (`previousTag == nil`) is always
     /// 1.0.0. Otherwise the version is the previous one bumped by the highest
-    /// bump among the commits; nil when nothing is releasable or the previous
-    /// tag is not a version.
-    public static func plan(commits: [ReleaseCommit], previousTag: String?) -> ReleasePlan? {
+    /// bump among the commits; nil when nothing is releasable. Throws when the
+    /// previous tag is not a version, so a wrong tag is never mistaken for
+    /// "nothing to release".
+    public static func plan(commits: [ReleaseCommit], previousTag: String?) throws -> ReleasePlan? {
+        let previousVersion: SemanticVersion?
+        if let previousTag {
+            guard let parsed = SemanticVersion(tag: previousTag) else {
+                throw ReleasePlanError.previousTagIsNotAVersion(previousTag)
+            }
+            previousVersion = parsed
+        } else {
+            previousVersion = nil
+        }
         var breaking: [ReleaseEntry] = []
         var features: [ReleaseEntry] = []
         var fixes: [ReleaseEntry] = []
@@ -93,9 +115,9 @@ public enum ReleasePlanner {
         }
 
         let version: SemanticVersion
-        if let previousTag {
-            guard let previous = SemanticVersion(tag: previousTag), bump != .none else { return nil }
-            version = previous.bumped(bump)
+        if let previousVersion {
+            guard bump != .none else { return nil }
+            version = previousVersion.bumped(bump)
         } else {
             version = SemanticVersion(major: 1, minor: 0, patch: 0)
         }

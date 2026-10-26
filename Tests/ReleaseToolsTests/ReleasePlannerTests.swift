@@ -19,48 +19,48 @@ import Testing
         #expect(ReleaseCommit.parseLog("").isEmpty)
     }
 
-    @Test func theFirstReleaseIsAlwaysOneOhOh() {
-        let plan = ReleasePlanner.plan(commits: [commit("docs: x")], previousTag: nil)
+    @Test func theFirstReleaseIsAlwaysOneOhOh() throws {
+        let plan = try ReleasePlanner.plan(commits: [commit("docs: x")], previousTag: nil)
         #expect(plan?.version.description == "1.0.0")
         #expect(plan?.previousTag == nil)
-        #expect(ReleasePlanner.plan(commits: [], previousTag: nil)?.version.description == "1.0.0")
+        #expect(try ReleasePlanner.plan(commits: [], previousTag: nil)?.version.description == "1.0.0")
     }
 
-    @Test func aFeatureAndAFixBumpTheMinorVersion() {
-        let plan = ReleasePlanner.plan(commits: [commit("fix: a"), commit("feat: b")], previousTag: "v1.2.3")
+    @Test func aFeatureAndAFixBumpTheMinorVersion() throws {
+        let plan = try ReleasePlanner.plan(commits: [commit("fix: a"), commit("feat: b")], previousTag: "v1.2.3")
         #expect(plan?.version.description == "1.3.0")
         #expect(plan?.previousTag == "v1.2.3")
     }
 
-    @Test func aFixAndAPerfBumpThePatchVersion() {
-        let plan = ReleasePlanner.plan(commits: [commit("perf: a"), commit("fix: b")], previousTag: "v1.2.3")
+    @Test func aFixAndAPerfBumpThePatchVersion() throws {
+        let plan = try ReleasePlanner.plan(commits: [commit("perf: a"), commit("fix: b")], previousTag: "v1.2.3")
         #expect(plan?.version.description == "1.2.4")
     }
 
-    @Test func docsOnlyChangesReleaseNothing() {
-        #expect(ReleasePlanner.plan(commits: [commit("docs: a"), commit("chore: b")], previousTag: "v1.2.3") == nil)
+    @Test func docsOnlyChangesReleaseNothing() throws {
+        #expect(try ReleasePlanner.plan(commits: [commit("docs: a"), commit("chore: b")], previousTag: "v1.2.3") == nil)
     }
 
-    @Test func aBreakingFixBumpsTheMajorVersion() {
-        let plan = ReleasePlanner.plan(commits: [commit("fix!: a")], previousTag: "v1.2.3")
+    @Test func aBreakingFixBumpsTheMajorVersion() throws {
+        let plan = try ReleasePlanner.plan(commits: [commit("fix!: a")], previousTag: "v1.2.3")
         #expect(plan?.version.description == "2.0.0")
         #expect(plan?.breaking.map(\.text) == ["a"])
         #expect(plan?.fixes.isEmpty == true)
     }
 
-    @Test func anUnparseableSubjectIsIgnoredAndLeftOutOfTheNotes() {
-        let plan = ReleasePlanner.plan(commits: [commit("tidy things"), commit("fix: a")], previousTag: "v1.0.0")
+    @Test func anUnparseableSubjectIsIgnoredAndLeftOutOfTheNotes() throws {
+        let plan = try ReleasePlanner.plan(commits: [commit("tidy things"), commit("fix: a")], previousTag: "v1.0.0")
         #expect(plan?.ignored == ["tidy things"])
         #expect(plan?.fixes.map(\.text) == ["a"])
         #expect(plan?.features.isEmpty == true)
     }
 
-    @Test func aPullRequestSuffixMovesIntoThePullRequestNumber() {
-        let plan = ReleasePlanner.plan(commits: [commit("fix(ui): a thing (#42)")], previousTag: "v1.0.0")
+    @Test func aPullRequestSuffixMovesIntoThePullRequestNumber() throws {
+        let plan = try ReleasePlanner.plan(commits: [commit("fix(ui): a thing (#42)")], previousTag: "v1.0.0")
         #expect(plan?.fixes == [ReleaseEntry(scope: "ui", text: "a thing", pullRequest: 42, bullets: [])])
     }
 
-    @Test func changesBulletsAreCapturedButLaterSectionsAreNot() {
+    @Test func changesBulletsAreCapturedButLaterSectionsAreNot() throws {
         let body = """
         ## Summary
         - not this
@@ -73,16 +73,20 @@ import Testing
         ## Test plan
         - nor this
         """
-        let plan = ReleasePlanner.plan(commits: [commit("feat: a (#7)", body)], previousTag: "v1.0.0")
+        let plan = try ReleasePlanner.plan(commits: [commit("feat: a (#7)", body)], previousTag: "v1.0.0")
         #expect(plan?.features.first?.bullets == ["first", "second"])
     }
 
-    @Test func entriesStayOldestFirst() {
-        let plan = ReleasePlanner.plan(commits: [commit("fix: one"), commit("fix: two")], previousTag: "v1.0.0")
+    @Test func entriesStayOldestFirst() throws {
+        let plan = try ReleasePlanner.plan(commits: [commit("fix: one"), commit("fix: two")], previousTag: "v1.0.0")
         #expect(plan?.fixes.map(\.text) == ["one", "two"])
     }
 
-    @Test func aNonVersionPreviousTagReleasesNothing() {
-        #expect(ReleasePlanner.plan(commits: [commit("feat: a")], previousTag: "nightly") == nil)
+    @Test func aPreviousTagThatIsNotAVersionFailsInsteadOfReleasingNothing() throws {
+        for tag in ["nightly", "1.2.0", "v1.2"] {
+            #expect(throws: ReleasePlanError.previousTagIsNotAVersion(tag)) {
+                try ReleasePlanner.plan(commits: [commit("feat: a")], previousTag: tag)
+            }
+        }
     }
 }
