@@ -232,6 +232,12 @@ jobs:
 
           swift build -c release --product release-tool
           tool="$(swift build -c release --show-bin-path)/release-tool"
+          # sign_update --verify can't catch a wrong private key, since it
+          # derives the public key from it. Check against the key the app
+          # ships with, or every later update would be rejected by clients.
+          public_key="$(plutil -extract SUPublicEDKey raw -o - "$APP/Contents/Info.plist")"
+          "$tool" verify-signature --public-key "$public_key" --signature "$signature" --file "$zip"
+
           "$tool" appcast \
             --version "$VERSION" \
             --url "https://github.com/MMSs/usage-tracker/releases/download/v$VERSION/Usage-Tracker-$VERSION.zip" \

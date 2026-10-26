@@ -82,6 +82,20 @@ case "appcast":
         notesHTML: readFile(required(opts, "notes-html")), published: Date(), minimumSystemVersion: "26.0"
     ), terminator: "")
 
+case "verify-signature":
+    let opts = options(Array(arguments.dropFirst()))
+    let path = required(opts, "file")
+    guard let data = FileManager.default.contents(atPath: path) else { fail("cannot read \(path)") }
+    let valid: Bool
+    do {
+        valid = try UpdateSignature.isValid(
+            signature: required(opts, "signature"), publicKey: required(opts, "public-key"), data: data
+        )
+    } catch {
+        fail("\(error)")
+    }
+    guard valid else { fail("Sparkle signature does not match SUPublicEDKey", code: 1) }
+
 default:
-    fail("usage: release-tool check-title|plan|appcast")
+    fail("usage: release-tool check-title|plan|appcast|verify-signature")
 }
