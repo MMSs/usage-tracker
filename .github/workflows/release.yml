@@ -216,7 +216,19 @@ jobs:
           fi
       - name: Staple and check Gatekeeper
         run: |
-          xcrun stapler staple "$APP"
+          # Right after notarization the ticket may not have propagated yet
+          # and stapler fails (error 65); a rerun would notarize again.
+          for attempt in 1 2 3; do
+            if xcrun stapler staple "$APP"; then
+              break
+            fi
+            if [[ "$attempt" -eq 3 ]]; then
+              echo "Stapling failed after $attempt attempts" >&2
+              exit 1
+            fi
+            echo "Stapling failed (attempt $attempt); retrying in 15 seconds"
+            sleep 15
+          done
           xcrun stapler validate "$APP"
           spctl --status || true
           spctl -a -vv -t exec "$APP" 2>&1 | tee "$RUNNER_TEMP/spctl.txt"
