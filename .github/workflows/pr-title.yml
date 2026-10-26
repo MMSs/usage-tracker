@@ -17,8 +17,11 @@ jobs:
   pr-title:
     runs-on: macos-26
     steps:
+      # The base branch's release-tool, so a PR can't loosen the rules it is
+      # checked against. Safe here: pull_request gives a read-only token.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           persist-credentials: false
       # A cold cache once failed to resolve and then resolved on a rerun.
       - run: swift package resolve || swift package resolve
