@@ -103,9 +103,10 @@ struct UsageHistoryStoreTests {
             let thinned = samples.filter { $0.date < now.addingTimeInterval(-hours(24)) }
             let recent = samples.filter { $0.date >= now.addingTimeInterval(-hours(24)) }
 
-            #expect(thinned == [59, 119].map {
-                UsageSample(date: start.addingTimeInterval(Double($0) * 60), percent: UInt8($0 % 100))
-            })
+            let expected: [UsageSample] = [59, 119].map { (minute: Int) -> UsageSample in
+                UsageSample(date: start.addingTimeInterval(Double(minute) * 60), percent: UInt8(minute % 100))
+            }
+            #expect(thinned == expected)
             #expect(recent.count == 24 * 60 + 1)
             #expect(zip(recent, recent.dropFirst()).allSatisfy { $1.date.timeIntervalSince($0.date) == 60 })
         }
@@ -171,7 +172,7 @@ struct UsageHistoryStoreTests {
             }
 
             let samples = store.samples(provider: .anthropic, now: start.addingTimeInterval(600))["session"]
-            let expected = (0..<10).map { minute in
+            let expected: [UsageSample] = (0..<10).map { (minute: Int) -> UsageSample in
                 UsageSample(date: start.addingTimeInterval(Double(minute) * 60 + 30), percent: UInt8(minute * 2 + 1))
             }
             #expect(samples == expected)
