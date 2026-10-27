@@ -10,6 +10,17 @@ import Testing
         #expect(MenuBarLimits.allCases.map { $0.title(names: nil) } == ["Both", "Short", "Long"])
     }
 
+    @Test func coloringPicksColorOrMonochrome() {
+        #expect(MenuBarColoring.allCases.map(\.title) == ["Color", "Monochrome"])
+
+        var appearance = MenuBarAppearance()
+        #expect(appearance.coloring == .monochrome)
+        appearance.coloring = .color
+        #expect(appearance.colored)
+        appearance.coloring = .monochrome
+        #expect(!appearance.colored)
+    }
+
     @Test func everySwitchCanBeOff() {
         let allOff = MenuBarAppearance(showText: false, countdown: false, showGraph: false)
         #expect(!allOff.drawsText && !allOff.drawsCountdown && !allOff.drawsGraph)
