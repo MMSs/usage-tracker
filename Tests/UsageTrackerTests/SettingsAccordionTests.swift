@@ -22,6 +22,26 @@ struct SettingsAccordionTests {
     }
 
     @Test
+    func expandingASectionOpensIt() {
+        var accordion = SettingsAccordion(titles: ["Alerts", "Appearance"])
+
+        accordion.setExpanded(true, "Appearance")
+
+        #expect(accordion.isOpen("Appearance"))
+        #expect(!accordion.isOpen("Alerts"))
+    }
+
+    /// One section always stays open, so collapsing the open one is refused.
+    @Test
+    func collapsingTheOpenSectionKeepsItOpen() {
+        var accordion = SettingsAccordion(titles: ["Alerts", "Appearance"])
+
+        accordion.setExpanded(false, "Alerts")
+
+        #expect(accordion.isOpen("Alerts"))
+    }
+
+    @Test
     func aSingleSectionIsAlwaysOpenAndNotCollapsible() {
         var accordion = SettingsAccordion(titles: ["Refresh"])
 

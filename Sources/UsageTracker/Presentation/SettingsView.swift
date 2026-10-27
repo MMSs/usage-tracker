@@ -134,8 +134,8 @@ struct SettingsPageLayout<Content: View>: View {
 }
 
 /// A titled group of rows on a soft card, the way the popover laid out its settings.
-/// With an accordion in the environment a titled section folds: its header opens it
-/// and its rows and footer show only while it is open.
+/// With an accordion in the environment a titled section is a disclosure group:
+/// its rows and footer show only while it is open.
 struct SettingsSection<Content: View>: View {
     /// Nil leaves the card untitled, under a tab that already names it.
     let title: String?
@@ -145,75 +145,70 @@ struct SettingsSection<Content: View>: View {
 
     @Environment(\.settingsAccordion) private var accordion
 
-    private var isOpen: Bool {
-        guard let title, let accordion else {
-            return true
-        }
-
-        return accordion.wrappedValue.isOpen(title)
-    }
-
     private var isCollapsible: Bool {
         title != nil && accordion?.wrappedValue.isCollapsible == true
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            if let title {
-                header(title)
+        if let title, isCollapsible {
+            DisclosureGroup(isExpanded: isExpanded(title)) {
+                card
+                    .padding(.top, 8)
+                    .modifier(FadesIn())
+            } label: {
+                Text(title)
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    // The whole header opens the section, not just the disclosure triangle.
+                    .onTapGesture { setExpanded(true, title) }
+                    .accessibilityAddTraits(.isHeader)
             }
-
-            // Layout never animates: the window snaps to the new height on
-            // the next turn, and sections sliding meanwhile would fight it.
-            // Only the opened section's rows fade in.
-            if isOpen {
-                VStack(alignment: .leading, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 0, content: content)
-                        .padding(.horizontal, 12)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(Color.primary.opacity(0.04))
-                        )
-
-                    if let footer {
-                        Text(footer)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                if let title {
+                    Text(title)
+                        .font(.headline)
+                        .accessibilityAddTraits(.isHeader)
                 }
-                .modifier(FadesIn(enabled: isCollapsible))
+                card
             }
         }
     }
 
-    /// A button that opens the section when it folds; otherwise a plain heading.
-    @ViewBuilder
-    private func header(_ title: String) -> some View {
-        if isCollapsible {
-            Button {
-                accordion?.wrappedValue.open(title)
-            } label: {
-                HStack {
-                    Text(title)
-                        .font(.headline)
-                    Spacer(minLength: 12)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        // Scoped to the turn, so the chevron never animates its position.
-                        .animation(.easeInOut(duration: 0.2)) { $0.rotationEffect(.degrees(isOpen ? 90 : 0)) }
-                        .accessibilityHidden(true)
-                }
-                .contentShape(Rectangle())
+    private var card: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0, content: content)
+                .padding(.horizontal, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.primary.opacity(0.04))
+                )
+
+            if let footer {
+                Text(footer)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-            .buttonStyle(.plain)
-            .accessibilityAddTraits(.isHeader)
-            .accessibilityValue(isOpen ? "Expanded" : "Collapsed")
-        } else {
-            Text(title)
-                .font(.headline)
-                .accessibilityAddTraits(.isHeader)
+        }
+    }
+
+    private func isExpanded(_ title: String) -> Binding<Bool> {
+        Binding(
+            get: { accordion?.wrappedValue.isOpen(title) ?? true },
+            set: { setExpanded($0, title) }
+        )
+    }
+
+    /// Layout never animates: the window snaps to the new height on the next
+    /// turn, and sections sliding meanwhile would fight it. Only the opened
+    /// section's rows fade in.
+    private func setExpanded(_ expanded: Bool, _ title: String) {
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            accordion?.wrappedValue.setExpanded(expanded, title)
         }
     }
 }
@@ -221,12 +216,11 @@ struct SettingsSection<Content: View>: View {
 /// Fades a section's rows in when it opens. Opacity only, so nothing the
 /// window's height follows ever moves.
 private struct FadesIn: ViewModifier {
-    let enabled: Bool
     @State private var shown = false
 
     func body(content: Content) -> some View {
         content
-            .opacity(!enabled || shown ? 1 : 0)
+            .opacity(shown ? 1 : 0)
             .onAppear {
                 withAnimation(.easeOut(duration: 0.15)) {
                     shown = true
@@ -898,7 +892,7 @@ struct GeneralSettingsView: View {
                         )
                     }
                 }
-                .modifier(FadesIn(enabled: true))
+                .modifier(FadesIn())
             }
 
             SettingsSection(
