@@ -24,6 +24,14 @@ struct SettingsAccordion: Equatable {
             open = title
         }
     }
+
+    /// What a disclosure control asks for: expanding opens `title`; collapsing is
+    /// refused, since one section always stays open.
+    mutating func setExpanded(_ expanded: Bool, _ title: String) {
+        if expanded {
+            open(title)
+        }
+    }
 }
 
 private struct SettingsAccordionKey: EnvironmentKey {
