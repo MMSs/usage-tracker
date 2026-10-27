@@ -68,6 +68,7 @@ import Testing
         ## Changes
         - first
         * second
+
         not a bullet
 
         ## Test plan
@@ -75,6 +76,25 @@ import Testing
         """
         let plan = try ReleasePlanner.plan(commits: [commit("feat: a (#7)", body)], previousTag: "v1.0.0")
         #expect(plan?.features.first?.bullets == ["first", "second"])
+    }
+
+    /// GitHub wraps a squash-merge body at about 72 columns without indenting the
+    /// continuation, so a line right after a bullet carries on that bullet.
+    @Test func aBulletWrappedOntoTheNextLinesStaysWhole() throws {
+        let body = """
+        ## Changes
+
+        - A card under it lists the providers with a custom appearance, in menu
+        bar order. A name opens that provider's Appearance section.
+        - Short.
+
+        Closing paragraph.
+        """
+        let plan = try ReleasePlanner.plan(commits: [commit("feat: a (#7)", body)], previousTag: "v1.0.0")
+        #expect(plan?.features.first?.bullets == [
+            "A card under it lists the providers with a custom appearance, in menu bar order. A name opens that provider's Appearance section.",
+            "Short.",
+        ])
     }
 
     @Test func entriesStayOldestFirst() throws {
