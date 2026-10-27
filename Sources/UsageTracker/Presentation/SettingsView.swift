@@ -178,7 +178,9 @@ struct SettingsSection<Content: View>: View {
 
     private var card: some View {
         VStack(alignment: .leading, spacing: 8) {
+            // Full width, so a card with only short rows doesn't shrink and get centred.
             VStack(alignment: .leading, spacing: 0, content: content)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 12)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
