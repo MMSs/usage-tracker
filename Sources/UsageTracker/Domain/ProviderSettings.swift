@@ -7,7 +7,9 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     var isEnabled = true
     var subscriptionRefreshInterval = RefreshInterval.default
     var apiRefreshInterval = RefreshInterval.default
-    var appearanceOverride: MenuBarAppearance?
+    /// The provider's own appearance, kept while it follows the defaults so switching it back on restores it.
+    private(set) var customAppearance: MenuBarAppearance?
+    private(set) var usesCustomAppearance = false
     var isSubscriptionEnabled = true
     var isAPIEnabled = true
     var alertsEnabled = true
@@ -17,6 +19,22 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     var showsSubscriptionInMenuBar = true
     var showsAPIInMenuBar = true
     static let `default` = ProviderSettings()
+
+    /// The custom appearance while it is in use. Setting one switches it on; nil switches it off and keeps it.
+    var appearanceOverride: MenuBarAppearance? {
+        get { usesCustomAppearance ? customAppearance : nil }
+        set {
+            if let newValue {
+                customAppearance = newValue
+            }
+            usesCustomAppearance = newValue != nil
+        }
+    }
+
+    /// Switches the custom appearance on or off; the first time on, it starts from `defaults`.
+    mutating func setUsesCustomAppearance(_ uses: Bool, defaults: MenuBarAppearance) {
+        appearanceOverride = uses ? customAppearance ?? defaults : nil
+    }
 
     init(
         isEnabled: Bool = true,
@@ -81,7 +99,7 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isEnabled, subscriptionRefreshInterval, apiRefreshInterval, appearanceOverride, isSubscriptionEnabled, isAPIEnabled, alertsEnabled, autoStartSessions, showsSubscriptionInMenuBar, showsAPIInMenuBar
+        case isEnabled, subscriptionRefreshInterval, apiRefreshInterval, appearanceOverride, savedCustomAppearance, isSubscriptionEnabled, isAPIEnabled, alertsEnabled, autoStartSessions, showsSubscriptionInMenuBar, showsAPIInMenuBar
         /// The single interval records had before the halves got their own; read, never written.
         case refreshInterval
     }
@@ -101,7 +119,9 @@ struct ProviderSettings: Equatable, Codable, Sendable {
             .flatMap(RefreshInterval.init(rawValue:)) ?? sharedInterval
         apiRefreshInterval = try container.decodeIfPresent(String.self, forKey: .apiRefreshInterval)
             .flatMap(RefreshInterval.init(rawValue:)) ?? sharedInterval
-        appearanceOverride = try? container.decodeIfPresent(MenuBarAppearance.self, forKey: .appearanceOverride)
+        let override = try? container.decodeIfPresent(MenuBarAppearance.self, forKey: .appearanceOverride)
+        customAppearance = override ?? (try? container.decodeIfPresent(MenuBarAppearance.self, forKey: .savedCustomAppearance))
+        usesCustomAppearance = override != nil
         isSubscriptionEnabled = try container.decodeIfPresent(Bool.self, forKey: .isSubscriptionEnabled) ?? true
         isAPIEnabled = try container.decodeIfPresent(Bool.self, forKey: .isAPIEnabled) ?? true
         alertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .alertsEnabled) ?? true
@@ -109,11 +129,11 @@ struct ProviderSettings: Equatable, Codable, Sendable {
 
         // The new key, then the old switch inside the override; a record with neither is left for the store.
         let legacy = decoder.userInfo[Self.legacyHalvesKey] as? LegacyHalves ?? LegacyHalves()
-        let override = try? container.nestedContainer(keyedBy: LegacyAppearanceKeys.self, forKey: .appearanceOverride)
+        let legacyOverride = try? container.nestedContainer(keyedBy: LegacyAppearanceKeys.self, forKey: .appearanceOverride)
         // A record with an override took its switches from the override alone; one without, from the global ones.
-        let oldSubscription = override.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showPlanUsage)) ?? true }
+        let oldSubscription = legacyOverride.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showPlanUsage)) ?? true }
             ?? legacy.globalSubscription
-        let oldAPI = override.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showAPISpend)) ?? true }
+        let oldAPI = legacyOverride.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showAPISpend)) ?? true }
             ?? legacy.globalAPI
         // The old item drew a hidden half when it was the only one it had, so a switch only counts beside a shown other half;
         // whether that half has a credential is for the app model to check (see `Loaded`).
@@ -162,7 +182,11 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         try container.encode(isEnabled, forKey: .isEnabled)
         try container.encode(subscriptionRefreshInterval.rawValue, forKey: .subscriptionRefreshInterval)
         try container.encode(apiRefreshInterval.rawValue, forKey: .apiRefreshInterval)
+        // Older builds read only the first key, so a switched-off appearance is kept under the second.
         try container.encodeIfPresent(appearanceOverride, forKey: .appearanceOverride)
+        if !usesCustomAppearance {
+            try container.encodeIfPresent(customAppearance, forKey: .savedCustomAppearance)
+        }
         try container.encode(isSubscriptionEnabled, forKey: .isSubscriptionEnabled)
         try container.encode(isAPIEnabled, forKey: .isAPIEnabled)
         try container.encode(alertsEnabled, forKey: .alertsEnabled)

@@ -215,7 +215,7 @@ import Testing
         #expect(GeneralSettingsView.customAppearanceProviders(in: model).map(\.id) == [.openai], "an item that isn't shown isn't listed")
     }
 
-    @Test func usingTheDefaultsDropsOnlyTheCustomAppearance() {
+    @Test func usingTheDefaultsSwitchesOnlyTheCustomAppearanceOff() {
         let model = makeModel(configured: [CredentialKey(provider: .cursor, fieldID: "session-token")])
         var settings = model.settings(for: .cursor)
         settings.appearanceOverride = model.globalAppearance
@@ -226,6 +226,31 @@ import Testing
         #expect(model.settings(for: .cursor).appearanceOverride == nil)
         #expect(model.settings(for: .cursor).refreshInterval(for: .subscription) == .tenMinutes)
         #expect(GeneralSettingsView.customAppearanceProviders(in: model).isEmpty)
+    }
+
+    @Test func switchingTheCustomAppearanceBackOnRestoresIt() {
+        let model = makeModel(configured: [CredentialKey(provider: .cursor, fieldID: "session-token")])
+        var custom = model.globalAppearance
+        custom.colored.toggle()
+        var settings = model.settings(for: .cursor)
+        settings.appearanceOverride = custom
+        model.setSettings(settings, for: .cursor)
+
+        model.useDefaultAppearance(for: .cursor)
+        #expect(model.appearance(for: .cursor) == model.globalAppearance)
+
+        settings = model.settings(for: .cursor)
+        settings.setUsesCustomAppearance(true, defaults: model.globalAppearance)
+        #expect(settings.appearanceOverride == custom)
+    }
+
+    @Test func aFirstCustomAppearanceStartsFromTheDefaults() {
+        var defaults = MenuBarAppearance()
+        defaults.countdown = true
+        var settings = ProviderSettings()
+
+        settings.setUsesCustomAppearance(true, defaults: defaults)
+        #expect(settings.appearanceOverride == defaults)
     }
 
     @Test func generalPreviewIsEmptyWhenNothingIsConfigured() {

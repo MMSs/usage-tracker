@@ -439,7 +439,7 @@ final class AppModel: ObservableObject {
         appearanceStore.setAppearance(appearance)
     }
 
-    /// Drops the provider's custom appearance so it follows the global one again.
+    /// Switches the provider's custom appearance off so it follows the global one again; the custom one is kept.
     func useDefaultAppearance(for provider: Provider) {
         var settings = settings(for: provider)
         settings.appearanceOverride = nil

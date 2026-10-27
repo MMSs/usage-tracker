@@ -417,7 +417,7 @@ struct ProviderSettingsView: View {
     private var usesCustomAppearance: Binding<Bool> {
         Binding(
             get: { settings.wrappedValue.appearanceOverride != nil },
-            set: { settings.wrappedValue.appearanceOverride = $0 ? appModel.globalAppearance : nil }
+            set: { settings.wrappedValue.setUsesCustomAppearance($0, defaults: appModel.globalAppearance) }
         )
     }
 
