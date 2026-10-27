@@ -143,17 +143,26 @@ public enum ReleasePlanner {
         return ReleaseEntry(scope: title.scope, text: text, pullRequest: pullRequest, bullets: changesBullets(body))
     }
 
-    /// The `- ` / `* ` lines under a `## Changes` line, up to the next `## `.
+    /// The `- ` / `* ` items under a `## Changes` line, up to the next `## `.
+    /// As in Markdown, a line right after an item continues it (GitHub wraps
+    /// squash-merge bodies that way); a blank line ends it.
     private static func changesBullets(_ body: String) -> [String] {
         var inChanges = false
+        var inBullet = false
         var bullets: [String] = []
-        for rawLine in body.split(whereSeparator: \.isNewline) {
+        for rawLine in body.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline) {
             let line = rawLine.trimmingCharacters(in: .whitespaces)
             if line.hasPrefix("## ") {
                 inChanges = line == "## Changes"
-            } else if inChanges, line.hasPrefix("- ") || line.hasPrefix("* ") {
+                inBullet = false
+            } else if !inChanges || line.isEmpty {
+                inBullet = false
+            } else if line.hasPrefix("- ") || line.hasPrefix("* ") {
                 let bullet = line.dropFirst(2).trimmingCharacters(in: .whitespaces)
-                if !bullet.isEmpty { bullets.append(bullet) }
+                inBullet = !bullet.isEmpty
+                if inBullet { bullets.append(bullet) }
+            } else if inBullet {
+                bullets[bullets.count - 1] += " " + line
             }
         }
         return bullets
