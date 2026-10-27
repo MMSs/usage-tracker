@@ -158,9 +158,10 @@ app menu while Settings is open.
   amount shows with Show text, or with the graph when there is no budget ring.
   Colored tints the text and graph by remaining capacity or pacing. Limits
   picks both windows or just the short or the long one. These sit under Menu
-  bar appearance; when a provider has a custom appearance, the section lists
-  it, its name opens that provider's appearance settings, and Use Defaults
-  switches the custom appearance off. Open at login
+  bar appearance, with a separate list below of the providers that have a
+  custom appearance: a name opens that provider's appearance settings, and
+  Use Defaults switches its custom appearance off, keeping it for when you
+  switch it back on. Open at login
   registers the app as a login item; the line under the switch shows what
   macOS reports, with a button to System Settings when it needs your approval.
 - Updates: release copies check for updates automatically. The Check

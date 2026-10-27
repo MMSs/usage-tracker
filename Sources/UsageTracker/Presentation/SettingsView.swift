@@ -790,7 +790,9 @@ struct UpdatesSection: View {
 
 struct GeneralSettingsView: View {
     @ObservedObject var appModel: AppModel
-    static let sectionTitles = ["Menu bar appearance", "Alerts", "Startup", "Updates"]
+    static let appearanceTitle = "Menu bar appearance"
+    static let sectionTitles = [appearanceTitle, "Alerts", "Startup", "Updates"]
+    static let customAppearanceFooter = "The defaults above don't change these providers' items."
     /// Opens a listed provider's own appearance settings.
     var showAppearance: (Provider) -> Void = { _ in }
 
@@ -836,7 +838,7 @@ struct GeneralSettingsView: View {
 
     static func appearanceFooter(listsCustom: Bool) -> String {
         let scope = listsCustom
-            ? "Defaults for every provider except those listed above. A provider's tab sets its own refresh rates."
+            ? "Defaults for every provider except those listed below. A provider's tab sets its own refresh rates."
             : "Defaults for every provider. A provider's tab can override them and sets its own refresh rates."
         return scope + " Colored tints the item by remaining capacity or pacing."
     }
@@ -871,14 +873,15 @@ struct GeneralSettingsView: View {
             )
 
             SettingsSection(
-                title: "Menu bar appearance",
+                title: Self.appearanceTitle,
                 footer: Self.appearanceFooter(listsCustom: !custom.isEmpty)
             ) {
                 MenuBarAppearanceRows(appearance: appearance, meterNames: nil)
+            }
 
-                if !custom.isEmpty {
-                    Divider()
-
+            // A card of its own under the defaults, shown and hidden with them.
+            if !custom.isEmpty, accordion.isOpen(Self.appearanceTitle) {
+                SettingsSection(title: nil, footer: Self.customAppearanceFooter) {
                     ForEach(custom, id: \.id) { provider in
                         CustomAppearanceRow(
                             name: provider.descriptor.displayName,
@@ -888,6 +891,7 @@ struct GeneralSettingsView: View {
                         )
                     }
                 }
+                .modifier(FadesIn(enabled: true))
             }
 
             SettingsSection(
