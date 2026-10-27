@@ -322,8 +322,15 @@ struct MenuBarAppearanceRows: View {
             .labelsHidden()
             .fixedSize()
         }
-        SettingsRow(label: "Colored") {
-            SwitchToggle(isOn: binding(\.colored) { var copy = $0; copy.colored = $1; return copy })
+        SettingsRow(label: "Tint") {
+            Picker("Tint", selection: binding(\.coloring) { var copy = $0; copy.coloring = $1; return copy }) {
+                ForEach(MenuBarColoring.allCases) { coloring in
+                    Text(coloring.title).tag(coloring)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .fixedSize()
         }
         SettingsRow(label: "Limits", isLast: true) {
             Picker("Limits", selection: binding(\.limits) { var copy = $0; copy.limits = $1; return copy }) {
@@ -840,7 +847,7 @@ struct GeneralSettingsView: View {
         let scope = listsCustom
             ? "Defaults for every provider except those listed below. A provider's tab sets its own refresh rates."
             : "Defaults for every provider. A provider's tab can override them and sets its own refresh rates."
-        return scope + " Colored tints the item by remaining capacity or pacing."
+        return scope + " Color tints the item by remaining capacity or pacing; Monochrome draws it in the menu bar's own color."
     }
 
     /// Each item as the menu bar draws it, with its provider's override if it has one.

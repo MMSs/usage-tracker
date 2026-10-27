@@ -156,7 +156,8 @@ app menu while Settings is open.
   Dials. All three can be off: the item is then just the logo (badged when a
   half fails) unless a half is loading, needs setup or has failed, and the API
   amount shows with Show text, or with the graph when there is no budget ring.
-  Colored tints the text and graph by remaining capacity or pacing. Limits
+  Tint is Color, which shades the text and graph by remaining capacity or
+  pacing, or Monochrome, which draws them in the menu bar's own color. Limits
   picks both windows or just the short or the long one. These sit under Menu
   bar appearance, with a separate list below of the providers that have a
   custom appearance: a name opens that provider's appearance settings, and
