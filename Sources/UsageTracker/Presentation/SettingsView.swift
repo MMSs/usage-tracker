@@ -720,7 +720,8 @@ struct OrganizationPickerRow: View {
 
 /// The Open at login switch with the live macOS status under it. Re-reads the
 /// status when the page appears and when the app comes back from System Settings.
-struct OpenAtLoginRows: View {
+/// The login item switch; what macOS reports about it is the section's footer, like every other tip.
+struct StartupSection: View {
     @ObservedObject var loginItem: LoginItemModel
 
     private var isOn: Binding<Bool> {
@@ -728,24 +729,18 @@ struct OpenAtLoginRows: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SettingsRow(label: "Open at login", isLast: loginItem.statusLine == nil) {
+        SettingsSection(title: "Startup", footer: loginItem.statusLine) {
+            SettingsRow(label: "Open at login", isLast: !loginItem.needsApproval) {
                 SwitchToggle(isOn: isOn)
             }
 
-            if let line = loginItem.statusLine {
+            if loginItem.needsApproval {
                 HStack {
-                    Text(line)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Spacer(minLength: 12)
-                    if loginItem.needsApproval {
-                        Button("Open System Settings") { loginItem.openSystemSettings() }
-                            .controlSize(.small)
-                    }
+                    Spacer()
+                    Button("Open System Settings") { loginItem.openSystemSettings() }
+                        .controlSize(.small)
                 }
-                .padding(.vertical, 8)
+                .frame(minHeight: 34)
             }
         }
         .onAppear { loginItem.refresh() }
@@ -913,9 +908,7 @@ struct GeneralSettingsView: View {
                 }
             }
 
-            SettingsSection(title: "Startup") {
-                OpenAtLoginRows(loginItem: appModel.loginItem)
-            }
+            StartupSection(loginItem: appModel.loginItem)
 
             UpdatesSection(updates: appModel.updates)
         }
