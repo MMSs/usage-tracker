@@ -21,9 +21,9 @@ import Testing
 
     @Test func theAppearanceFooterMentionsCustomAppearancesOnlyWhenListed() {
         #expect(GeneralSettingsView.appearanceFooter(listsCustom: false)
-            == "Defaults for every provider. A provider's tab can override them and sets its own refresh rates. Colored tints the item by remaining capacity or pacing.")
+            == "Defaults for every provider. A provider's tab can override them and sets its own refresh rates. Color tints the item by remaining capacity or pacing; Monochrome draws it in the menu bar's own color.")
         #expect(GeneralSettingsView.appearanceFooter(listsCustom: true)
-            == "Defaults for every provider except those listed below. A provider's tab sets its own refresh rates. Colored tints the item by remaining capacity or pacing.")
+            == "Defaults for every provider except those listed below. A provider's tab sets its own refresh rates. Color tints the item by remaining capacity or pacing; Monochrome draws it in the menu bar's own color.")
     }
 
     /// One button says what it does; no row label repeating it.

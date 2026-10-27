@@ -33,6 +33,20 @@ enum MenuBarLimits: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 }
 
+/// Whether the item is tinted by remaining capacity or pacing, or drawn in the menu bar's own color.
+enum MenuBarColoring: String, CaseIterable, Identifiable, Sendable {
+    case color, monochrome
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .color: "Color"
+        case .monochrome: "Monochrome"
+        }
+    }
+}
+
 struct MenuBarAppearance: Equatable, Codable, Sendable {
     var showText = true
     var countdown = false
@@ -46,6 +60,12 @@ struct MenuBarAppearance: Equatable, Codable, Sendable {
     var drawsText: Bool { showText }
     var drawsGraph: Bool { showGraph }
     var drawsCountdown: Bool { countdown }
+
+    /// `colored` as the settings pick it; the stored key stays `colored`.
+    var coloring: MenuBarColoring {
+        get { colored ? .color : .monochrome }
+        set { colored = newValue == .color }
+    }
 
     /// The API spend amount follows Show text, and also marks the spend when
     /// the graph is on but there is no budget to draw it against.
