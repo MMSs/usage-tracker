@@ -16,7 +16,14 @@ import Testing
     }
 
     @Test func theGeneralPageEndsWithUpdates() {
-        #expect(GeneralSettingsView.sectionTitles == ["Menu bar", "Alerts", "Startup", "Updates"])
+        #expect(GeneralSettingsView.sectionTitles == ["Menu bar appearance", "Alerts", "Startup", "Updates"])
+    }
+
+    @Test func theAppearanceFooterMentionsCustomAppearancesOnlyWhenListed() {
+        #expect(GeneralSettingsView.appearanceFooter(listsCustom: false)
+            == "Defaults for every provider. A provider's tab can override them and sets its own refresh rates. Colored tints the item by remaining capacity or pacing.")
+        #expect(GeneralSettingsView.appearanceFooter(listsCustom: true)
+            == "Defaults for every provider except those listed below. A provider's tab sets its own refresh rates. Colored tints the item by remaining capacity or pacing.")
     }
 
     /// One button says what it does; no row label repeating it.
@@ -120,6 +127,29 @@ import Testing
         #expect(selection.tabs[.anthropic] == .menuBar)
     }
 
+    /// General's custom-appearance link lands where the switch is: the
+    /// Options tab with its Appearance section open.
+    @Test func showingAProvidersAppearanceOpensItsSection() {
+        let selection = SettingsSelection()
+        selection.apply(SettingsRequest(provider: .anthropic, opensHelp: true), listed: [.anthropic])
+
+        selection.showAppearance(of: .anthropic)
+        #expect(selection.page == .provider(.anthropic))
+        #expect(selection.tabs[.anthropic] == .menuBar)
+        #expect(selection.openSections[.anthropic] == "Appearance")
+        #expect(selection.helpProvider == nil)
+    }
+
+    @Test func pickingATabOpensItsFirstSectionAgain() {
+        let selection = SettingsSelection()
+        selection.showAppearance(of: .cursor)
+        selection.showAppearance(of: .openai)
+
+        selection.selectTab(.subscription, for: .cursor)
+        #expect(selection.openSections[.cursor] == nil)
+        #expect(selection.openSections[.openai] == "Appearance", "another provider's section is left alone")
+    }
+
     private func makeModel(configured: [CredentialKey]) -> AppModel {
         let credentials = MemoryCredentialStore()
         for key in configured {
@@ -160,6 +190,67 @@ import Testing
 
         model.providers.forEach { $0.isEnabled = false }
         #expect(GeneralSettingsView.previewProviders(in: model).isEmpty)
+    }
+
+    private func customize(_ provider: Provider, in model: AppModel) {
+        var settings = model.settings(for: provider)
+        settings.appearanceOverride = model.globalAppearance
+        model.setSettings(settings, for: provider)
+    }
+
+    @Test func generalListsTheItemsWithACustomAppearanceInPreviewOrder() {
+        let model = makeModel(configured: [
+            CredentialKey(provider: .openai, fieldID: "admin-key"),
+            CredentialKey(provider: .cursor, fieldID: "session-token"),
+        ])
+        #expect(GeneralSettingsView.customAppearanceProviders(in: model).isEmpty)
+
+        customize(.cursor, in: model)
+        #expect(GeneralSettingsView.customAppearanceProviders(in: model).map(\.id) == [.cursor])
+
+        customize(.openai, in: model)
+        #expect(GeneralSettingsView.customAppearanceProviders(in: model).map(\.id) == [.openai, .cursor])
+
+        model.provider(.cursor).isEnabled = false
+        #expect(GeneralSettingsView.customAppearanceProviders(in: model).map(\.id) == [.openai], "an item that isn't shown isn't listed")
+    }
+
+    @Test func usingTheDefaultsSwitchesOnlyTheCustomAppearanceOff() {
+        let model = makeModel(configured: [CredentialKey(provider: .cursor, fieldID: "session-token")])
+        var settings = model.settings(for: .cursor)
+        settings.appearanceOverride = model.globalAppearance
+        settings.setRefreshInterval(.tenMinutes, for: .subscription)
+        model.setSettings(settings, for: .cursor)
+
+        model.useDefaultAppearance(for: .cursor)
+        #expect(model.settings(for: .cursor).appearanceOverride == nil)
+        #expect(model.settings(for: .cursor).refreshInterval(for: .subscription) == .tenMinutes)
+        #expect(GeneralSettingsView.customAppearanceProviders(in: model).isEmpty)
+    }
+
+    @Test func switchingTheCustomAppearanceBackOnRestoresIt() {
+        let model = makeModel(configured: [CredentialKey(provider: .cursor, fieldID: "session-token")])
+        var custom = model.globalAppearance
+        custom.colored.toggle()
+        var settings = model.settings(for: .cursor)
+        settings.appearanceOverride = custom
+        model.setSettings(settings, for: .cursor)
+
+        model.useDefaultAppearance(for: .cursor)
+        #expect(model.appearance(for: .cursor) == model.globalAppearance)
+
+        settings = model.settings(for: .cursor)
+        settings.setUsesCustomAppearance(true, defaults: model.globalAppearance)
+        #expect(settings.appearanceOverride == custom)
+    }
+
+    @Test func aFirstCustomAppearanceStartsFromTheDefaults() {
+        var defaults = MenuBarAppearance()
+        defaults.countdown = true
+        var settings = ProviderSettings()
+
+        settings.setUsesCustomAppearance(true, defaults: defaults)
+        #expect(settings.appearanceOverride == defaults)
     }
 
     @Test func generalPreviewIsEmptyWhenNothingIsConfigured() {

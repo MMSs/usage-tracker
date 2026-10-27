@@ -25,6 +25,23 @@ import Testing
         }
     }
 
+    @Test func aSwitchedOffCustomAppearanceSurvivesTheRoundTrip() throws {
+        let custom = MenuBarAppearance(showText: false, countdown: true, showGraph: true, graphStyle: .bars, colored: true)
+        var settings = ProviderSettings(appearanceOverride: custom)
+        settings.setUsesCustomAppearance(false, defaults: .default)
+
+        let data = try JSONEncoder().encode(settings)
+        let json = try #require(String(data: data, encoding: .utf8))
+        var decoded = try JSONDecoder().decode(ProviderSettings.self, from: data)
+
+        #expect(decoded == settings)
+        #expect(decoded.appearanceOverride == nil)
+        // Older builds read an override from this key alone, so it is left out while switched off.
+        #expect(!json.contains(#""appearanceOverride""#))
+        decoded.setUsesCustomAppearance(true, defaults: .default)
+        #expect(decoded.appearanceOverride == custom)
+    }
+
     @Test func aSinglePlan5IntervalCarriesToBothHalves() {
         withIsolatedDefaults { defaults in
             defaults.set(Data(#"{"isEnabled":true,"refreshInterval":"thirtySeconds"}"#.utf8),

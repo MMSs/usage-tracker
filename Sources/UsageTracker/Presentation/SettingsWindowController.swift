@@ -61,6 +61,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         show()
     }
 
+    /// Moves from General to the provider's appearance settings.
+    func showAppearance(of provider: Provider) {
+        selection.showAppearance(of: provider)
+        tabs?.select(selection.page)
+    }
+
     private func show() {
         let window = self.window ?? makeWindow()
         self.window = window
@@ -80,8 +86,9 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         window?.delegate = nil
         window = nil
         tabs = nil
-        // A provider page's tab lasts as long as its window.
+        // A provider page's tab and open section last as long as its window.
         selection.tabs = [:]
+        selection.openSections = [:]
         dock.setVisible(false)
     }
 
@@ -119,7 +126,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         switch page {
         case .general:
             let host = SettingsPageController { report in
-                AnyView(SettingsPageLayout(reportHeight: report) { GeneralSettingsView(appModel: self.model) })
+                AnyView(SettingsPageLayout(reportHeight: report) {
+                    // Weak: the page lives inside this controller's window.
+                    GeneralSettingsView(appModel: self.model) { [weak self] provider in
+                        self?.showAppearance(of: provider)
+                    }
+                })
             }
             host.title = "General"
             item = NSTabViewItem(viewController: host)
@@ -158,6 +170,10 @@ private struct ProviderSettingsPage: View {
                         selection.selectTab(tab, for: provider.id)
                     }
                 }
+            ),
+            openSection: Binding(
+                get: { selection.openSections[provider.id] },
+                set: { selection.openSections[provider.id] = $0 }
             )
         )
     }
