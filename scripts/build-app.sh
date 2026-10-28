@@ -67,6 +67,39 @@ if [[ "$identity" != "-" ]]; then
   sign+=(--options runtime --timestamp)
 fi
 
+# iCloud sync needs a provisioning profile granting the iCloud container,
+# push and keychain sharing. With USAGE_TRACKER_PROVISIONING_PROFILE set, the
+# profile is embedded and the app is signed with entitlements derived from
+# it; without one the app runs as before and says sync isn't available.
+entitlements=()
+profile="${USAGE_TRACKER_PROVISIONING_PROFILE:-}"
+if [[ -n "$profile" ]]; then
+  if [[ "$identity" == "-" ]]; then
+    echo "A provisioning profile needs a signing identity, not ad hoc signing" >&2
+    exit 1
+  fi
+  cp "$profile" "$bundle/Contents/embedded.provisionprofile"
+
+  decoded="$root/build/profile.plist"
+  plist="$root/build/UsageTracker.entitlements"
+  security cms -D -i "$profile" > "$decoded"
+  /usr/libexec/PlistBuddy -x -c "Print :Entitlements" "$decoded" > "$plist"
+  app_id="$(/usr/libexec/PlistBuddy -c "Print :com.apple.application-identifier" "$plist")"
+
+  # A profile grants wildcards and both environments; a signed app names
+  # exactly what it uses. A release talks to the production CloudKit.
+  environment=Development
+  [[ -n "${USAGE_TRACKER_VERSION:-}" ]] && environment=Production
+  plutil -replace com.apple.developer.icloud-container-environment -string "$environment" "$plist"
+  plutil -replace com.apple.developer.icloud-services -json '["CloudKit"]' "$plist"
+  plutil -replace keychain-access-groups -json "[\"$app_id\"]" "$plist"
+  for unused in com.apple.developer.ubiquity-kvstore-identifier com.apple.developer.ubiquity-container-identifiers \
+    com.apple.developer.icloud-container-development-container-identifiers; do
+    plutil -remove "$unused" "$plist" 2>/dev/null || true
+  done
+  entitlements=(--entitlements "$plist")
+fi
+
 # Inside out, in the order Sparkle documents for embedding its framework.
 fw="$bundle/Contents/Frameworks/Sparkle.framework"
 "${sign[@]}" "$fw/Versions/B/XPCServices/Installer.xpc"
@@ -74,11 +107,14 @@ fw="$bundle/Contents/Frameworks/Sparkle.framework"
 "${sign[@]}" "$fw/Versions/B/Autoupdate"
 "${sign[@]}" "$fw/Versions/B/Updater.app"
 "${sign[@]}" "$fw"
-"${sign[@]}" --identifier com.mohabsam.usage-tracker "$bundle"
+"${sign[@]}" "${entitlements[@]}" --identifier com.mohabsam.usage-tracker "$bundle"
 if [[ "$identity" == "-" ]]; then
   echo "Signed ad hoc"
 else
   echo "Signed with $identity"
+fi
+if [[ -n "$profile" ]]; then
+  echo "Embedded $profile; iCloud sync available"
 fi
 
 echo "Built $bundle"
