@@ -57,17 +57,48 @@ struct ProviderPopoverView: View {
         .padding(16))
     }
 
+    /// The app's set-up item opens this while nothing is configured, so it
+    /// offers every provider alike rather than the one whose slot hosts it.
     private var setUpPage: some View {
         VStack(alignment: .leading, spacing: 14) {
-            header
+            HStack(spacing: 6) {
+                AppMark()
+                    .foregroundStyle(.primary)
+                    .frame(width: 16, height: 16)
+                Text(UsageTrackerApp.applicationName)
+                    .font(.headline)
+            }
+            .accessibilityElement(children: .combine)
+
+            Text("Add a credential for any provider to see its usage and spend here.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            VStack(spacing: 6) {
+                ForEach(appModel.listedProviders) { provider in
+                    Button {
+                        openSettings(SettingsRequest(provider: provider.id, opensHelp: true))
+                    } label: {
+                        HStack(spacing: 8) {
+                            ProviderGlyph(provider: provider.id)
+                                .fill(.primary)
+                                .frame(width: 14, height: 14)
+                            Text(provider.descriptor.displayName)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.large)
+                    .accessibilityLabel("Set up \(provider.descriptor.displayName)")
+                }
+            }
 
             HStack {
-                Button("Set up") {
-                    openSettings(opensHelp: true)
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-
                 Spacer()
 
                 Button {
@@ -407,7 +438,7 @@ struct ProviderPopoverView: View {
             .accessibilityValue(RefreshIcon.accessibilityValue(refreshPhase))
 
             Button {
-                openSettings(opensHelp: false)
+                openSettings(SettingsRequest(provider: provider.id))
             } label: {
                 Image(systemName: "gearshape")
             }
@@ -447,9 +478,9 @@ struct ProviderPopoverView: View {
     // MARK: - Window behaviour
 
     /// Settings lives in its own window, so the popover closes to make way for it.
-    private func openSettings(opensHelp: Bool) {
+    private func openSettings(_ request: SettingsRequest) {
         closePopover()
-        appModel.presentSettings(SettingsRequest(provider: provider.id, opensHelp: opensHelp))
+        appModel.presentSettings(request)
     }
 
     /// The environment action closes a MenuBarExtra window; the status item click is the fallback.

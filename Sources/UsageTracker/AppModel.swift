@@ -495,9 +495,10 @@ final class AppModel: ObservableObject {
     // MARK: Menu bar
 
     /// Enabled providers with an enabled, configured half, in registry
-    /// order. When nothing is configured, the first provider alone, so there
-    /// is always an item to click. When everything configured is switched
-    /// off, nothing: the app is reached by opening it.
+    /// order. When nothing is configured, the first provider's slot alone,
+    /// which hosts the app's set-up item, so there is always an item to
+    /// click. When everything configured is switched off, nothing: the app
+    /// is reached by opening it.
     var insertedProviders: [Provider] {
         guard !showsSetUpItem else {
             return [ProviderRegistry.all[0].id]
@@ -514,8 +515,14 @@ final class AppModel: ObservableObject {
         elements.reversed()
     }
 
-    /// True while nothing is configured, so the menu bar holds only the first
-    /// provider's set-up item rather than any usage.
+    /// Providers with a Settings page, in the order of their menu bar items.
+    /// The set-up popover offers the same list.
+    var listedProviders: [ProviderViewModel] {
+        Self.menuBarDisplayOrder(providers.filter(\.hasAnyHalf))
+    }
+
+    /// True while nothing is configured, so the menu bar holds only the
+    /// app's set-up item rather than any usage.
     var showsSetUpItem: Bool {
         !providers.contains(where: \.isConfigured)
     }

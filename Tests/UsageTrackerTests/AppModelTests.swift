@@ -423,8 +423,15 @@ import Testing
         #expect(AppModel.menuBarDisplayOrder(Provider.allCases) == [.openai, .anthropic, .cursor])
     }
 
-    @Test func theSetUpItemFallsBackToCursor() {
-        #expect(makeModel().insertedProviders == [.cursor])
+    @Test func theSetUpItemTakesTheFirstSlot() {
+        let model = makeModel()
+
+        #expect(model.showsSetUpItem)
+        #expect(model.insertedProviders == [.cursor])
+    }
+
+    @Test func listedProvidersFollowTheMenuBarOrder() {
+        #expect(makeModel().listedProviders.map(\.id) == [.openai, .anthropic, .cursor])
     }
 
     @Test func refreshAllFetchesEveryProviderOnce() async {

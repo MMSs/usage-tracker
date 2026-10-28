@@ -1,13 +1,13 @@
 import Foundation
 
 enum MenuBarStatus: Equatable {
-    case setUp, expired, error, loading
-    /// Drawn like `setUp`; VoiceOver says what to set up.
+    case expired, error, loading
+    /// VoiceOver says what to set up.
     case chooseOrganization
 
     var title: String {
         switch self {
-        case .setUp, .chooseOrganization: "Set up"
+        case .chooseOrganization: "Set up"
         case .expired: "Expired"
         case .error: "Error"
         case .loading: "Loading"
@@ -129,12 +129,10 @@ struct MenuBarHalves: Equatable, Sendable {
 extension MenuBarItem {
     /// What the appearance and the provider's half switches let the item
     /// draw. With both halves hidden only the logo is left; a Limits choice
-    /// with no matching meter keeps all. The set-up item, all there is to
-    /// click while nothing is configured, is never hidden.
+    /// with no matching meter keeps all.
     func visible(in appearance: MenuBarAppearance, halves: MenuBarHalves) -> MenuBarItem {
-        let setUp = HalfDisplay.status(.setUp)
-        var subscription = halves.subscription || subscription == setUp ? subscription : nil
-        let api = halves.api || api == setUp ? api : nil
+        var subscription = halves.subscription ? subscription : nil
+        let api = halves.api ? api : nil
         let hidden = [
             (Half.subscription, halves.subscription ? nil : self.subscription),
             (Half.api, halves.api ? nil : self.api),
@@ -180,13 +178,8 @@ enum MenuBarItemBuilder {
         api: HalfSnapshot?,
         apiBudget: Decimal?,
         now: Date,
-        calendar: Calendar = .current,
-        forceSetUp: Bool = false
+        calendar: Calendar = .current
     ) -> MenuBarItem? {
-        if forceSetUp {
-            return MenuBarItem(provider: descriptor.id, subscription: .status(.setUp), api: nil)
-        }
-
         let subscriptionDisplay = display(subscription) { report in
             subscriptionMeters(descriptor: descriptor, report: report, now: now, calendar: calendar)
         }

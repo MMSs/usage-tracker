@@ -34,8 +34,7 @@ struct ProviderMenuBarScene: Scene {
             subscription: provider.snapshot(.subscription),
             api: provider.snapshot(.api),
             apiBudget: model.budget(for: provider.id),
-            now: now,
-            forceSetUp: !provider.isConfigured
+            now: now
         ) ?? MenuBarItem(provider: provider.id, subscription: .status(.loading), api: nil)
     }
 
@@ -48,12 +47,22 @@ struct ProviderMenuBarScene: Scene {
         ) {
             ProviderPopoverView(provider: provider, appModel: model)
         } label: {
-            MenuBarLabel(item: item, appearance: appearance, halves: model.menuBarHalves(for: provider.id), displayName: provider.descriptor.displayName)
+            label
                 .task {
                     // Idempotent, so any inserted scene may start the refresh cycle.
                     model.start()
                 }
         }
         .menuBarExtraStyle(.window)
+    }
+
+    /// While nothing is configured, this scene hosts the app's set-up item.
+    @ViewBuilder
+    private var label: some View {
+        if model.showsSetUpItem {
+            SetUpMenuBarLabel(appName: UsageTrackerApp.applicationName)
+        } else {
+            MenuBarLabel(item: item, appearance: appearance, halves: model.menuBarHalves(for: provider.id), displayName: provider.descriptor.displayName)
+        }
     }
 }
