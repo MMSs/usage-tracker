@@ -228,7 +228,7 @@ import Testing
     }
 
     @Test func statusStatesRender() throws {
-        for status in [MenuBarStatus.setUp, .chooseOrganization, .expired, .error, .loading] {
+        for status in [MenuBarStatus.chooseOrganization, .expired, .error, .loading] {
             let item = MenuBarItem(provider: .anthropic, subscription: .status(status), api: nil)
 
             #expect(try #require(render(item)).size.width > 0)
@@ -275,6 +275,26 @@ import Testing
         let marked = MenuBarItem(provider: .cursor, subscription: .meters([meter("S", "41%")], stale: true, errorMark: true), api: nil)
 
         #expect(try #require(render(marked)).size.width > (try #require(render(plain)).size.width))
+    }
+
+    @Test func theSetUpItemIsTheAppsOwnTemplate() throws {
+        let image = try #require(MenuBarItemImage.renderSetUp(appName: "Usage Tracker"))
+
+        #expect(image.isTemplate)
+        #expect(image.size.height == MenuBarItemImage.height)
+        #expect(image.size.width > MenuBarItemImage.height)
+        #expect(image.accessibilityDescription == "Usage Tracker, Set up")
+    }
+
+    @Test func theAppMarkFillsItsBoxWithArcsInsideTheTracks() {
+        let box = CGRect(x: 0, y: 0, width: 14, height: 14)
+        let tracks = AppMarkRings(part: .tracks).path(in: box).boundingRect
+        let arcs = AppMarkRings(part: .arcs).path(in: box).boundingRect
+
+        #expect(abs(tracks.width - box.width) < 0.01)
+        #expect(abs(tracks.height - box.height) < 0.01)
+        #expect(!arcs.isEmpty)
+        #expect(tracks.insetBy(dx: -0.01, dy: -0.01).contains(arcs))
     }
 
     @Test func glyphPathsAreNonEmpty() {

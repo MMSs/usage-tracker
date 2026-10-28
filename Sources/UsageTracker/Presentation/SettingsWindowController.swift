@@ -39,17 +39,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         self.frameAutosaveName = frameAutosaveName
     }
 
-    /// Providers with a page, in the order of their menu bar items.
-    private var listedProviders: [ProviderViewModel] {
-        AppModel.menuBarDisplayOrder(model.providers.filter(\.hasAnyHalf))
-    }
-
     var pages: [SettingsPage] {
-        [.general] + listedProviders.map { .provider($0.id) }
+        [.general] + model.listedProviders.map { .provider($0.id) }
     }
 
     func present(_ request: SettingsRequest) {
-        selection.apply(request, listed: listedProviders.map(\.id))
+        selection.apply(request, listed: model.listedProviders.map(\.id))
         show()
     }
 

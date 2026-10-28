@@ -28,3 +28,18 @@ struct MenuBarLabel: View {
         }
     }
 }
+
+/// The app's own item while no provider is set up, so the first thing a new
+/// user sees names no provider.
+struct SetUpMenuBarLabel: View {
+    let appName: String
+
+    var body: some View {
+        if let image = MenuBarItemImage.renderSetUp(appName: appName) {
+            Image(nsImage: image)
+                .accessibilityLabel("\(appName), Set up")
+        } else {
+            Text("Set up")
+        }
+    }
+}
