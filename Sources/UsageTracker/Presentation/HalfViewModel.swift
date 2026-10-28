@@ -211,6 +211,75 @@ final class HalfViewModel: ObservableObject {
         }
     }
 
+    /// This half's latest outcome for the other Macs; nil before it has one.
+    var sharedState: SharedHalfState? {
+        let state = SharedHalfState(
+            report: report,
+            fetchedAt: lastSuccess,
+            failure: lastFailure,
+            rateLimitedUntil: rateLimitedUntil,
+            retriesBlocked: scheduledRetriesBlocked
+        )
+
+        return state.updatedAt == nil ? nil : state
+    }
+
+    /// Takes another Mac's outcome when it is newer than this half's own, as
+    /// if this half had refreshed. True when it did. A switched-off half
+    /// keeps what it has, as it would without sync.
+    @discardableResult
+    func adopt(_ state: SharedHalfState) -> Bool {
+        guard isEnabled, let updated = state.updatedAt else {
+            return false
+        }
+
+        if let local = [lastSuccess, lastFailure?.date].compactMap({ $0 }).max(), local >= updated {
+            return false
+        }
+
+        if let fetched = state.report, let fetchedAt = state.fetchedAt, fetchedAt > lastSuccess ?? .distantPast {
+            // Before the published properties change, so the menu bar rebuild they trigger reads it.
+            history?.record(fetched, provider: provider, at: fetchedAt)
+            report = fetched
+            lastSuccess = fetchedAt
+            isStale = false
+            cache.store(CachedReport(report: fetched, fetchedAt: fetchedAt), provider: provider, half: half)
+        }
+
+        lastFailure = state.failure
+        rateLimitedUntil = state.rateLimitedUntil
+        scheduledRetriesBlocked = state.retriesBlocked
+        status = state.failure.map { Self.status(for: $0.cause) } ?? .ready
+
+        // What is kept may be another organization's, as when this half fails that way itself.
+        if state.failure?.cause == .needsOrganization {
+            report = nil
+            lastSuccess = nil
+            cache.clear(provider: provider, half: half)
+            history?.clear(provider: provider)
+        }
+
+        Log.refresh.info("\(self.logName, privacy: .public): adopted another Mac's refresh")
+        return true
+    }
+
+    /// Takes the organization another Mac chose, without asking the provider:
+    /// that Mac's refresh brings the report.
+    func adoptOrganization(_ id: String?) {
+        guard let scope = organizationScope, scope.selectedOrganizationID != id else {
+            return
+        }
+
+        if let id {
+            scope.selectOrganization(id)
+        } else {
+            scope.resetOrganizations()
+        }
+        history?.clear(provider: provider)
+        selectedOrganizationID = id
+        scheduledRetriesBlocked = false
+    }
+
     /// Sends the provider's session-starting message, then refreshes so the
     /// new window shows. False when it cannot start, is switched off, one is
     /// already running, or it failed (`sessionStart` is then `.failed`).
