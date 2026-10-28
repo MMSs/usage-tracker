@@ -253,7 +253,7 @@ import Testing
         }
     }
 
-    @Test func halfFlagsRoundTripAndDefaultToOn() {
+    @Test func halfFlagsRoundTripAndDefaultToOff() {
         withIsolatedDefaults { defaults in
             let store = UserDefaultsProviderSettingsStore(defaults: defaults)
             var settings = ProviderSettings()
@@ -266,8 +266,12 @@ import Testing
             #expect(!read.isEnabled(.api))
 
             defaults.set(Data(#"{"isEnabled":true}"#.utf8), forKey: UserDefaultsProviderSettingsStore.key(for: .cursor))
-            let old = UserDefaultsProviderSettingsStore(defaults: defaults).settings(for: .cursor)
-            #expect(old.isSubscriptionEnabled && old.isAPIEnabled)
+            let old = UserDefaultsProviderSettingsStore(defaults: defaults).loadSettings(for: .cursor)
+            #expect(!old.settings.isSubscriptionEnabled && !old.settings.isAPIEnabled)
+            #expect(old.unsetHalves == [.subscription, .api])
+
+            #expect(store.loadSettings(for: .anthropic).unsetHalves.isEmpty)
+            #expect(store.loadSettings(for: .openai).unsetHalves == [.subscription, .api], "no record at all")
         }
     }
 

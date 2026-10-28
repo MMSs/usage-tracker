@@ -12,6 +12,12 @@ final class MemoryProviderSettingsStore: ProviderSettingsStoring {
         stored[provider] ?? .default
     }
 
+    /// Like the real store, a provider with no record has no half switches yet.
+    func loadSettings(for provider: Provider) -> ProviderSettings.Loaded {
+        stored[provider].map { ProviderSettings.Loaded(settings: $0) }
+            ?? ProviderSettings.Loaded(settings: .default, unsetHalves: [.subscription, .api])
+    }
+
     func setSettings(_ settings: ProviderSettings, for provider: Provider) {
         stored[provider] = settings
     }
