@@ -23,9 +23,14 @@ enum KeychainCredentialStoreError: Error {
 
 final class KeychainCredentialStore: CredentialStoring {
     private let service: String
+    private let synchronizable: Bool
 
-    init(service: String = AppIdentity.bundleID) {
+    /// `synchronizable` items live in the data protection keychain and reach
+    /// the user's other Macs through iCloud Keychain; this needs the keychain
+    /// sharing entitlement. The others stay on this Mac.
+    init(service: String = AppIdentity.bundleID, synchronizable: Bool = false) {
         self.service = service
+        self.synchronizable = synchronizable
     }
 
     func credential(for key: CredentialKey) throws -> String? {
@@ -79,6 +84,10 @@ final class KeychainCredentialStore: CredentialStoring {
 
         var addQuery = baseQuery(for: key)
         addQuery[kSecValueData as String] = data
+        if synchronizable {
+            // A synced item cannot be bound to this device.
+            addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+        }
         let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
 
         guard addStatus == errSecSuccess else {
@@ -95,10 +104,15 @@ final class KeychainCredentialStore: CredentialStoring {
     }
 
     private func baseQuery(for key: CredentialKey) -> [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key.account,
         ]
+        if synchronizable {
+            query[kSecUseDataProtectionKeychain as String] = true
+            query[kSecAttrSynchronizable as String] = true
+        }
+        return query
     }
 }

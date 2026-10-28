@@ -18,8 +18,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.loginItem.reconcileAtLaunch()
+        // iCloud tells the app about another Mac's change with a silent push.
+        // Without the push entitlement this fails quietly and pulls at each refresh still catch up.
+        if model.sync?.isAvailable(.settingsOnly) == true {
+            NSApp.registerForRemoteNotifications()
+        }
         AboutPanel.replaceAboutItem(in: NSApp.mainMenu)
         aboutObserver = AboutPanel.MenuTrackingObserver { NSApp.mainMenu }
+    }
+
+    func application(_ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]) {
+        Task { await model.sync?.pull() }
+    }
+
+    func application(_ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error) {
+        Log.sync.notice("no push for sync: \(String(describing: type(of: error)), privacy: .public)")
     }
 
     /// Finder, Spotlight or the Dock icon: bring Settings forward without changing the page.

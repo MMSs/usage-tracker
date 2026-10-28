@@ -17,4 +17,12 @@ final class MemoryUsageHistoryStore: UsageHistoryStoring {
     func clear(provider: Provider) {
         clearCount += 1
     }
+
+    func allSamples(provider: Provider) -> [String: [UsageSample]] {
+        stored
+    }
+
+    func merge(_ samples: [String: [UsageSample]], provider: Provider, now: Date) {
+        stored = UserDefaultsUsageHistoryStore.merged(stored, samples, now: now)
+    }
 }

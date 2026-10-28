@@ -21,6 +21,7 @@ enum Log {
     static let scheduler = Logger(subsystem: subsystem, category: "scheduler")
     static let migration = Logger(subsystem: subsystem, category: "migration")
     static let loginItem = Logger(subsystem: subsystem, category: "login-item")
+    static let sync = Logger(subsystem: subsystem, category: "sync")
 }
 
 /// Account-neutral text for log lines.

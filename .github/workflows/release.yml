@@ -194,7 +194,14 @@ jobs:
         env:
           USAGE_TRACKER_VERSION: ${{ needs.plan.outputs.version }}
           USAGE_TRACKER_SIGNING_IDENTITY: "Developer ID Application: Mohammad Mohab Al Samman (8W45S9762S)"
+          # Optional: the Developer ID provisioning profile, base64, that lets
+          # the app use iCloud sync. Without it the release builds as before.
+          PROVISIONING_PROFILE: ${{ secrets.PROVISIONING_PROFILE }}
         run: |
+          if [[ -n "$PROVISIONING_PROFILE" ]]; then
+            export USAGE_TRACKER_PROVISIONING_PROFILE="$RUNNER_TEMP/usage-tracker.provisionprofile"
+            printf '%s' "$PROVISIONING_PROFILE" | base64 --decode > "$USAGE_TRACKER_PROVISIONING_PROFILE"
+          fi
           scripts/build-app.sh
           codesign --verify --deep --strict --verbose=2 "$APP"
       - name: Notarize the app

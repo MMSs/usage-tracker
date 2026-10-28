@@ -750,6 +750,54 @@ struct StartupSection: View {
     }
 }
 
+/// Which of this Mac's things go to the user's other Macs through iCloud.
+struct SyncSection: View {
+    @ObservedObject var sync: SyncCoordinator
+    static let title = "iCloud Sync"
+
+    private var mode: Binding<SyncMode> {
+        Binding(get: { sync.mode }, set: { mode in Task { await sync.setMode(mode) } })
+    }
+
+    var body: some View {
+        SettingsSection(title: Self.title, footer: Self.footer(mode: sync.mode, status: sync.status, reason: sync.unavailableReason(.settingsOnly))) {
+            SettingsRow(label: "Sync with my Macs") {
+                Picker("Sync with my Macs", selection: mode) {
+                    ForEach(SyncMode.allCases) { mode in
+                        Text(mode.title)
+                            .tag(mode)
+                            .selectionDisabled(!sync.isAvailable(mode))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
+            }
+        }
+    }
+
+    /// What the chosen mode shares, then how syncing is going.
+    static func footer(mode: SyncMode, status: SyncStatus, reason: String?) -> String {
+        let explanation = switch mode {
+        case .off:
+            "Nothing leaves this Mac. Settings only shares appearance, switches, refresh rates, alerts and budgets with your Macs on the same iCloud account. Everything also shares credentials through iCloud Keychain and usage, so your Macs take turns asking each provider."
+        case .settingsOnly:
+            "Appearance, switches, refresh rates, alerts and budgets are shared. Each Mac keeps its own credentials and asks the providers for itself."
+        case .everything:
+            "Settings, credentials and usage are shared. One Mac asks each provider per refresh and the others show its answer, history included."
+        }
+
+        let state: String? = switch status {
+        case .off: mode == .off ? reason : nil
+        case let .unavailable(message), let .failed(message): message
+        case .syncing: "Syncing…"
+        case .upToDate: "Up to date."
+        }
+
+        return [explanation, state].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
 struct UpdatesSection: View {
     @ObservedObject var updates: UpdatesModel
     static let checkNowTitle = "Check Now"
@@ -789,7 +837,7 @@ struct UpdatesSection: View {
 struct GeneralSettingsView: View {
     @ObservedObject var appModel: AppModel
     static let appearanceTitle = "Menu bar appearance"
-    static let sectionTitles = [appearanceTitle, "Alerts", "Startup", "Updates"]
+    static let sectionTitles = [appearanceTitle, "Alerts", SyncSection.title, "Startup", "Updates"]
     static let customAppearanceFooter = "The defaults above don't change these providers' items."
     /// Opens a listed provider's own appearance settings.
     var showAppearance: (Provider) -> Void = { _ in }
@@ -906,6 +954,10 @@ struct GeneralSettingsView: View {
                             .disabled(!appModel.alertsEnabled)
                     }
                 }
+            }
+
+            if let sync = appModel.sync {
+                SyncSection(sync: sync)
             }
 
             StartupSection(loginItem: appModel.loginItem)
