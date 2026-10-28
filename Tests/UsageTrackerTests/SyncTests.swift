@@ -303,3 +303,42 @@ struct SimulatedMac {
         #expect(mac.sync.status == .unavailable("Sign in to iCloud in System Settings to sync."))
     }
 }
+
+@Suite @MainActor struct SyncSectionTests {
+    @Test func theFooterSaysWhatIsSharedAndHowItIsGoing() {
+        let off = SyncSection.footer(mode: .off, status: .off, reason: nil)
+        let everything = SyncSection.footer(mode: .everything, status: .upToDate(.now), reason: nil)
+        let failing = SyncSection.footer(mode: .settingsOnly, status: .failed("Can't reach iCloud right now."), reason: nil)
+
+        #expect(off.hasPrefix("Nothing leaves this Mac."))
+        #expect(everything.hasSuffix("Up to date."))
+        #expect(failing.contains("Each Mac keeps its own credentials"))
+        #expect(failing.hasSuffix("Can't reach iCloud right now."))
+    }
+
+    @Test func aBuildThatCannotSyncSaysWhyWhileOff() {
+        let footer = SyncSection.footer(mode: .off, status: .off, reason: "Builds made from source don't sync.")
+
+        #expect(footer.hasSuffix("Builds made from source don't sync."))
+    }
+}
+
+@Suite @MainActor struct SettingsOnlyCatchUpTests {
+    @Test func aScheduledRefreshPicksUpAnotherMacsSettings() async {
+        let server = InMemorySyncServer()
+        let keychain = MemoryCredentialStore()
+        let clock = TestClock()
+        let first = SimulatedMac("A", server: server, sharedKeychain: keychain, clock: clock, mode: .settingsOnly)
+        let second = SimulatedMac("B", server: server, sharedKeychain: keychain, clock: clock, mode: .settingsOnly)
+        await first.sync.start()
+        await second.sync.start()
+        var appearance = MenuBarAppearance.default
+        appearance.colored.toggle()
+
+        first.model.setGlobalAppearance(appearance)
+        await first.sync.pull()
+        await second.scheduledRefresh()
+
+        #expect(second.model.globalAppearance == appearance)
+    }
+}

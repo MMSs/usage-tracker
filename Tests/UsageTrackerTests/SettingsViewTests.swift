@@ -16,7 +16,7 @@ import Testing
     }
 
     @Test func theGeneralPageEndsWithUpdates() {
-        #expect(GeneralSettingsView.sectionTitles == ["Menu bar appearance", "Alerts", "Startup", "Updates"])
+        #expect(GeneralSettingsView.sectionTitles == ["Menu bar appearance", "Alerts", "iCloud Sync", "Startup", "Updates"])
     }
 
     @Test func theAppearanceFooterMentionsCustomAppearancesOnlyWhenListed() {

@@ -417,15 +417,15 @@ final class SyncCoordinator: ObservableObject {
     // MARK: Fetch turns
 
     /// Decides whether this Mac asks the provider at a scheduled refresh. It
-    /// catches up first; a fresh enough answer from another Mac, or another
+    /// catches up first, in any mode; a fresh enough answer from another Mac, or another
     /// Mac fetching now, means no request. iCloud unreachable means fetching
     /// here, as without sync.
     func prepareScheduledFetch(_ target: RefreshTarget, interval: TimeInterval) async -> SyncFetchDecision {
+        // Every mode catches up here, so a missed push only delays a change.
+        await pull()
         guard mode.sharesUsage, transport != nil else {
             return .fetch
         }
-
-        await pull()
 
         if let state = delegate?.sharedState(for: target), state.isShareable, let updated = state.updatedAt,
            now().timeIntervalSince(updated) < interval * Self.freshness {
