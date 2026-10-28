@@ -15,6 +15,8 @@ final class AppModel: ObservableObject {
     private let now: () -> Date
     let loginItem: LoginItemModel
     let updates: UpdatesModel
+    /// Nil when the app runs without sync (tests, previews).
+    let sync: SyncCoordinator?
     private(set) var scheduler: RefreshScheduler!
     /// Set by the app delegate; opens the Settings window. A no-op until then.
     var presentSettings: (SettingsRequest) -> Void = { _ in }
@@ -60,7 +62,8 @@ final class AppModel: ObservableObject {
             try? await Task.sleep(for: duration)
         },
         now: @escaping () -> Date = Date.init,
-        alertMonitor: AlertMonitor? = nil
+        alertMonitor: AlertMonitor? = nil,
+        sync: SyncCoordinator? = nil
     ) {
         self.providers = providers
         self.credentialStore = credentialStore
@@ -71,6 +74,7 @@ final class AppModel: ObservableObject {
         self.updates = updates
         self.now = now
         self.alertMonitor = alertMonitor
+        self.sync = sync
         alertsEnabled = alertMonitor?.isEnabled ?? true
         alertKinds = Set(AlertKind.allCases.filter { alertMonitor?.isEnabled($0) ?? $0.defaultEnabled })
         globalAppearance = appearanceStore.appearance()
@@ -97,6 +101,7 @@ final class AppModel: ObservableObject {
             networkObserver: networkObserver,
             sleep: sleep
         )
+        sync?.delegate = self
     }
 
     func start() {
@@ -105,6 +110,9 @@ final class AppModel: ObservableObject {
         }
 
         isStarted = true
+        if let sync {
+            Task { await sync.start() }
+        }
         scheduler.start()
 
         if alertsEnabled, !alertKinds.isEmpty {
@@ -114,6 +122,12 @@ final class AppModel: ObservableObject {
 
     /// Refreshes every enabled provider; disabled ones keep their last report untouched.
     func refreshAll(manual: Bool) async {
+        // Each half takes its own turn with the other Macs.
+        if sync?.mode.sharesUsage == true {
+            await refreshEachHalf(manual: manual)
+            return
+        }
+
         let started = now()
         await withTaskGroup(of: Void.self) { group in
             for provider in providers where provider.isEnabled {
@@ -149,8 +163,16 @@ final class AppModel: ObservableObject {
             return
         }
 
+        if !manual, let sync, await sync.prepareScheduledFetch(target, interval: scheduledInterval(target)) == .skip {
+            return
+        }
+
         let refreshStart = now()
         await provider.refresh(target.half, manual: manual)
+        if let sync {
+            let fetched = provider.half(target.half)?.sharedState?.updatedAt.map { $0 >= refreshStart } ?? false
+            await sync.publishRefresh(target, fetched: fetched)
+        }
         evaluateAlerts(for: provider, halves: [target.half])
         trackFailures(of: provider, halves: [target.half], since: refreshStart)
         guard target.half == .subscription else {
@@ -188,6 +210,42 @@ final class AppModel: ObservableObject {
         }
     }
 
+    /// Refreshes each switched-on half on its own, so each takes its turn with the other Macs.
+    private func refreshEachHalf(manual: Bool) async {
+        let targets = providers.filter(\.isEnabled).flatMap { provider in
+            [Half.subscription, .api].filter { provider.half($0)?.isEnabled == true }.map { RefreshTarget(provider: provider.id, half: $0) }
+        }
+
+        await withTaskGroup(of: Void.self) { group in
+            for target in targets {
+                group.addTask { await self.refresh(target, manual: manual) }
+            }
+        }
+    }
+
+    private func scheduledInterval(_ target: RefreshTarget) -> TimeInterval {
+        TimeInterval(settings(for: target.provider).refreshInterval(for: target.half).seconds)
+    }
+
+    /// Another Mac's outcome for the half, taken as if refreshed here, with a
+    /// refresh's alerts and session bookkeeping. Never an automatic session
+    /// start: the Mac that fetched decides that.
+    func adoptRefresh(_ state: SharedHalfState, for target: RefreshTarget) {
+        let provider = provider(target.provider)
+        guard provider.isEnabled, provider.adopt(state, for: target.half) else {
+            return
+        }
+
+        evaluateAlerts(for: provider, halves: [target.half])
+        trackFailures(of: provider, halves: [target.half], since: .distantPast)
+        guard target.half == .subscription else {
+            return
+        }
+
+        noteOpenSession(provider)
+        finishSession(of: provider, endedAt: endedSession(of: provider))
+    }
+
     // MARK: Session start
 
     /// Starts the provider's closed session when the user turned that on, at
@@ -221,8 +279,15 @@ final class AppModel: ObservableObject {
             return
         }
 
+        // Another Mac may have started it, or be starting it now.
+        if let sync, !(await sync.claimSessionStart(id, within: Self.autoStartInterval)) {
+            return
+        }
+
         autoStartsAwaitingCheck.insert(id)
-        await subscription.startSession()
+        if await subscription.startSession(), let sync {
+            await sync.publishRefresh(RefreshTarget(provider: id, half: .subscription))
+        }
     }
 
     /// A running session shows starts can open it (or it was used): any
@@ -269,9 +334,14 @@ final class AppModel: ObservableObject {
 
     // MARK: Alerts
 
+    var alertSwitches: AlertSwitches {
+        AlertSwitches(enabled: alertsEnabled, kinds: AlertKind.allCases.filter(alertKinds.contains).map(\.rawValue))
+    }
+
     func setAlertsEnabled(_ enabled: Bool) {
         alertMonitor?.isEnabled = enabled
         alertsEnabled = alertMonitor?.isEnabled ?? enabled
+        sync?.publish(.alerts(alertSwitches))
 
         if alertsEnabled, !alertKinds.isEmpty {
             alertMonitor?.requestAuthorization()
@@ -286,6 +356,7 @@ final class AppModel: ObservableObject {
         } else {
             alertKinds.remove(kind)
         }
+        sync?.publish(.alerts(alertSwitches))
 
         if enabled, alertsEnabled {
             alertMonitor?.requestAuthorization()
@@ -355,6 +426,7 @@ final class AppModel: ObservableObject {
         let wasOn = Self.enabledFlags(provider)
         providerSettings[id] = settings
         providerSettingsStore.setSettings(settings, for: id)
+        sync?.publish(.provider(id, settings))
         Self.apply(settings, to: provider)
         for half in [Half.subscription, .api] {
             scheduler.setSchedule(Self.interval(settings, half, of: provider), for: RefreshTarget(provider: id, half: half))
@@ -442,6 +514,7 @@ final class AppModel: ObservableObject {
     func setGlobalAppearance(_ appearance: MenuBarAppearance) {
         globalAppearance = appearance
         appearanceStore.setAppearance(appearance)
+        sync?.publish(.appearance(appearance))
     }
 
     /// Switches the provider's custom appearance off so it follows the global one again; the custom one is kept.
@@ -495,6 +568,7 @@ final class AppModel: ObservableObject {
     func setBudget(_ budget: Decimal?, for provider: Provider) {
         budgetStore.setBudget(budget, for: provider)
         apiBudgets[provider] = budgetStore.budget(for: provider)
+        sync?.publish(.budget(provider, apiBudgets[provider]))
     }
 
     // MARK: Menu bar

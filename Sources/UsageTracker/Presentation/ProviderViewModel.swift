@@ -118,6 +118,14 @@ final class ProviderViewModel: ObservableObject, Identifiable {
         recomputeIsConfigured()
     }
 
+    /// Takes another Mac's outcome for one half; true when it was newer.
+    @discardableResult
+    func adopt(_ state: SharedHalfState, for half: Half) -> Bool {
+        let adopted = self.half(half)?.adopt(state) ?? false
+        recomputeIsConfigured()
+        return adopted
+    }
+
     func credentialsChanged(half: Half) async {
         switch half {
         case .subscription: await subscription?.credentialsChanged()
