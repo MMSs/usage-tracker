@@ -23,17 +23,36 @@ enum MenuBarItemImage {
             colored: colored
         )
         let content = MenuBarItemContent(item: item, appearance: appearance, palette: palette)
-            .frame(height: height)
 
-        let renderer = ImageRenderer(content: content)
+        return image(of: content, template: !colored, description: item.accessibilityText(displayName: displayName))
+    }
+
+    /// The app's own item while no provider is set up: the app mark and
+    /// "Set up", a template in every appearance.
+    @MainActor
+    static func renderSetUp(appName: String) -> NSImage? {
+        let content = HStack(spacing: 4) {
+            AppMark()
+                .frame(width: 14, height: 14)
+            Text("Set up")
+                .font(Font(NSFont.menuBarFont(ofSize: 0)))
+        }
+        .foregroundStyle(.black)
+
+        return image(of: content, template: true, description: "\(appName), Set up")
+    }
+
+    @MainActor
+    private static func image(of content: some View, template: Bool, description: String) -> NSImage? {
+        let renderer = ImageRenderer(content: content.frame(height: height))
         renderer.scale = NSScreen.main?.backingScaleFactor ?? 2
 
         guard let image = renderer.nsImage else {
             return nil
         }
 
-        image.isTemplate = !colored
-        image.accessibilityDescription = item.accessibilityText(displayName: displayName)
+        image.isTemplate = template
+        image.accessibilityDescription = description
 
         return image
     }
@@ -218,7 +237,7 @@ struct HalfView: View {
     private func statusView(_ status: MenuBarStatus) -> some View {
         HStack(spacing: 4) {
             switch status {
-            case .setUp, .chooseOrganization:
+            case .chooseOrganization:
                 Image(systemName: "key.fill")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(palette.foreground)

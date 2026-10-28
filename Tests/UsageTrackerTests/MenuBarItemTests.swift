@@ -398,7 +398,6 @@ private func apiReport(spent: Decimal) -> ProviderReport {
 
         #expect(try #require(build(.anthropic, subscription: waiting)).logoBadge == false)
         #expect(try #require(build(.anthropic, subscription: loading)).logoBadge == false)
-        #expect(MenuBarItem(provider: .cursor, subscription: .status(.setUp), api: nil).logoBadge == false)
     }
 
     @Test func aHiddenFailedHalfStillBadges() throws {
@@ -517,33 +516,4 @@ private func apiReport(spent: Decimal) -> ProviderReport {
         let moneyFailed = try #require(build(.anthropic, subscription: nil, api: apiFailedWithReport))
         #expect(moneyFailed.accessibilityText(displayName: "Anthropic") == "Anthropic, API $1.00, API spend: refresh failed")
     }
-}
-
-@Test func forceSetUpShowsOnlyTheSetUpStatus() {
-    let item = MenuBarItemBuilder.make(
-        descriptor: ProviderRegistry.descriptor(for: .cursor),
-        subscription: HalfSnapshot(status: .unconfigured, report: nil, isStale: true),
-        api: nil,
-        apiBudget: nil,
-        now: now,
-        calendar: calendar,
-        forceSetUp: true
-    )
-    #expect(item == MenuBarItem(provider: .cursor, subscription: .status(.setUp), api: nil))
-}
-
-@Test func theForcedSetUpItemIgnoresTheMenuBarSwitches() throws {
-    let item = try #require(MenuBarItemBuilder.make(
-        descriptor: ProviderRegistry.descriptor(for: .cursor),
-        subscription: HalfSnapshot(status: .unconfigured, report: nil, isStale: true),
-        api: nil,
-        apiBudget: nil,
-        now: now,
-        calendar: calendar,
-        forceSetUp: true
-    ))
-
-    let shown = item.visible(in: MenuBarAppearance(), halves: MenuBarHalves(subscription: false, api: false))
-
-    #expect(shown.subscription == .status(.setUp))
 }
