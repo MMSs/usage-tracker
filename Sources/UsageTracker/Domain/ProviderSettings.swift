@@ -1,8 +1,9 @@
 import Foundation
 
 /// What a user can set per provider. Appearance falls back to the global
-/// defaults unless overridden here. Each half (subscription, API usage) can
-/// be switched off on its own; it then has no meters and is never fetched.
+/// defaults unless overridden here. Each half (subscription, API usage) has
+/// its own switch, off until the user turns it on; while off it has no
+/// meters and is never fetched.
 struct ProviderSettings: Equatable, Codable, Sendable {
     var isEnabled = true
     var subscriptionRefreshInterval = RefreshInterval.default
@@ -18,7 +19,8 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     /// Whether the half is drawn in the menu bar item. A hidden half is still fetched, alerts and shows in the panel.
     var showsSubscriptionInMenuBar = true
     var showsAPIInMenuBar = true
-    static let `default` = ProviderSettings()
+    /// A provider nobody has set up: both halves off.
+    static let `default` = ProviderSettings(isSubscriptionEnabled: false, isAPIEnabled: false)
 
     /// The custom appearance while it is in use. Setting one switches it on; nil switches it off and keeps it.
     var appearanceOverride: MenuBarAppearance? {
@@ -122,8 +124,11 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         let override = try? container.decodeIfPresent(MenuBarAppearance.self, forKey: .appearanceOverride)
         customAppearance = override ?? (try? container.decodeIfPresent(MenuBarAppearance.self, forKey: .savedCustomAppearance))
         usesCustomAppearance = override != nil
-        isSubscriptionEnabled = try container.decodeIfPresent(Bool.self, forKey: .isSubscriptionEnabled) ?? true
-        isAPIEnabled = try container.decodeIfPresent(Bool.self, forKey: .isAPIEnabled) ?? true
+        // No switch is off; the app model turns on a half that already holds a credential (see `Loaded`).
+        let subscriptionSwitch = try container.decodeIfPresent(Bool.self, forKey: .isSubscriptionEnabled)
+        let apiSwitch = try container.decodeIfPresent(Bool.self, forKey: .isAPIEnabled)
+        isSubscriptionEnabled = subscriptionSwitch ?? false
+        isAPIEnabled = apiSwitch ?? false
         alertsEnabled = try container.decodeIfPresent(Bool.self, forKey: .alertsEnabled) ?? true
         autoStartSessions = try container.decodeIfPresent(Bool.self, forKey: .autoStartSessions) ?? false
 
@@ -136,11 +141,12 @@ struct ProviderSettings: Equatable, Codable, Sendable {
         let oldAPI = legacyOverride.map { (try? $0.decodeIfPresent(Bool.self, forKey: .showAPISpend)) ?? true }
             ?? legacy.globalAPI
         // The old item drew a hidden half when it was the only one it had, so a switch only counts beside a shown other half;
-        // whether that half has a credential is for the app model to check (see `Loaded`).
+        // whether that half has a credential is for the app model to check (see `Loaded`). The old build had every half on
+        // until switched off.
         showsSubscriptionInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showsSubscriptionInMenuBar)
-            ?? (oldSubscription || !(legacy.hasAPI && isAPIEnabled))
+            ?? (oldSubscription || !(legacy.hasAPI && apiSwitch ?? true))
         showsAPIInMenuBar = try container.decodeIfPresent(Bool.self, forKey: .showsAPIInMenuBar)
-            ?? (oldAPI || !(legacy.hasSubscription && isSubscriptionEnabled))
+            ?? (oldAPI || !(legacy.hasSubscription && subscriptionSwitch ?? true))
     }
 
     /// The `JSONDecoder.userInfo` key under which the store hands `init(from:)` what the old build kept elsewhere.
@@ -160,10 +166,15 @@ struct ProviderSettings: Equatable, Codable, Sendable {
     struct Loaded: Decodable {
         var settings: ProviderSettings
         var legacyHiddenHalves: Set<Half>
+        /// Halves the record has no switch for (no record yet, or one from
+        /// before the switches). They start off; the app model turns on those
+        /// that already hold a credential, so an existing setup keeps working.
+        var unsetHalves: Set<Half>
 
-        init(settings: ProviderSettings, legacyHiddenHalves: Set<Half> = []) {
+        init(settings: ProviderSettings, legacyHiddenHalves: Set<Half> = [], unsetHalves: Set<Half> = []) {
             self.settings = settings
             self.legacyHiddenHalves = legacyHiddenHalves
+            self.unsetHalves = unsetHalves
         }
 
         init(from decoder: Decoder) throws {
@@ -174,6 +185,8 @@ struct ProviderSettings: Equatable, Codable, Sendable {
             legacyHiddenHalves = Set(keys.filter { half, key in
                 !container.contains(key) && !settings.showsInMenuBar(half)
             }.keys)
+            let switches: [Half: CodingKeys] = [.subscription: .isSubscriptionEnabled, .api: .isAPIEnabled]
+            unsetHalves = Set(switches.filter { !container.contains($0.value) }.keys)
         }
     }
 

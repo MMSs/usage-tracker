@@ -523,6 +523,33 @@ import Testing
         }
     }
 
+    @Test func aFreshInstallStartsWithEveryHalfOff() {
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults: defaults)
+
+            for provider in model.providers {
+                let settings = model.settings(for: provider.id)
+                #expect(!settings.isSubscriptionEnabled && !settings.isAPIEnabled)
+                #expect(provider.subscription?.isEnabled == false)
+                #expect(provider.api?.isEnabled != true)
+            }
+            // Saved, so a credential added later leaves the switch to the user.
+            #expect(UserDefaultsProviderSettingsStore(defaults: defaults).loadSettings(for: .cursor).unsetHalves.isEmpty)
+        }
+    }
+
+    @Test func aHalfThatAlreadyHoldsACredentialStaysOn() {
+        configureAll()
+        withIsolatedDefaults { defaults in
+            let model = makeModel(defaults: defaults)
+
+            #expect(model.settings(for: .cursor).isSubscriptionEnabled)
+            #expect(model.settings(for: .anthropic).isSubscriptionEnabled)
+            #expect(!model.settings(for: .anthropic).isAPIEnabled, "no admin key")
+            #expect(model.insertedProviders == [.cursor, .anthropic, .openai])
+        }
+    }
+
     @Test func aLegacyHiddenHalfBesideAConfiguredHalfStaysHidden() {
         configureAll()
         credentials.values[CredentialKey(provider: .anthropic, fieldID: "admin-key")] = "adm"

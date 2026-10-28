@@ -390,16 +390,21 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// The stored settings. The old item drew a half its switch hid when the
-    /// other half had no credential, so such a half stays shown; the record is
-    /// then saved once, so its own keys decide from now on.
+    /// The stored settings. A half with no switch in the record starts off
+    /// unless it already holds a credential, so a setup from before the
+    /// switches keeps working. The old item drew a half its switch hid when
+    /// the other half had no credential, so such a half stays shown. Either
+    /// way the record is then saved once, so its own keys decide from now on.
     private static func loadSettings(of provider: ProviderViewModel, from store: ProviderSettingsStoring) -> ProviderSettings {
         let loaded = store.loadSettings(for: provider.id)
-        guard !loaded.legacyHiddenHalves.isEmpty else {
+        guard !loaded.legacyHiddenHalves.isEmpty || !loaded.unsetHalves.isEmpty else {
             return loaded.settings
         }
 
         var settings = loaded.settings
+        for half in loaded.unsetHalves where provider.half(half)?.isConfigured == true {
+            settings.setEnabled(true, for: half)
+        }
         for half in loaded.legacyHiddenHalves {
             let other: Half = half == .subscription ? .api : .subscription
             if provider.half(other)?.isConfigured != true {
