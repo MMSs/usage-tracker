@@ -2,7 +2,7 @@ import Foundation
 
 /// Why a half's last refresh failed. Holds no credential, URL, or response
 /// body, so it is safe to show and to log.
-enum RefreshFailure: Equatable, Sendable {
+enum RefreshFailure: Equatable, Codable, Sendable {
     /// No response from the server: DNS, TLS, or a timeout.
     case transport
     /// No response because the connection is down.
@@ -79,7 +79,7 @@ extension RefreshFailure {
 }
 
 /// A half's last failure and when it happened; cleared by the next success.
-struct RecordedFailure: Equatable, Sendable {
+struct RecordedFailure: Equatable, Codable, Sendable {
     let cause: RefreshFailure
     let date: Date
 }

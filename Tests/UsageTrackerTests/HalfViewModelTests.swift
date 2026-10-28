@@ -1063,3 +1063,93 @@ final class StubOrganizationScopedFetcher: ReportFetching, OrganizationScopedFet
         #expect(plain.callCount == 0)
     }
 }
+
+@Suite @MainActor struct HalfViewModelAdoptionTests {
+    let now = Date(timeIntervalSince1970: 1_000_000)
+    let store = MemoryCredentialStore()
+    let cache = MemoryReportCache()
+    let history = MemoryUsageHistoryStore()
+    let fetcher = StubReportFetcher(result: .success(makeReport()))
+
+    private func makeModel() -> HalfViewModel {
+        let now = now
+        store.values[CredentialKey(provider: .cursor, fieldID: "session-token")] = "tok"
+        return HalfViewModel(
+            provider: .cursor, half: .subscription, fields: ProviderRegistry.descriptor(for: .cursor).subscriptionFields,
+            fetcher: fetcher, credentialStore: store, cache: cache, history: history, now: { now }
+        )
+    }
+
+    @Test func aNewerReportIsTakenAsIfFetchedHere() {
+        let model = makeModel()
+        let fetchedAt = now.addingTimeInterval(-60)
+        let state = SharedHalfState(report: makeReport(55), fetchedAt: fetchedAt, failure: nil, rateLimitedUntil: nil, retriesBlocked: false)
+
+        #expect(model.adopt(state))
+        #expect(model.status == .ready)
+        #expect(model.report == makeReport(55))
+        #expect(model.lastSuccess == fetchedAt)
+        #expect(!model.isStale)
+        #expect(cache.cached(provider: .cursor, half: .subscription) == CachedReport(report: makeReport(55), fetchedAt: fetchedAt))
+        #expect(history.recorded.count == 1)
+        #expect(fetcher.callCount == 0)
+    }
+
+    @Test func anOlderStateIsIgnored() async {
+        let model = makeModel()
+        await model.refresh(manual: true)
+        let older = SharedHalfState(report: makeReport(99), fetchedAt: now.addingTimeInterval(-1), failure: nil, rateLimitedUntil: nil, retriesBlocked: false)
+
+        #expect(!model.adopt(older))
+        #expect(model.report == makeReport())
+    }
+
+    @Test func aFailureKeepsTheReportAndBlocksLikeALocalOne() {
+        let model = makeModel()
+        let success = SharedHalfState(report: makeReport(20), fetchedAt: now.addingTimeInterval(-120), failure: nil, rateLimitedUntil: nil, retriesBlocked: false)
+        model.adopt(success)
+
+        let expired = SharedHalfState(
+            report: makeReport(20), fetchedAt: now.addingTimeInterval(-120),
+            failure: RecordedFailure(cause: .unauthorized, date: now.addingTimeInterval(-10)),
+            rateLimitedUntil: nil, retriesBlocked: true
+        )
+
+        #expect(model.adopt(expired))
+        #expect(model.status == .expired)
+        #expect(model.report == makeReport(20))
+        #expect(model.scheduledRetriesBlocked)
+        #expect(model.lastFailure?.cause == .unauthorized)
+    }
+
+    @Test func aSwitchedOffHalfAdoptsNothing() {
+        let model = makeModel()
+        model.isEnabled = false
+        let state = SharedHalfState(report: makeReport(55), fetchedAt: now, failure: nil, rateLimitedUntil: nil, retriesBlocked: false)
+
+        #expect(!model.adopt(state))
+        #expect(model.report == nil)
+    }
+
+    @Test func theSharedStateRoundTripsThroughJSON() throws {
+        let state = SharedHalfState(
+            report: makeReport(30), fetchedAt: now,
+            failure: RecordedFailure(cause: .rateLimited(until: now.addingTimeInterval(60)), date: now),
+            rateLimitedUntil: now.addingTimeInterval(60), retriesBlocked: false
+        )
+        let data = try JSONEncoder().encode(state)
+
+        #expect(try JSONDecoder().decode(SharedHalfState.self, from: data) == state)
+    }
+
+    @Test func aFailureAboutThisMacIsNotShared() {
+        func state(_ cause: RefreshFailure) -> SharedHalfState {
+            SharedHalfState(report: nil, fetchedAt: nil, failure: RecordedFailure(cause: cause, date: now), rateLimitedUntil: nil, retriesBlocked: false)
+        }
+
+        #expect(!state(.offline).isShareable)
+        #expect(!state(.keychain).isShareable)
+        #expect(state(.unauthorized).isShareable)
+        #expect(state(.httpStatus(500)).isShareable)
+    }
+}
