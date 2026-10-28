@@ -646,11 +646,23 @@ final class AppModel: ObservableObject {
         // Before any store reads, so they see the migrated credentials and settings.
         IdentifierMigration.live().run()
 
-        let credentialStore = KeychainCredentialStore()
+        // Sync before the providers: with credentials shared they read the iCloud Keychain items.
+        let localCredentials = KeychainCredentialStore()
+        let syncingCredentials = SyncEntitlements.hasKeychainSharing
+            ? SyncingCredentialStore(local: localCredentials, shared: KeychainCredentialStore(synchronizable: true))
+            : nil
+        let credentialStore: CredentialStoring = syncingCredentials ?? localCredentials
+        let sync = SyncCoordinator(
+            transport: SyncEntitlements.hasCloudKit ? CloudKitSyncTransport(containerIdentifier: SyncEntitlements.containerIdentifier) : nil,
+            credentials: syncingCredentials,
+            preferences: UserDefaultsSyncPreferencesStore()
+        )
+
         let cache = UserDefaultsReportCache()
         let history = UserDefaultsUsageHistoryStore()
-        // Read and written only by the organization-scoped fetchers.
-        let organizationStore = UserDefaultsOrganizationSelectionStore()
+        // Read and written only by the organization-scoped fetchers; a choice reaches the other Macs.
+        let organizationStore = SyncingOrganizationSelectionStore(inner: UserDefaultsOrganizationSelectionStore())
+        organizationStore.onChange = { [weak sync] provider, id in sync?.publishOrganization(id, for: provider) }
 
         let models = UserDefaultsSessionModelStore()
 
@@ -685,7 +697,8 @@ final class AppModel: ObservableObject {
             updates: UpdatesModel(updater: updater, build: build),
             sleepObserver: SystemSleepObserver(),
             networkObserver: NetworkReachabilityObserver(),
-            alertMonitor: AlertMonitor(notifier: SystemUsageNotifier(), store: UserDefaultsAlertStateStore())
+            alertMonitor: AlertMonitor(notifier: SystemUsageNotifier(), store: UserDefaultsAlertStateStore()),
+            sync: sync
         )
     }
 }
