@@ -119,6 +119,22 @@ final class HalfViewModel: ObservableObject {
         history?.samples(provider: provider, now: now) ?? [:]
     }
 
+    /// Everything the history store holds for the provider, for the other Macs.
+    var sharedHistory: [String: [UsageSample]] {
+        history?.allSamples(provider: provider) ?? [:]
+    }
+
+    /// Adds another Mac's samples, so a Mac that was away draws what it missed.
+    func mergeHistory(_ samples: [String: [UsageSample]]) {
+        guard let history else {
+            return
+        }
+
+        history.merge(samples, provider: provider, now: now())
+        // The charts read the store, which publishes nothing itself.
+        objectWillChange.send()
+    }
+
     /// Enabled and holding a credential: the half takes part in the item and the popover.
     var isActive: Bool { isEnabled && isConfigured }
 
