@@ -61,10 +61,27 @@ jobs:
         id: plan
         run: |
           sha="$GITHUB_SHA"
-          prev="$(git describe --tags --abbrev=0 --match 'v*' "$sha" 2>/dev/null || true)"
+          # The latest release is the highest version tag. Its commit is
+          # usually on main; after a history rewrite the tag stays locked to
+          # the old commit, so its counterpart on main is found by author
+          # date and subject instead.
+          prev="$(git tag -l 'v*' | sort -V | tail -1)"
+          base=""
+          if [[ -n "$prev" ]]; then
+            if git merge-base --is-ancestor "$prev" "$sha"; then
+              base="$prev"
+            else
+              stamp="$(git log -1 --format='%at %s' "$prev")"
+              base="$(git log --first-parent --format='%H%x09%at %s' "$sha" | awk -F'\t' -v s="$stamp" '$2==s {print $1; exit}')"
+              if [[ -z "$base" ]]; then
+                echo "Can't find the commit of $prev on main" >&2
+                exit 1
+              fi
+            fi
+          fi
           # With no tag yet the whole history goes in; the first release
           # ignores it and uses the first-release summary instead.
-          if [[ -n "$prev" ]]; then range="$prev..$sha"; else range="$sha"; fi
+          if [[ -n "$base" ]]; then range="$base..$sha"; else range="$sha"; fi
           work="$RUNNER_TEMP/plan"
           mkdir -p "$work"
           git log --reverse --format='%s%x1f%b%x1e' "$range" > "$work/log.txt"
