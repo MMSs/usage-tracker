@@ -164,12 +164,13 @@ struct DailyBarsChart: View {
     @ViewBuilder
     private func column(_ bar: DayBar, height: CGFloat) -> some View {
         if let value = bar.value, !bar.isFuture {
-            if value > 0 {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(bar.tint.chartColor)
-                    .opacity(bar.isToday ? 1 : 0.65)
-                    .frame(height: max(1, height * bar.heightFraction))
-            }
+            // A day that rose by nothing paints nothing but keeps its column: a
+            // column with no view takes no width, and the bars after it would
+            // slide under the wrong day names.
+            RoundedRectangle(cornerRadius: 2)
+                .fill(bar.tint.chartColor)
+                .opacity(bar.isToday ? 1 : 0.65)
+                .frame(height: value > 0 ? max(1, height * bar.heightFraction) : 0)
         } else {
             RoundedRectangle(cornerRadius: 1)
                 .fill(.primary.opacity(0.12))

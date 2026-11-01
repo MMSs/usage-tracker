@@ -71,6 +71,42 @@ private func chartDay(_ day: Int, hour: Int = 0) -> Date {
         day: chartDay(24, hour: 12), value: 4.2, heightFraction: 1, tint: .neutral, isToday: true, isFuture: false
     )
 
+    /// A day that rose by nothing draws no bar but keeps its slot, so the
+    /// bars after it stay under their own day names.
+    @Test func aZeroDayKeepsItsSlot() throws {
+        let values: [Double?] = [nil, 0, 0, 1, 0, 5, nil]
+        let bars = values.enumerated().map { offset, value in
+            DayBar(
+                day: chartDay(20 + offset), value: value, heightFraction: (value ?? 0) / 10, tint: .onPace,
+                isToday: offset == 5, isFuture: offset == 6
+            )
+        }
+        let chart = DailyBarsChart(bars: bars, showsPaceLine: false, dayLabels: false, unit: nil)
+            .frame(width: 280, height: 40)
+
+        // The days without data paint their faint slot line, the bars their day; zeros paint nothing.
+        #expect(try inkedSlots(chart, slots: 7) == [0, 3, 5, 6])
+    }
+
+    /// The slots, left to right, whose middle column has a painted pixel.
+    private func inkedSlots(_ view: some View, slots: Int) throws -> [Int] {
+        let renderer = ImageRenderer(content: view)
+        renderer.scale = 1
+        let image = try #require(renderer.cgImage)
+        let width = image.width, height = image.height
+        var pixels = [UInt8](repeating: 0, count: width * height * 4)
+        let context = try #require(CGContext(
+            data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ))
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+
+        return (0..<slots).filter { slot in
+            let x = (slot * width) / slots + width / (slots * 2)
+            return (0..<height).contains { y in pixels[(y * width + x) * 4 + 3] > 0 }
+        }
+    }
+
     @Test func dollarCaptionShowsDayAndTwoDecimalAmount() {
         #expect(DailyBarsChart.caption(for: bar, unit: .dollars) == "24 Oct · $4.20")
     }
