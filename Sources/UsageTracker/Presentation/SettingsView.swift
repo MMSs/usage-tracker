@@ -160,8 +160,8 @@ struct SettingsSection<Content: View>: View {
                     .font(.headline)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
-                    // The whole header opens the section, not just the disclosure triangle.
-                    .onTapGesture { setExpanded(true, title) }
+                    // The whole header opens or collapses the section, not just the disclosure triangle.
+                    .onTapGesture { setExpanded(!(accordion?.wrappedValue.isOpen(title) ?? true), title) }
                     .accessibilityAddTraits(.isHeader)
             }
         } else {
@@ -395,7 +395,7 @@ struct ProviderSettingsView: View {
     let helpFieldID: String?
     /// The chosen tab; nil, or one the page lacks, shows the first.
     @Binding var tab: ProviderSettingsTab?
-    /// Which of the tab's titled sections is open; nil, or one the tab lacks, opens its first.
+    /// Which of the tab's titled sections is open; nil, or one the tab lacks, leaves them all collapsed.
     @Binding var openSection: String?
 
     private var accordion: Binding<SettingsAccordion> {
