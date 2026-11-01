@@ -12,11 +12,11 @@ import Testing
     @Test func eachHalfTabHasOnlyAScheduleSection() {
         #expect(ProviderSettingsTab.subscription.sections == ["Schedule"])
         #expect(ProviderSettingsTab.api.sections == ["Schedule"])
-        #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance"])
+        #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance", "iCloud Sync"])
     }
 
     @Test func theGeneralPageEndsWithUpdates() {
-        #expect(GeneralSettingsView.sectionTitles == ["Menu bar appearance", "Alerts", "Startup", "Updates"])
+        #expect(GeneralSettingsView.sectionTitles == ["Menu bar appearance", "Alerts", "iCloud Sync", "Startup", "Updates"])
     }
 
     @Test func theAppearanceFooterMentionsCustomAppearancesOnlyWhenListed() {

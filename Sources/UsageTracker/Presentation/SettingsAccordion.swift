@@ -4,12 +4,13 @@ import SwiftUI
 /// with a single titled section keeps it open.
 struct SettingsAccordion: Equatable {
     let titles: [String]
-    private(set) var open: String
+    /// The one open section; nil when all are collapsed, which is how several start.
+    private(set) var open: String?
 
-    /// `open` falls back to the first title when it names none of them.
+    /// `open` is ignored when it names none of the titles. A lone section is always open.
     init(titles: [String], open: String? = nil) {
         self.titles = titles
-        self.open = open.flatMap { titles.contains($0) ? $0 : nil } ?? titles.first ?? ""
+        self.open = titles.count == 1 ? titles.first : open.flatMap { titles.contains($0) ? $0 : nil }
     }
 
     var isCollapsible: Bool { titles.count > 1 }
@@ -25,11 +26,13 @@ struct SettingsAccordion: Equatable {
         }
     }
 
-    /// What a disclosure control asks for: expanding opens `title`; collapsing is
-    /// refused, since one section always stays open.
+    /// What a disclosure control asks for: expanding opens `title`; collapsing
+    /// the open section leaves every section collapsed, so the headings alone show.
     mutating func setExpanded(_ expanded: Bool, _ title: String) {
         if expanded {
             open(title)
+        } else if isCollapsible, isOpen(title) {
+            open = nil
         }
     }
 }

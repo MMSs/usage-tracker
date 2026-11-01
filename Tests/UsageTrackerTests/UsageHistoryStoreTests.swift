@@ -281,3 +281,39 @@ struct UsageHistoryStoreTests {
         }
     }
 }
+
+struct UsageHistoryMergeTests {
+    private let start = Date(timeIntervalSince1970: 1_800_000_000)
+
+    @Test func mergingAddsTheOtherMacsSamplesInOrder() {
+        withIsolatedDefaults { defaults in
+            let store = UserDefaultsUsageHistoryStore(defaults: defaults)
+            let mine = UsageSample(date: start, percent: 10)
+            let theirs = UsageSample(date: start.addingTimeInterval(120), percent: 20)
+            store.merge(["weekly": [mine]], provider: .cursor, now: start)
+
+            store.merge(["weekly": [theirs], "session": [theirs]], provider: .cursor, now: start.addingTimeInterval(180))
+
+            #expect(store.allSamples(provider: .cursor)["weekly"] == [mine, theirs])
+            #expect(store.allSamples(provider: .cursor)["session"] == [theirs])
+        }
+    }
+
+    @Test func oneSampleAMinuteKeepsTheLaterReading() {
+        let early = UsageSample(date: start.addingTimeInterval(5), percent: 30)
+        let late = UsageSample(date: start.addingTimeInterval(40), percent: 10)
+
+        let merged = UserDefaultsUsageHistoryStore.merged(["w": [late]], ["w": [early]], now: start.addingTimeInterval(60))
+
+        #expect(merged["w"] == [late])
+    }
+
+    @Test func mergingTrimsToEightDays() {
+        let old = UsageSample(date: start.addingTimeInterval(-9 * 86_400), percent: 5)
+        let recent = UsageSample(date: start, percent: 6)
+
+        let merged = UserDefaultsUsageHistoryStore.merged([:], ["w": [old, recent]], now: start)
+
+        #expect(merged["w"] == [recent])
+    }
+}

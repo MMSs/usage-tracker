@@ -2,13 +2,23 @@ import Testing
 @testable import UsageTracker
 
 struct SettingsAccordionTests {
+    /// Several sections start collapsed, so the list of headings is what the user sees first.
     @Test
-    func theFirstSectionStartsOpen() {
+    func everySectionStartsCollapsed() {
         let accordion = SettingsAccordion(titles: ["Alerts", "Appearance"])
 
-        #expect(accordion.isOpen("Alerts"))
+        #expect(!accordion.isOpen("Alerts"))
         #expect(!accordion.isOpen("Appearance"))
+        #expect(accordion.open == nil)
         #expect(accordion.isCollapsible)
+    }
+
+    @Test
+    func aChosenStartingSectionStartsOpen() {
+        let accordion = SettingsAccordion(titles: ["Alerts", "Appearance"], open: "Appearance")
+
+        #expect(accordion.isOpen("Appearance"))
+        #expect(!accordion.isOpen("Alerts"))
     }
 
     @Test
@@ -31,12 +41,22 @@ struct SettingsAccordionTests {
         #expect(!accordion.isOpen("Alerts"))
     }
 
-    /// One section always stays open, so collapsing the open one is refused.
     @Test
-    func collapsingTheOpenSectionKeepsItOpen() {
-        var accordion = SettingsAccordion(titles: ["Alerts", "Appearance"])
+    func collapsingTheOpenSectionLeavesAllCollapsed() {
+        var accordion = SettingsAccordion(titles: ["Alerts", "Appearance"], open: "Alerts")
 
         accordion.setExpanded(false, "Alerts")
+
+        #expect(!accordion.isOpen("Alerts"))
+        #expect(!accordion.isOpen("Appearance"))
+        #expect(accordion.open == nil)
+    }
+
+    @Test
+    func collapsingAClosedSectionChangesNothing() {
+        var accordion = SettingsAccordion(titles: ["Alerts", "Appearance"], open: "Alerts")
+
+        accordion.setExpanded(false, "Appearance")
 
         #expect(accordion.isOpen("Alerts"))
     }
@@ -61,9 +81,10 @@ struct SettingsAccordionTests {
     }
 
     @Test
-    func anUnknownStartingTitleFallsBackToTheFirst() {
+    func anUnknownStartingTitleLeavesAllCollapsed() {
         let accordion = SettingsAccordion(titles: ["Menu bar", "Alerts"], open: "Nope")
 
-        #expect(accordion.isOpen("Menu bar"))
+        #expect(!accordion.isOpen("Menu bar"))
+        #expect(!accordion.isOpen("Alerts"))
     }
 }
