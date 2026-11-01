@@ -763,9 +763,7 @@ struct SyncSection: View {
     var body: some View {
         SettingsSection(title: Self.title, footer: Self.footer(choices: sync.choices, status: sync.status, reason: sync.settingsUnavailableReason)) {
             SettingsRow(label: "Settings", isLast: true) {
-                Toggle("Settings", isOn: sharesSettings)
-                    .labelsHidden()
-                    .toggleStyle(.checkbox)
+                SwitchToggle(isOn: sharesSettings)
                     .disabled(!sync.canShareSettings)
             }
         }
@@ -821,9 +819,7 @@ struct ProviderSyncSection: View {
         } else {
             SettingsSection(title: Self.title, footer: SyncCoordinator.noICloudReason) {
                 SettingsRow(label: "Usage and credentials", isLast: true) {
-                    Toggle("Usage and credentials", isOn: .constant(false))
-                        .labelsHidden()
-                        .toggleStyle(.checkbox)
+                    SwitchToggle(isOn: .constant(false))
                         .disabled(true)
                 }
             }
@@ -845,9 +841,7 @@ private struct ProviderSyncRows: View {
     var body: some View {
         SettingsSection(title: ProviderSyncSection.title, footer: Self.footer(shares: shares.wrappedValue, reason: sync.usageUnavailableReason)) {
             SettingsRow(label: "Usage and credentials", isLast: true) {
-                Toggle("Usage and credentials", isOn: shares)
-                    .labelsHidden()
-                    .toggleStyle(.checkbox)
+                SwitchToggle(isOn: shares)
                     .disabled(!sync.canShareUsage)
             }
         }
