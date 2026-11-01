@@ -141,35 +141,6 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
-    /// A refresh that succeeds without the session window is a shape change
-    /// too, not an idle account: the window is listed whether or not it runs.
-    @Test func aReportWithoutItsSessionWindowIsExplained() {
-        let message = PopoverPresentation.halfError(
-            half: .subscription, status: .ready, failure: nil, service: Self.claude, shortWindowMissing: true
-        )
-
-        #expect(message == HalfErrorMessage(
-            text: "Plan usage: claude.ai sent no session window.",
-            fix: "The API may have changed; check for an update.",
-            severity: .warning
-        ))
-        #expect(PopoverPresentation.halfError(half: .subscription, status: .ready, failure: nil, service: Self.claude) == nil)
-    }
-
-    @Test func shortWindowMissingOnlyForAReadySubscriptionReportWithoutIt() {
-        let anthropic = ProviderRegistry.descriptor(for: .anthropic)
-        let session = LimitWindow(id: "session", label: "Session", percentUsed: 1, resetsAt: nil, parentID: nil)
-        let weekly = LimitWindow(id: "weekly", label: "Weekly", percentUsed: 1, resetsAt: nil, parentID: nil)
-        let withoutSession = ProviderReport(planName: nil, windows: [weekly], extras: [], spend: nil)
-        let withSession = ProviderReport(planName: nil, windows: [session, weekly], extras: [], spend: nil)
-
-        #expect(PopoverPresentation.shortWindowMissing(from: withoutSession, half: .subscription, descriptor: anthropic))
-        #expect(!PopoverPresentation.shortWindowMissing(from: withSession, half: .subscription, descriptor: anthropic))
-        #expect(!PopoverPresentation.shortWindowMissing(from: nil, half: .subscription, descriptor: anthropic))
-        #expect(!PopoverPresentation.shortWindowMissing(from: withoutSession, half: .api, descriptor: anthropic))
-        #expect(!PopoverPresentation.shortWindowMissing(from: withoutSession, half: .subscription, descriptor: ProviderRegistry.descriptor(for: .cursor)))
-    }
-
     private func rateLimited(until: Date, now: Date, uses24Hour: Bool = true) -> HalfErrorMessage? {
         PopoverPresentation.halfError(
             half: .api, status: .error, failure: .rateLimited(until: until),

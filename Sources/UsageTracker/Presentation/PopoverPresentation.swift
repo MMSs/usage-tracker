@@ -186,7 +186,6 @@ enum PopoverPresentation {
         failure: RefreshFailure?,
         service: HalfService,
         display: HalfDisplay? = nil,
-        shortWindowMissing: Bool = false,
         now: Date = Date(),
         calendar: Calendar = .current,
         uses24Hour: Bool = CountdownFormatter.systemUses24Hour
@@ -208,9 +207,6 @@ enum PopoverPresentation {
             )
         case .ready where display == .status(.error), .loading where display == .status(.error):
             explanation = ("\(service.name) sent nothing the app can show.", mayHaveChanged, .warning)
-        case .ready where shortWindowMissing, .loading where shortWindowMissing:
-            // The refresh worked, but a window the provider always lists is gone: a shape change, not an idle account.
-            explanation = ("\(service.name) sent no session window.", mayHaveChanged, .warning)
         case .ready, .loading, .unconfigured:
             return nil
         }
@@ -235,19 +231,8 @@ enum PopoverPresentation {
             failure: model.lastFailure?.cause,
             service: descriptor.service(for: model.half),
             display: display,
-            shortWindowMissing: shortWindowMissing(from: model.report, half: model.half, descriptor: descriptor),
             now: now
         )
-    }
-
-    /// True when a subscription report lacks the short window its provider
-    /// lists (the session); claude.ai was seen to stop sending it.
-    static func shortWindowMissing(from report: ProviderReport?, half: Half, descriptor: ProviderDescriptor) -> Bool {
-        guard half == .subscription, let report, let shortID = descriptor.shortWindowID else {
-            return false
-        }
-
-        return !report.windows.contains { $0.id == shortID }
     }
 
     private static let retries = "It retries automatically."
