@@ -141,7 +141,7 @@ struct AnthropicSubscriptionReportServiceTests {
 
         _ = try await service.fetchReport(credentials: ["session-key": "k"], today: Date())
 
-        #expect(service.organizations.map(\.detail) == ["Max 20x", "API"])
+        #expect(service.organizations.map(\.detail) == ["Ultra", "API"])
     }
 
     @Test func choosingStoresTheChoiceAndResettingForgetsItAndTheList() async throws {
@@ -164,7 +164,7 @@ struct AnthropicSubscriptionReportServiceTests {
 struct AccountOrganizationTests {
     @Test func labelsAddTheDetailAndTheIDPrefixOnlyWhenLabelsStillCollide() {
         let organizations = [
-            AccountOrganization(id: "aaaaaaaa-1", name: "sam's Organization", detail: "Max 20x"),
+            AccountOrganization(id: "aaaaaaaa-1", name: "sam's Organization", detail: "Ultra"),
             AccountOrganization(id: "bbbbbbbb-2", name: "sam's Organization", detail: "API"),
             AccountOrganization(id: "cccccccc-3", name: "Acme", detail: nil),
             AccountOrganization(id: "dddddddd-4", name: "Twin", detail: "Pro"),
@@ -172,7 +172,7 @@ struct AccountOrganizationTests {
         ]
 
         #expect(AccountOrganization.labels(for: organizations) == [
-            "aaaaaaaa-1": "sam's Organization · Max 20x",
+            "aaaaaaaa-1": "sam's Organization · Ultra",
             "bbbbbbbb-2": "sam's Organization · API",
             "cccccccc-3": "Acme",
             "dddddddd-4": "Twin · Pro · dddddddd",
@@ -183,10 +183,42 @@ struct AccountOrganizationTests {
     @Test func organizationDetailNamesThePlanOrAPI() {
         typealias Organization = AnthropicOrganizationsResponse.Organization
         #expect(Organization(uuid: "a", capabilities: ["api"]).detail == "API")
-        #expect(Organization(uuid: "a", rateLimitTier: "default_claude_max_5x", capabilities: ["chat", "claude_max"]).detail == "Max 5x")
+        #expect(Organization(uuid: "a", rateLimitTier: "default_claude_max_5x", capabilities: ["chat", "claude_max"]).detail == "Max")
         #expect(Organization(uuid: "a", rateLimitTier: "default_claude_pro").detail == "Pro")
         #expect(Organization(uuid: "a", capabilities: ["chat"]).detail == nil)
         #expect(Organization(uuid: "a").detail == nil)
+    }
+
+    @Test func plansCarryTheirRenamedNames() {
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_20x", capabilities: ["chat", "claude_max"]) == "Ultra")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_ultra", capabilities: nil) == "Ultra")
+        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["claude_ultra"]) == "Ultra")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_5x", capabilities: nil) == "Max")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max", capabilities: nil) == "Max")
+        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["chat", "claude_max"]) == "Max")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_free", capabilities: ["chat"]) == "Free")
+        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["claude_free"]) == "Free")
+        #expect(AnthropicPlanName.from(rateLimitTier: "auto_trust_tier_b", capabilities: ["api"]) == nil)
+    }
+
+    @Test func theServerSentPlanNameWinsOverTheTier() throws {
+        typealias Organization = AnthropicOrganizationsResponse.Organization
+        let sent = Organization(uuid: "a", rateLimitTier: "default_claude_max_20x", capabilities: ["chat"], planDisplayName: " Ultra Plus ")
+        #expect(sent.planName == "Ultra Plus")
+        #expect(sent.detail == "Ultra Plus")
+
+        let labelled = Organization(uuid: "a", rateLimitTier: "default_claude_max_20x", planDisplayName: "  ", planDisplayLabel: "Max")
+        #expect(labelled.planName == "Max")
+
+        let blank = Organization(uuid: "a", rateLimitTier: "default_claude_max_20x", planDisplayName: "", planDisplayLabel: nil)
+        #expect(blank.planName == "Ultra")
+
+        let json = Data("""
+        [{"uuid": "a", "name": "Mine", "rate_limit_tier": "default_claude_max_20x", "capabilities": ["chat", "claude_max"], "plan_display_name": "Ultra", "plan_display_label": null}]
+        """.utf8)
+        let decoded = try JSONDecoder().decode(AnthropicOrganizationsResponse.self, from: json)
+        #expect(decoded.organizations.map(\.planDisplayName) == ["Ultra"])
+        #expect(decoded.organizations.map(\.planName) == ["Ultra"])
     }
 
     @Test func namelessOrganizationsAreTitledByTheirIDPrefix() {

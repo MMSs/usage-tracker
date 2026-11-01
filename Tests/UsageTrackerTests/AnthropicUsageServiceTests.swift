@@ -75,7 +75,7 @@ struct AnthropicUsageServiceTests {
 
         let snapshot = try await service.fetchSubscription(sessionKey: "k")
 
-        #expect(snapshot.planName == "Max 5x")
+        #expect(snapshot.planName == "Max")
         #expect(snapshot.usage.fiveHour?.utilization == 30)
         // A plain JSONDecoder would drop every resets_at.
         #expect(snapshot.usage.fiveHour?.resetsAt != nil)
@@ -121,7 +121,7 @@ struct AnthropicUsageServiceTests {
         #expect(client.requestedPaths.filter { $0.hasSuffix("/organizations") }.count == 2)
         #expect(client.requestedPaths.contains { $0.hasSuffix("/old-org/usage") })
         #expect(client.requestedPaths.contains { $0.hasSuffix("/3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14/usage") })
-        #expect(snapshot.planName == "Max 5x")
+        #expect(snapshot.planName == "Max")
     }
 
     @Test(arguments: [
@@ -284,7 +284,7 @@ struct AnthropicUsageServiceTests {
 
         #expect(count(client, suffix: "/org-b/usage") == 1)
         #expect(count(client, suffix: "/org-a/usage") == 0)
-        #expect(snapshot.planName == "Max 20x")
+        #expect(snapshot.planName == "Ultra")
     }
 
     // MARK: Starting a session
@@ -455,7 +455,7 @@ struct AnthropicUsageServiceTests {
         let snapshot = try await service.fetchSubscription(sessionKey: "k", organizationID: "gone")
 
         #expect(count(client, suffix: "/3f1c2a9e-7b4d-4e8a-9c61-0d2f5b8a7e14/usage") == 1)
-        #expect(snapshot.planName == "Max 5x")
+        #expect(snapshot.planName == "Max")
     }
 
     @Test func needingAChoiceListsTheOrganizationsAgainNextTime() async throws {

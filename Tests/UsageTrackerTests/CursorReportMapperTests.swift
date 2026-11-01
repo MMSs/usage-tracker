@@ -14,9 +14,10 @@ import Testing
         calendar.date(from: DateComponents(year: 2026, month: month, day: day))!
     }
 
-    private func usage(_ plan: String, start: String = "2026-10-12", end: String = "2026-11-11", unlimited: Bool = false) throws -> CursorUsageResponse {
+    private func usage(_ plan: String, start: String = "2026-10-12", end: String = "2026-11-11", unlimited: Bool = false, membership: String? = nil) throws -> CursorUsageResponse {
+        let membershipField = membership.map { #","membershipType":"\#($0)""# } ?? ""
         let json = """
-        {"billingCycleStart":"\(start)T00:00:00.000Z","billingCycleEnd":"\(end)T00:00:00.000Z","individualUsage":{"plan":\(plan)},"isUnlimited":\(unlimited)}
+        {"billingCycleStart":"\(start)T00:00:00.000Z","billingCycleEnd":"\(end)T00:00:00.000Z","individualUsage":{"plan":\(plan)},"isUnlimited":\(unlimited)\(membershipField)}
         """
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -34,6 +35,14 @@ import Testing
 
     private func map(_ usage: CursorUsageResponse, daily: DailySpendResponse? = nil) -> ProviderReport {
         CursorReportMapper.map(usage: usage, daily: daily, today: localMidnight(10, 20), calendar: calendar)
+    }
+
+    @Test func thePlanIsNamedFromTheMembershipOnEveryShape() throws {
+        #expect(map(try usage(#"{"used":0,"totalPercentUsed":53}"#, membership: "free")).planName == "Hobby")
+        #expect(map(try usage(#"{"used":1200,"limit":4000}"#, membership: "pro_plus")).planName == "Pro+")
+        #expect(map(try usage(#"{"used":1200}"#, unlimited: true, membership: "enterprise")).planName == "Enterprise")
+        #expect(map(try usage(#"{"used":1200}"#, membership: "ultra")).planName == "Ultra")
+        #expect(map(try usage(#"{"used":0,"totalPercentUsed":53}"#)).planName == nil)
     }
 
     @Test func personalPlanMapsPercentWithSplit() throws {
@@ -135,5 +144,20 @@ import Testing
         let report = map(try usage(#"{"used":100,"limit":20000}"#), daily: nil)
 
         #expect(report.spend?.daily == [])
+    }
+}
+
+struct CursorPlanNameTests {
+    @Test func knownMembershipsUseCursorsPlanNames() {
+        let keys = ["free", "free_trial", "pro", "pro_plus", "ultra", "team", "teams", "business", "enterprise"]
+        #expect(keys.map { CursorPlanName.from(membershipType: $0) } == ["Hobby", "Pro Trial", "Pro", "Pro+", "Ultra", "Teams", "Teams", "Business", "Enterprise"])
+        #expect(CursorPlanName.from(membershipType: " PRO ") == "Pro")
+    }
+
+    @Test func unknownMembershipsStillReadAsANameAndBlanksAreNil() {
+        #expect(CursorPlanName.from(membershipType: "pro_max") == "Pro max")
+        #expect(CursorPlanName.from(membershipType: "") == nil)
+        #expect(CursorPlanName.from(membershipType: "  ") == nil)
+        #expect(CursorPlanName.from(membershipType: nil) == nil)
     }
 }

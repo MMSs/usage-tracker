@@ -170,10 +170,7 @@ final class AnthropicUsageService: AnthropicUsageFetching {
             throw FetchError.needsOrganizationChoice
         }
 
-        return Organization(
-            uuid: chosen.uuid,
-            planName: AnthropicPlanName.from(rateLimitTier: chosen.rateLimitTier, capabilities: chosen.capabilities)
-        )
+        return Organization(uuid: chosen.uuid, planName: chosen.planName)
     }
 
     private func fetchUsage(organization: Organization, sessionKey: String) async throws -> AnthropicUsageResponse {

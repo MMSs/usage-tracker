@@ -12,6 +12,7 @@ enum CursorReportMapper {
             end: dateInCalendar(forAPIDateOnly: usage.billingCycleEnd, calendar: calendar)
         )
         let overall = usage.individualUsage.overall
+        let planName = CursorPlanName.from(membershipType: usage.membershipType)
         let usedDollars = Decimal(overall.used) / 100
         let cycleWindow = { (percent: Double) in
             LimitWindow(id: "cycle", label: "Included usage", percentUsed: percent, resetsAt: period.end, parentID: nil)
@@ -19,7 +20,7 @@ enum CursorReportMapper {
 
         if usage.isUnlimited {
             return ProviderReport(
-                planName: nil,
+                planName: planName,
                 windows: [],
                 extras: [MoneyRow(id: "cycle", label: "Included usage", amount: usedDollars, limit: nil)],
                 spend: SpendPeriod(
@@ -36,7 +37,7 @@ enum CursorReportMapper {
             let limitDollars = Decimal(limit) / 100
 
             return ProviderReport(
-                planName: nil,
+                planName: planName,
                 windows: [cycleWindow(Double(overall.used) / Double(limit) * 100)],
                 extras: [MoneyRow(id: "cycle", label: "Included usage", amount: usedDollars, limit: limitDollars)],
                 spend: SpendPeriod(
@@ -65,7 +66,7 @@ enum CursorReportMapper {
             }
 
             return ProviderReport(
-                planName: nil,
+                planName: planName,
                 windows: windows,
                 extras: [],
                 spend: SpendPeriod(
@@ -79,7 +80,7 @@ enum CursorReportMapper {
         }
 
         return ProviderReport(
-            planName: nil,
+            planName: planName,
             windows: [cycleWindow(0)],
             extras: [MoneyRow(id: "cycle", label: "Included usage", amount: usedDollars, limit: nil)],
             spend: SpendPeriod(

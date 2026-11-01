@@ -44,10 +44,10 @@ struct AnthropicReportMapperTests {
         let report = map(snapshot(
             fiveHour: Window(utilization: 42, resetsAt: fiveHourReset),
             sevenDay: Window(utilization: 17.5, resetsAt: weeklyReset),
-            planName: "Max 5x"
+            planName: "Max"
         ))
 
-        #expect(report.planName == "Max 5x")
+        #expect(report.planName == "Max")
         #expect(report.spend == nil)
         #expect(report.windows == [
             LimitWindow(id: "session", label: "Session", percentUsed: 42, resetsAt: fiveHourReset, parentID: nil, windowLength: 5 * 3600),
