@@ -27,6 +27,25 @@ import Testing
         #expect(LogFormat.endpoint(nil) == "?")
     }
 
+    @Test func errorSummaryReadsTheServersExplanation() {
+        let envelope = #"{"type":"error","error":{"type":"invalid_request_error","message":"Invalid date range: ending date must be after starting date"},"request_id":"req_1"}"#
+        #expect(LogFormat.errorSummary(Data(envelope.utf8)) == "invalid_request_error: Invalid date range: ending date must be after starting date")
+        #expect(LogFormat.errorSummary(Data(#"{"detail":"Not Found"}"#.utf8)) == "Not Found")
+        #expect(LogFormat.errorSummary(Data(#"{"message":"Too Many Requests"}"#.utf8)) == "Too Many Requests")
+        #expect(LogFormat.errorSummary(Data(#"{"error":"bad"}"#.utf8)) == "bad")
+        #expect(LogFormat.errorSummary(Data("<!DOCTYPE html>".utf8)) == nil)
+        #expect(LogFormat.errorSummary(Data(#"{"ok":true}"#.utf8)) == nil)
+        #expect(LogFormat.errorSummary(Data()) == nil)
+    }
+
+    @Test func errorSummaryIsCutShort() {
+        let long = String(repeating: "x", count: 300)
+        let summary = LogFormat.errorSummary(Data(#"{"message":"\#(long)"}"#.utf8))
+
+        #expect(summary?.count == 201)
+        #expect(summary?.hasSuffix("…") == true)
+    }
+
     @Test func decodingSummaryNamesTheKindAndPath() {
         struct Bucket: Decodable { let amount: String }
         struct Page: Decodable { let data: [Bucket] }

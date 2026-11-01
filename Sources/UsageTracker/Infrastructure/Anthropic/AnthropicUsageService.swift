@@ -189,13 +189,13 @@ final class AnthropicUsageService: AnthropicUsageFetching {
         }
 
         // A response with neither window is a shape change, not an idle account.
-        guard usage.fiveHour != nil || usage.sevenDay != nil else {
+        guard usage.sessionWindow != nil || usage.weeklyWindow != nil else {
             Log.http.error("usage response has neither the 5-hour nor the weekly window")
             throw FetchError.decoding
         }
 
         // An unreadable reset would read as a closed session, which auto-start acts on.
-        if usage.fiveHour?.hasUnreadableReset == true || usage.sevenDay?.hasUnreadableReset == true {
+        if usage.sessionWindow?.hasUnreadableReset == true || usage.weeklyWindow?.hasUnreadableReset == true {
             Log.http.error("usage response has an unreadable reset time")
             throw FetchError.decoding
         }

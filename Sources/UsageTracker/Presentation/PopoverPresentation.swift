@@ -236,7 +236,7 @@ enum PopoverPresentation {
     }
 
     private static let retries = "It retries automatically."
-    private static let mayHaveChanged = "It may have changed; check for an update."
+    private static let mayHaveChanged = "The API may have changed; check for an update."
 
     private static func failureExplanation(
         _ failure: RefreshFailure,
@@ -250,8 +250,11 @@ enum PopoverPresentation {
             ("Couldn't reach \(service.host).", "Check your connection; it retries automatically.", .warning)
         case .challenge:
             ("\(service.host) asked for a browser check.", "Open \(service.host) in your browser, then Refresh.", .warning)
+        case let .httpStatus(code) where (400..<500).contains(code):
+            // The request itself was refused; no retry fixes that, an update does.
+            ("\(service.name) rejected the app's request (HTTP \(code)).", mayHaveChanged, .warning)
         case let .httpStatus(code):
-            ("\(service.name) returned an error (HTTP \(code)).", retries, .warning)
+            ("\(service.name) returned a server error (HTTP \(code)).", retries, .warning)
         case let .rateLimited(until?) where until > now:
             ("\(service.name) is rate limiting requests; retrying at \(CountdownFormatter.clockTime(until, now: now, calendar: calendar, uses24Hour: uses24Hour)).", nil, .warning)
         case .rateLimited:

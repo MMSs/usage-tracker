@@ -51,6 +51,10 @@ enum HTTPResponseHandler {
             Log.http.info("\(line, privacy: .public)")
         } else {
             Log.http.notice("\(line, privacy: .public)")
+            // What the server refused, e.g. a date range it no longer accepts.
+            if let summary = LogFormat.errorSummary(data) {
+                Log.http.notice("\(method, privacy: .public) \(endpoint, privacy: .public) \(status, privacy: .public) says: \(summary, privacy: .public)")
+            }
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {

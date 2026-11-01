@@ -16,7 +16,7 @@ final class AnthropicAPIReportService: ReportFetching {
         }
 
         let month = try APISpend.month(containing: today, calendar: calendar)
-        let days = try await service.fetchMonthToDate(adminKey: adminKey, month: month, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: adminKey, month: month, today: today, calendar: calendar)
 
         return APISpend.report(days: days, month: month, today: today, calendar: calendar)
     }
