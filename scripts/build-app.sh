@@ -78,9 +78,25 @@ fi
 # iCloud sync needs a provisioning profile granting the iCloud container,
 # push and keychain sharing. With USAGE_TRACKER_PROVISIONING_PROFILE set, the
 # profile is embedded and the app is signed with entitlements derived from
-# it; without one the app runs as before and says sync isn't available.
+# it. Left unset, the newest macOS profile for this app that Xcode has
+# downloaded (Settings > Accounts > Download Manual Profiles) is used, so a
+# plain rebuild keeps sync. Set it empty to build without one; CI has no
+# profiles, so its builds run as before and say sync isn't available.
 entitlements=()
-profile="${USAGE_TRACKER_PROVISIONING_PROFILE:-}"
+profile="${USAGE_TRACKER_PROVISIONING_PROFILE-}"
+if [[ -z "${USAGE_TRACKER_PROVISIONING_PROFILE+set}" ]]; then
+  mkdir -p "$root/build"
+  candidate_plist="$root/build/candidate-profile.plist"
+  for candidate in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.provisionprofile(Nom); do
+    security cms -D -i "$candidate" > "$candidate_plist" 2>/dev/null || continue
+    candidate_app="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$candidate_plist" 2>/dev/null)" || continue
+    [[ "$candidate_app" == *.com.mohabsam.usage-tracker ]] || continue
+    /usr/libexec/PlistBuddy -c "Print :Platform" "$candidate_plist" 2>/dev/null | grep -q OSX || continue
+    profile="$candidate"
+    break
+  done
+  rm -f "$candidate_plist"
+fi
 if [[ -n "$profile" ]]; then
   if [[ "$identity" == "-" ]]; then
     echo "A provisioning profile needs a signing identity, not ad hoc signing" >&2
