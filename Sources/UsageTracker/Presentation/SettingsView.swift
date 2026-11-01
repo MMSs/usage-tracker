@@ -66,7 +66,7 @@ enum ProviderSettingsTab: Hashable {
     var sections: [String] {
         switch self {
         case .subscription, .api: ["Schedule"]
-        case .menuBar: ["Alerts", "Appearance"]
+        case .menuBar: ["Alerts", "Appearance", ProviderSyncSection.title]
         }
     }
 
@@ -526,9 +526,7 @@ struct ProviderSettingsView: View {
         Group {
             halfSection(half)
 
-            Text("Credentials are stored only in your login Keychain. Nothing leaves this Mac.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            CredentialStorageNote(sync: appModel.sync, provider: provider.id)
 
             ForEach(ProviderSettingsTab(half).sections, id: \.self) { title in
                 section(title, half: half)
@@ -571,6 +569,8 @@ struct ProviderSettingsView: View {
             alertsSection(title)
         case ("Appearance", _):
             appearanceSection(title)
+        case (ProviderSyncSection.title, _):
+            ProviderSyncSection(sync: appModel.sync, provider: provider.id)
         default:
             EmptyView()
         }
@@ -750,51 +750,149 @@ struct StartupSection: View {
     }
 }
 
-/// Which of this Mac's things go to the user's other Macs through iCloud.
+/// Whether this Mac's settings go to the user's other Macs through iCloud.
+/// Each provider's Options tab chooses its usage and credentials separately.
 struct SyncSection: View {
     @ObservedObject var sync: SyncCoordinator
     static let title = "iCloud Sync"
 
-    private var mode: Binding<SyncMode> {
-        Binding(get: { sync.mode }, set: { mode in Task { await sync.setMode(mode) } })
+    private var sharesSettings: Binding<Bool> {
+        Binding(get: { sync.choices.sharesSettings }, set: { shares in Task { await sync.setSharesSettings(shares) } })
     }
 
     var body: some View {
-        SettingsSection(title: Self.title, footer: Self.footer(mode: sync.mode, status: sync.status, reason: sync.unavailableReason(.settingsOnly))) {
-            SettingsRow(label: "Sync with my Macs") {
-                Picker("Sync with my Macs", selection: mode) {
-                    ForEach(SyncMode.allCases) { mode in
-                        Text(mode.title)
-                            .tag(mode)
-                            .selectionDisabled(!sync.isAvailable(mode))
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .fixedSize()
+        SettingsSection(title: Self.title, footer: Self.footer(choices: sync.choices, status: sync.status, reason: sync.settingsUnavailableReason)) {
+            SettingsRow(label: "Settings", isLast: true) {
+                Toggle("Settings", isOn: sharesSettings)
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .disabled(!sync.canShareSettings)
             }
         }
     }
 
-    /// What the chosen mode shares, then how syncing is going.
-    static func footer(mode: SyncMode, status: SyncStatus, reason: String?) -> String {
-        let explanation = switch mode {
-        case .off:
-            "Nothing leaves this Mac. Settings only shares appearance, switches, refresh rates, alerts and budgets with your Macs on the same iCloud account. Everything also shares credentials through iCloud Keychain and usage, so your Macs take turns asking each provider."
-        case .settingsOnly:
-            "Appearance, switches, refresh rates, alerts and budgets are shared. Each Mac keeps its own credentials and asks the providers for itself."
-        case .everything:
-            "Settings, credentials and usage are shared. One Mac asks each provider per refresh and the others show its answer, history included."
+    static let settingsScope = "appearance, menu-bar visibility, refresh rates, alerts and budgets"
+
+    /// What the choices share, then how syncing is going.
+    static func footer(choices: SyncChoices, status: SyncStatus, reason: String?) -> String {
+        let settings = if choices.sharesSettings {
+            "Settings share \(settingsScope) with your Macs on the same iCloud account; which providers are on stays per Mac."
+        } else if choices.sharesAnyUsage {
+            "Settings stay on this Mac."
+        } else {
+            "Nothing leaves this Mac. Settings would share \(settingsScope) with your Macs on the same iCloud account; which providers are on stays per Mac."
         }
 
+        let names = Provider.allCases.filter(choices.sharesUsage(of:)).map { ProviderRegistry.descriptor(for: $0).displayName }
+        let usage = names.isEmpty
+            ? "No provider shares its usage or credentials; each provider's Options tab can turn that on."
+            : "\(list(names)) share\(names.count == 1 ? "s" : "") usage and credentials: one Mac asks per refresh and the others show its answer, history included."
+
         let state: String? = switch status {
-        case .off: mode == .off ? reason : nil
+        case .off: choices.isOff ? reason : nil
         case let .unavailable(message), let .failed(message): message
         case .syncing: "Syncing…"
         case .upToDate: "Up to date."
         }
 
-        return [explanation, state].compactMap { $0 }.joined(separator: " ")
+        return [settings, usage, state].compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// "A", "A and B", "A, B and C".
+    static func list(_ names: [String]) -> String {
+        guard names.count > 1 else {
+            return names.first ?? ""
+        }
+        return names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+    }
+}
+
+/// Whether one provider's usage and credentials go to the user's other Macs.
+/// Shown on the provider's Options tab, which the page hides while the
+/// provider is off, so only an enabled provider can be shared.
+struct ProviderSyncSection: View {
+    let sync: SyncCoordinator?
+    let provider: Provider
+    static let title = "iCloud Sync"
+
+    var body: some View {
+        if let sync {
+            ProviderSyncRows(sync: sync, provider: provider)
+        } else {
+            SettingsSection(title: Self.title, footer: SyncCoordinator.noICloudReason) {
+                SettingsRow(label: "Usage and credentials", isLast: true) {
+                    Toggle("Usage and credentials", isOn: .constant(false))
+                        .labelsHidden()
+                        .toggleStyle(.checkbox)
+                        .disabled(true)
+                }
+            }
+        }
+    }
+}
+
+private struct ProviderSyncRows: View {
+    @ObservedObject var sync: SyncCoordinator
+    let provider: Provider
+
+    private var shares: Binding<Bool> {
+        Binding(
+            get: { sync.choices.sharesUsage(of: provider) },
+            set: { shares in Task { await sync.setSharesUsage(shares, of: provider) } }
+        )
+    }
+
+    var body: some View {
+        SettingsSection(title: ProviderSyncSection.title, footer: Self.footer(shares: shares.wrappedValue, reason: sync.usageUnavailableReason)) {
+            SettingsRow(label: "Usage and credentials", isLast: true) {
+                Toggle("Usage and credentials", isOn: shares)
+                    .labelsHidden()
+                    .toggleStyle(.checkbox)
+                    .disabled(!sync.canShareUsage)
+            }
+        }
+    }
+
+    static func footer(shares: Bool, reason: String?) -> String {
+        if let reason {
+            return reason
+        }
+        return shares
+            ? "This provider's credentials are shared through iCloud Keychain, and your Macs take turns asking it and show one another's answer, history included. A Mac with the provider off takes no part."
+            : "This provider's credentials and usage stay on this Mac. Settings are shared separately, from the General tab."
+    }
+}
+
+/// Where a provider's credentials live, under its credential fields.
+struct CredentialStorageNote: View {
+    let sync: SyncCoordinator?
+    let provider: Provider
+
+    var body: some View {
+        if let sync {
+            ObservedNote(sync: sync, provider: provider)
+        } else {
+            Text(Self.text(shared: false))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    static func text(shared: Bool) -> String {
+        shared
+            ? "Credentials are shared with your Macs through iCloud Keychain and kept in your login Keychain too."
+            : "Credentials are stored only in your login Keychain. Nothing leaves this Mac."
+    }
+
+    private struct ObservedNote: View {
+        @ObservedObject var sync: SyncCoordinator
+        let provider: Provider
+
+        var body: some View {
+            Text(CredentialStorageNote.text(shared: sync.choices.sharesUsage(of: provider)))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 }
 

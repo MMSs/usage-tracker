@@ -36,7 +36,7 @@ struct SyncingCredentialStoreTests {
 
     @Test func whileSharingWritesAndRemovalsReachBoth() throws {
         let store = store
-        try store.startSharing(keys: [])
+        try store.startSharing(keys: [token])
 
         try store.set("new", for: token)
         #expect(shared.values[token] == "new" && local.values[token] == "new")
@@ -55,9 +55,33 @@ struct SyncingCredentialStoreTests {
         #expect(try store.credential(for: token) == nil)
     }
 
+    @Test func onlyASharedKeyUsesICloud() throws {
+        let store = store
+        shared.values[admin] = "icloud"
+        try store.startSharing(keys: [token])
+
+        try store.set("mine", for: admin)
+
+        #expect(try store.credential(for: admin) == "mine")
+        #expect(shared.values[admin] == "icloud")
+    }
+
+    @Test func leavingOneKeyLeavesTheOthersShared() throws {
+        let store = store
+        local.values[token] = "tok"
+        local.values[admin] = "adm"
+        try store.startSharing(keys: [token, admin])
+
+        try store.stopSharing(keys: [admin])
+        shared.values[token] = "rotated elsewhere"
+
+        #expect(try store.credential(for: token) == "rotated elsewhere")
+        #expect(store.sharedKeys == [token])
+    }
+
     @Test func leavingKeepsWhatTheMacsSharedLast() throws {
         let store = store
-        try store.startSharing(keys: [])
+        try store.startSharing(keys: [token, admin])
         shared.values[token] = "rotated elsewhere"
         local.values[admin] = "removed elsewhere"
 

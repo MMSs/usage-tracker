@@ -12,7 +12,7 @@ import Testing
     @Test func eachHalfTabHasOnlyAScheduleSection() {
         #expect(ProviderSettingsTab.subscription.sections == ["Schedule"])
         #expect(ProviderSettingsTab.api.sections == ["Schedule"])
-        #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance"])
+        #expect(ProviderSettingsTab.menuBar.sections == ["Alerts", "Appearance", "iCloud Sync"])
     }
 
     @Test func theGeneralPageEndsWithUpdates() {

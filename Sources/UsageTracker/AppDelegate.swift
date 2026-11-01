@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         model.loginItem.reconcileAtLaunch()
         // iCloud tells the app about another Mac's change with a silent push.
         // Without the push entitlement this fails quietly and pulls at each refresh still catch up.
-        if model.sync?.isAvailable(.settingsOnly) == true {
+        if model.sync?.canShareSettings == true {
             NSApp.registerForRemoteNotifications()
         }
         AboutPanel.replaceAboutItem(in: NSApp.mainMenu)

@@ -10,10 +10,16 @@ extension AppModel: SyncApplying {
     func applySynced(_ setting: SyncedSetting) {
         switch setting {
         case let .provider(id, settings):
-            guard settings != self.settings(for: id) else {
+            // Which providers and halves are on is each Mac's own choice.
+            let local = self.settings(for: id)
+            var merged = settings
+            merged.isEnabled = local.isEnabled
+            merged.isSubscriptionEnabled = local.isSubscriptionEnabled
+            merged.isAPIEnabled = local.isAPIEnabled
+            guard merged != local else {
                 return
             }
-            setSettings(settings, for: id)
+            setSettings(merged, for: id)
         case let .appearance(appearance):
             guard appearance != globalAppearance else {
                 return
@@ -62,7 +68,7 @@ extension AppModel: SyncApplying {
     }
 
     /// The credentials now come from elsewhere: each half takes a scheduled
-    /// turn, which in Everything usually adopts another Mac's answer.
+    /// turn, which for a shared provider usually adopts another Mac's answer.
     func syncedCredentialsChanged() {
         Task { await refreshAll(manual: false) }
     }

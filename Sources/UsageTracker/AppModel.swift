@@ -122,8 +122,8 @@ final class AppModel: ObservableObject {
 
     /// Refreshes every enabled provider; disabled ones keep their last report untouched.
     func refreshAll(manual: Bool) async {
-        // Each half takes its own turn with the other Macs.
-        if sync?.mode.sharesUsage == true {
+        // Each half of a shared provider takes its own turn with the other Macs.
+        if sync?.choices.sharesAnyUsage == true {
             await refreshEachHalf(manual: manual)
             return
         }

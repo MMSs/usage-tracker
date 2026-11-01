@@ -3,13 +3,17 @@ import Testing
 @testable import UsageTracker
 
 final class MemorySyncPreferencesStore: SyncPreferencesStoring {
-    var mode: SyncMode
+    var choices: SyncChoices
     let deviceID: String
 
-    init(mode: SyncMode, deviceID: String) {
-        self.mode = mode
+    init(choices: SyncChoices, deviceID: String) {
+        self.choices = choices
         self.deviceID = deviceID
     }
+}
+
+extension SyncChoices {
+    static let settingsOnly = SyncChoices(sharesSettings: true)
 }
 
 /// A clock several Macs share, moved by hand.
@@ -32,13 +36,14 @@ struct SimulatedMac {
     let local: MemoryCredentialStore
 
     static let cursorToken = CredentialKey(provider: .cursor, fieldID: "session-token")
+    static let anthropicKey = CredentialKey(provider: .anthropic, fieldID: "admin-key")
 
     init(
         _ deviceID: String,
         server: InMemorySyncServer,
         sharedKeychain: MemoryCredentialStore,
         clock: TestClock,
-        mode: SyncMode = .everything,
+        choices: SyncChoices = .everything,
         report: ProviderReport = makeReport(1)
     ) {
         let now = { clock.date }
@@ -48,8 +53,8 @@ struct SimulatedMac {
         sync = SyncCoordinator(
             transport: transport,
             credentials: credentials,
-            preferences: MemorySyncPreferencesStore(mode: mode, deviceID: deviceID),
-            credentialKeys: [Self.cursorToken],
+            preferences: MemorySyncPreferencesStore(choices: choices, deviceID: deviceID),
+            credentialKeys: [Self.cursorToken, Self.anthropicKey],
             now: now
         )
         fetcher = StubReportFetcher(result: .success(report))
@@ -100,8 +105,8 @@ struct SimulatedMac {
         keychain.values[SimulatedMac.cursorToken] = "tok"
     }
 
-    private func mac(_ id: String, mode: SyncMode = .everything, report: ProviderReport = makeReport(1)) async -> SimulatedMac {
-        let mac = SimulatedMac(id, server: server, sharedKeychain: keychain, clock: clock, mode: mode, report: report)
+    private func mac(_ id: String, choices: SyncChoices = .everything, report: ProviderReport = makeReport(1)) async -> SimulatedMac {
+        let mac = SimulatedMac(id, server: server, sharedKeychain: keychain, clock: clock, choices: choices, report: report)
         await mac.sync.start()
         return mac
     }
@@ -184,9 +189,9 @@ struct SimulatedMac {
         #expect(first.cursor.report == makeReport(77))
     }
 
-    @Test func settingsOnlyMacsFetchForThemselves() async {
-        let first = await mac("A", mode: .settingsOnly)
-        let second = await mac("B", mode: .settingsOnly)
+    @Test func anUnsharedProviderIsFetchedOnEveryMac() async {
+        let first = await mac("A", choices: .settingsOnly)
+        let second = await mac("B", choices: .settingsOnly)
         first.local.values[SimulatedMac.cursorToken] = "a"
         second.local.values[SimulatedMac.cursorToken] = "b"
 
@@ -242,20 +247,90 @@ struct SimulatedMac {
     }
 
     @Test func joiningTakesWhatICloudAlreadyHolds() async {
-        let first = await mac("A", mode: .settingsOnly)
+        let first = await mac("A", choices: .settingsOnly)
         var appearance = MenuBarAppearance.default
         appearance.colored.toggle()
         first.model.setGlobalAppearance(appearance)
         await first.sync.pull()
 
-        let second = await mac("B", mode: .off)
-        await second.sync.setMode(.settingsOnly)
+        let second = await mac("B", choices: .nothing)
+        await second.sync.setSharesSettings(true)
 
         #expect(second.model.globalAppearance == appearance)
     }
 
-    @Test func offTouchesNothing() async {
-        let mac = await mac("A", mode: .off)
+    @Test func aProviderSwitchedOffOnOneMacStaysOnOnTheOther() async {
+        let first = await mac("A", choices: .settingsOnly)
+        let second = await mac("B", choices: .settingsOnly)
+        var settings = first.model.settings(for: .cursor)
+        settings.isEnabled = false
+        settings.setEnabled(false, for: .subscription)
+
+        first.model.setSettings(settings, for: .cursor)
+        await first.sync.pull()
+        await second.sync.pull()
+
+        #expect(second.model.settings(for: .cursor).isEnabled)
+        #expect(second.model.settings(for: .cursor).isEnabled(.subscription))
+    }
+
+    @Test func aProvidersOtherSettingsStillReachTheOtherMac() async {
+        let first = await mac("A", choices: .settingsOnly)
+        let second = await mac("B", choices: .settingsOnly)
+        var settings = first.model.settings(for: .cursor)
+        settings.alertsEnabled = false
+        settings.setRefreshInterval(.thirtyMinutes, for: .subscription)
+
+        first.model.setSettings(settings, for: .cursor)
+        await first.sync.pull()
+        await second.sync.pull()
+
+        #expect(!second.model.settings(for: .cursor).alertsEnabled)
+        #expect(second.model.settings(for: .cursor).refreshInterval(for: .subscription) == .thirtyMinutes)
+    }
+
+    // MARK: Sharing a provider
+
+    @Test func sharingAProviderMovesOnlyItsCredentials() async {
+        keychain.values[SimulatedMac.cursorToken] = nil
+        let mac = await mac("A", choices: .nothing)
+        mac.local.values[SimulatedMac.cursorToken] = "a"
+        mac.local.values[SimulatedMac.anthropicKey] = "x"
+
+        await mac.sync.setSharesUsage(true, of: .cursor)
+
+        #expect(keychain.values[SimulatedMac.cursorToken] == "a")
+        #expect(keychain.values[SimulatedMac.anthropicKey] == nil)
+        #expect(mac.sync.choices.sharesUsage(of: .cursor))
+        #expect(!mac.sync.choices.sharesUsage(of: .anthropic))
+    }
+
+    @Test func onlyASharedProviderTakesTurns() async {
+        let first = await mac("A", choices: SyncChoices(sharedProviders: [.cursor]))
+        let second = await mac("B", choices: SyncChoices(sharedProviders: [.anthropic]))
+        second.local.values[SimulatedMac.cursorToken] = "b"
+
+        await first.scheduledRefresh()
+        clock.advance(60)
+        await second.scheduledRefresh()
+
+        #expect(first.fetcher.callCount == 1)
+        #expect(second.fetcher.callCount == 1)
+        #expect(server.payload(SyncRecordName.usage(cursor)) != nil)
+    }
+
+    @Test func unsharingAProviderKeepsItsCredentialsHere() async {
+        let mac = await mac("A", choices: SyncChoices(sharedProviders: [.cursor]))
+
+        await mac.sync.setSharesUsage(false, of: .cursor)
+
+        #expect(mac.local.values[SimulatedMac.cursorToken] == "tok")
+        #expect(mac.sync.choices == .nothing)
+        #expect(mac.sync.status == .off)
+    }
+
+    @Test func nothingSharedTouchesNothing() async {
+        let mac = await mac("A", choices: .nothing)
         var appearance = MenuBarAppearance.default
         appearance.colored.toggle()
 
@@ -288,12 +363,13 @@ struct SimulatedMac {
     @Test func aBuildWithoutICloudOffersOnlyOff() {
         let sync = SyncCoordinator(
             transport: nil, credentials: nil,
-            preferences: MemorySyncPreferencesStore(mode: .everything, deviceID: "A")
+            preferences: MemorySyncPreferencesStore(choices: .everything, deviceID: "A")
         )
 
-        #expect(sync.mode == .off)
-        #expect(!sync.isAvailable(.settingsOnly))
-        #expect(sync.unavailableReason(.settingsOnly) != nil)
+        #expect(sync.choices == .nothing)
+        #expect(!sync.canShareSettings)
+        #expect(!sync.canShareUsage)
+        #expect(sync.settingsUnavailableReason != nil)
     }
 
     @Test func signedOutOfICloudSaysSo() async {
@@ -306,18 +382,21 @@ struct SimulatedMac {
 
 @Suite @MainActor struct SyncSectionTests {
     @Test func theFooterSaysWhatIsSharedAndHowItIsGoing() {
-        let off = SyncSection.footer(mode: .off, status: .off, reason: nil)
-        let everything = SyncSection.footer(mode: .everything, status: .upToDate(.now), reason: nil)
-        let failing = SyncSection.footer(mode: .settingsOnly, status: .failed("Can't reach iCloud right now."), reason: nil)
+        let nothing = SyncSection.footer(choices: .nothing, status: .off, reason: nil)
+        let everything = SyncSection.footer(choices: .everything, status: .upToDate(.now), reason: nil)
+        let failing = SyncSection.footer(choices: .settingsOnly, status: .failed("Can't reach iCloud right now."), reason: nil)
+        let cursorOnly = SyncSection.footer(choices: SyncChoices(sharedProviders: [.cursor]), status: .upToDate(.now), reason: nil)
 
-        #expect(off.hasPrefix("Nothing leaves this Mac."))
+        #expect(nothing.hasPrefix("Nothing leaves this Mac."))
+        #expect(everything.contains("Cursor, Anthropic and OpenAI share"))
         #expect(everything.hasSuffix("Up to date."))
-        #expect(failing.contains("Each Mac keeps its own credentials"))
+        #expect(failing.contains("No provider shares its usage or credentials"))
         #expect(failing.hasSuffix("Can't reach iCloud right now."))
+        #expect(cursorOnly.hasPrefix("Settings stay on this Mac. Cursor shares"))
     }
 
     @Test func aBuildThatCannotSyncSaysWhyWhileOff() {
-        let footer = SyncSection.footer(mode: .off, status: .off, reason: "Builds made from source don't sync.")
+        let footer = SyncSection.footer(choices: .nothing, status: .off, reason: "Builds made from source don't sync.")
 
         #expect(footer.hasSuffix("Builds made from source don't sync."))
     }
@@ -328,8 +407,8 @@ struct SimulatedMac {
         let server = InMemorySyncServer()
         let keychain = MemoryCredentialStore()
         let clock = TestClock()
-        let first = SimulatedMac("A", server: server, sharedKeychain: keychain, clock: clock, mode: .settingsOnly)
-        let second = SimulatedMac("B", server: server, sharedKeychain: keychain, clock: clock, mode: .settingsOnly)
+        let first = SimulatedMac("A", server: server, sharedKeychain: keychain, clock: clock, choices: .settingsOnly)
+        let second = SimulatedMac("B", server: server, sharedKeychain: keychain, clock: clock, choices: .settingsOnly)
         await first.sync.start()
         await second.sync.start()
         var appearance = MenuBarAppearance.default

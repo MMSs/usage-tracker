@@ -38,11 +38,11 @@ enum SyncFetchDecision: Equatable, Sendable {
 }
 
 /// Keeps this Mac in step with the user's other Macs through their private
-/// iCloud: shared settings, and in Everything one fetch per refresh for all
-/// of them, one session start, and one history.
+/// iCloud: shared settings, and for each shared provider one fetch per
+/// refresh for all of them, one session start, and one history.
 @MainActor
 final class SyncCoordinator: ObservableObject {
-    @Published private(set) var mode: SyncMode
+    @Published private(set) var choices: SyncChoices
     @Published private(set) var status: SyncStatus = .off
     weak var delegate: SyncApplying?
 
@@ -67,8 +67,11 @@ final class SyncCoordinator: ObservableObject {
     private var pullTask: Task<Void, Never>?
     private var isStarted = false
 
+    static let noICloudReason = "This copy of Usage Tracker can't use iCloud. Builds made from source don't sync."
+    static let noKeychainReason = "This copy of Usage Tracker can't use iCloud Keychain, so usage and credentials can't be shared."
+
     /// `transport` nil: this build has no iCloud entitlement. `credentials`
-    /// nil: it has no keychain sharing, so Everything is unavailable.
+    /// nil: it has no keychain sharing, so no provider can be shared.
     init(
         transport: SyncTransport?,
         credentials: SyncingCredentialStore?,
@@ -82,42 +85,50 @@ final class SyncCoordinator: ObservableObject {
         self.credentialKeys = credentialKeys
         self.now = now
 
-        var mode = preferences.mode
-        if !Self.isAllowed(mode, transport: transport, credentials: credentials) {
-            mode = .off
-            preferences.mode = .off
+        let choices = Self.allowed(preferences.choices, transport: transport, credentials: credentials)
+        if choices != preferences.choices {
+            preferences.choices = choices
         }
-        self.mode = mode
+        self.choices = choices
 
-        // Before any credential is read, so the providers start from the shared items.
-        if mode.sharesCredentials {
-            credentials?.resumeSharing()
+        // Before any credential is read, so the shared providers start from the shared items.
+        if choices.sharesAnyUsage {
+            credentials?.resumeSharing(keys: credentialKeys.filter { choices.sharedProviders.contains($0.provider) })
         }
     }
 
     var deviceID: String { preferences.deviceID }
 
-    func isAvailable(_ mode: SyncMode) -> Bool {
-        Self.isAllowed(mode, transport: transport, credentials: credentials)
+    var canShareSettings: Bool { transport != nil }
+    var canShareUsage: Bool { transport != nil && credentials != nil }
+
+    /// Why settings can't be shared in this build; nil when they can.
+    var settingsUnavailableReason: String? {
+        canShareSettings ? nil : Self.noICloudReason
     }
 
-    /// Why a mode can't be chosen in this build; nil when it can.
-    func unavailableReason(_ mode: SyncMode) -> String? {
-        guard !isAvailable(mode) else {
+    /// Why no provider's usage and credentials can be shared in this build; nil when they can.
+    var usageUnavailableReason: String? {
+        if canShareUsage {
             return nil
         }
-
-        return transport == nil
-            ? "This copy of Usage Tracker can't use iCloud. Builds made from source don't sync."
-            : "This copy of Usage Tracker can't use iCloud Keychain, so credentials can't be shared."
+        return transport == nil ? Self.noICloudReason : Self.noKeychainReason
     }
 
-    private static func isAllowed(_ mode: SyncMode, transport: SyncTransport?, credentials: SyncingCredentialStore?) -> Bool {
-        switch mode {
-        case .off: true
-        case .settingsOnly: transport != nil
-        case .everything: transport != nil && credentials != nil
+    /// The choices this build can honour.
+    private static func allowed(_ choices: SyncChoices, transport: SyncTransport?, credentials: SyncingCredentialStore?) -> SyncChoices {
+        var allowed = choices
+        if transport == nil {
+            allowed.sharesSettings = false
         }
+        if transport == nil || credentials == nil {
+            allowed.sharedProviders = []
+        }
+        return allowed
+    }
+
+    private func keys(of providers: Set<Provider>) -> [CredentialKey] {
+        credentialKeys.filter { providers.contains($0.provider) }
     }
 
     // MARK: Lifecycle
@@ -129,7 +140,7 @@ final class SyncCoordinator: ObservableObject {
         }
 
         isStarted = true
-        guard mode != .off else {
+        guard !choices.isOff else {
             status = .off
             return
         }
@@ -141,28 +152,48 @@ final class SyncCoordinator: ObservableObject {
         await pull()
     }
 
-    /// Switches mode. Joining takes what iCloud already holds over this
-    /// Mac's own and uploads what iCloud lacks; leaving keeps local copies.
-    func setMode(_ new: SyncMode) async {
-        guard new != mode, isAvailable(new) else {
+    /// Shares the settings bundle, or stops.
+    func setSharesSettings(_ shares: Bool) async {
+        var new = choices
+        new.sharesSettings = shares
+        await change(to: new)
+    }
+
+    /// Shares the provider's usage and credentials, or stops.
+    func setSharesUsage(_ shares: Bool, of provider: Provider) async {
+        var new = choices
+        if shares {
+            new.sharedProviders.insert(provider)
+        } else {
+            new.sharedProviders.remove(provider)
+        }
+        await change(to: new)
+    }
+
+    /// Joining takes what iCloud already holds over this Mac's own and
+    /// uploads what iCloud lacks; leaving keeps local copies.
+    private func change(to proposed: SyncChoices) async {
+        let new = Self.allowed(proposed, transport: transport, credentials: credentials)
+        guard new != choices else {
             return
         }
 
-        let old = mode
-        mode = new
-        preferences.mode = new
-        Log.sync.notice("mode \(old.rawValue, privacy: .public) → \(new.rawValue, privacy: .public)")
+        let old = choices
+        choices = new
+        preferences.choices = new
+        Log.sync.notice("settings \(new.sharesSettings, privacy: .public), providers \(new.sharedProviders.map(\.rawValue).sorted(), privacy: .public)")
 
-        if old.sharesCredentials, !new.sharesCredentials {
+        let left = old.sharedProviders.subtracting(new.sharedProviders)
+        if !left.isEmpty {
             do {
-                try credentials?.stopSharing(keys: credentialKeys)
+                try credentials?.stopSharing(keys: keys(of: left))
             } catch {
                 Log.sync.error("keeping shared credentials failed: \(String(describing: type(of: error)), privacy: .public)")
             }
             delegate?.syncedCredentialsChanged()
         }
 
-        guard new != .off else {
+        guard !new.isOff else {
             records = [:]
             pendingSettings = [:]
             status = .off
@@ -177,12 +208,17 @@ final class SyncCoordinator: ObservableObject {
             transport.resetChanges()
             let changes = try await transport.changes()
             apply(changes, joining: true)
-            try await uploadMissingSettings()
+            if new.sharesSettings {
+                try await uploadMissingSettings()
+            }
 
-            if new.sharesCredentials, !old.sharesCredentials {
-                try credentials?.startSharing(keys: credentialKeys)
+            let joined = new.sharedProviders.subtracting(old.sharedProviders)
+            if !joined.isEmpty {
+                try credentials?.startSharing(keys: keys(of: joined))
                 delegate?.syncedCredentialsChanged()
-                try await uploadMissingUsage()
+                for provider in joined {
+                    try await uploadMissingUsage(of: provider)
+                }
             }
 
             status = .upToDate(now())
@@ -193,7 +229,7 @@ final class SyncCoordinator: ObservableObject {
 
     /// Fetches what the other Macs changed and applies it; concurrent calls share one fetch.
     func pull() async {
-        guard mode != .off, transport != nil else {
+        guard !choices.isOff, transport != nil else {
             return
         }
 
@@ -226,7 +262,7 @@ final class SyncCoordinator: ObservableObject {
     /// Checks the account and prepares iCloud; false, with the status saying why, when it can't.
     private func connect() async -> Bool {
         guard let transport else {
-            status = .unavailable(unavailableReason(.settingsOnly) ?? "")
+            status = .unavailable(Self.noICloudReason)
             return false
         }
 
@@ -268,7 +304,7 @@ final class SyncCoordinator: ObservableObject {
     /// Sends a setting changed on this Mac to the others. A change arriving
     /// from another Mac is not sent back.
     func publish(_ setting: SyncedSetting) {
-        guard mode.sharesSettings, transport != nil, !applyingRemote else {
+        guard choices.sharesSettings, transport != nil, !applyingRemote else {
             return
         }
 
@@ -344,27 +380,27 @@ final class SyncCoordinator: ObservableObject {
 
         do {
             switch kind {
-            case "settings" where mode.sharesSettings:
+            case "settings" where choices.sharesSettings:
                 if let setting = try decodeSetting(record, parts: parts, joining: joining) {
                     delegate?.applySynced(setting)
                 }
-            case "usage" where mode.sharesUsage:
-                guard parts.count == 3, let provider = Provider(rawValue: parts[1]), let half = Half(rawValue: parts[2]),
-                      let state = try body(SharedHalfState.self, record, joining: false)
+            case "usage":
+                guard parts.count == 3, let provider = Provider(rawValue: parts[1]), choices.sharesUsage(of: provider),
+                      let half = Half(rawValue: parts[2]), let state = try body(SharedHalfState.self, record, joining: false)
                 else {
                     return
                 }
                 delegate?.adoptShared(state, for: RefreshTarget(provider: provider, half: half))
-            case "history" where mode.sharesUsage:
+            case "history":
                 // Merging is idempotent, so this Mac's own history may come back.
-                guard parts.count == 2, let provider = Provider(rawValue: parts[1]),
+                guard parts.count == 2, let provider = Provider(rawValue: parts[1]), choices.sharesUsage(of: provider),
                       let history = try body(SharedHistory.self, record, joining: true)
                 else {
                     return
                 }
                 delegate?.mergeHistory(history.samples, for: provider)
-            case "org" where mode.sharesUsage:
-                guard parts.count == 2, let provider = Provider(rawValue: parts[1]),
+            case "org":
+                guard parts.count == 2, let provider = Provider(rawValue: parts[1]), choices.sharesUsage(of: provider),
                       let organization = try body(SharedOrganization.self, record, joining: joining)
                 else {
                     return
@@ -417,13 +453,13 @@ final class SyncCoordinator: ObservableObject {
     // MARK: Fetch turns
 
     /// Decides whether this Mac asks the provider at a scheduled refresh. It
-    /// catches up first, in any mode; a fresh enough answer from another Mac, or another
-    /// Mac fetching now, means no request. iCloud unreachable means fetching
-    /// here, as without sync.
+    /// catches up first whatever is shared; for a shared provider a fresh
+    /// enough answer from another Mac, or another Mac fetching now, means no
+    /// request. iCloud unreachable means fetching here, as without sync.
     func prepareScheduledFetch(_ target: RefreshTarget, interval: TimeInterval) async -> SyncFetchDecision {
-        // Every mode catches up here, so a missed push only delays a change.
+        // Whatever is shared catches up here, so a missed push only delays a change.
         await pull()
-        guard mode.sharesUsage, transport != nil else {
+        guard choices.sharesUsage(of: target.provider), transport != nil else {
             return .fetch
         }
 
@@ -469,7 +505,7 @@ final class SyncCoordinator: ObservableObject {
     /// hands back the fetch turn. `fetched` false (the refresh was skipped)
     /// only hands back the turn. A newer answer already in iCloud wins.
     func publishRefresh(_ target: RefreshTarget, fetched: Bool = true) async {
-        guard mode.sharesUsage, transport != nil, let delegate else {
+        guard choices.sharesUsage(of: target.provider), transport != nil, let delegate else {
             return
         }
 
@@ -561,26 +597,24 @@ final class SyncCoordinator: ObservableObject {
         records[name] = try? await transport.save(SyncRecord(name: name, payload: payload, version: mine.version))
     }
 
-    private func uploadMissingUsage() async throws {
+    private func uploadMissingUsage(of provider: Provider) async throws {
         guard let delegate else {
             return
         }
 
-        for provider in Provider.allCases {
-            let organization = SyncRecordName.organization(provider)
-            if records[organization] == nil, let id = delegate.selectedOrganization(for: provider) {
-                try await saveOrganization(id, for: provider)
-            }
-
-            for half in [Half.subscription, .api] {
-                let target = RefreshTarget(provider: provider, half: half)
-                if records[SyncRecordName.usage(target)] == nil, let state = delegate.sharedState(for: target), state.isShareable {
-                    try await saveUsage(state, for: target)
-                }
-            }
-
-            try await saveHistory(of: provider)
+        let organization = SyncRecordName.organization(provider)
+        if records[organization] == nil, let id = delegate.selectedOrganization(for: provider) {
+            try await saveOrganization(id, for: provider)
         }
+
+        for half in [Half.subscription, .api] {
+            let target = RefreshTarget(provider: provider, half: half)
+            if records[SyncRecordName.usage(target)] == nil, let state = delegate.sharedState(for: target), state.isShareable {
+                try await saveUsage(state, for: target)
+            }
+        }
+
+        try await saveHistory(of: provider)
     }
 
     // MARK: Session starts
@@ -589,7 +623,7 @@ final class SyncCoordinator: ObservableObject {
     /// attempted one within `interval`, or another claimed it first. iCloud
     /// unreachable leaves it to this Mac, as without sync.
     func claimSessionStart(_ provider: Provider, within interval: TimeInterval) async -> Bool {
-        guard mode.sharesUsage, let transport else {
+        guard choices.sharesUsage(of: provider), let transport else {
             return true
         }
 
@@ -617,7 +651,7 @@ final class SyncCoordinator: ObservableObject {
 
     /// Sends the organization chosen on this Mac to the others.
     func publishOrganization(_ id: String?, for provider: Provider) {
-        guard mode.sharesUsage, transport != nil, !applyingRemote else {
+        guard choices.sharesUsage(of: provider), transport != nil, !applyingRemote else {
             return
         }
 
