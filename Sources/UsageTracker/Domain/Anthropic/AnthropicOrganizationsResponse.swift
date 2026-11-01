@@ -7,6 +7,9 @@ struct AnthropicOrganizationsResponse: Equatable, Sendable {
         var name: String? = nil
         var rateLimitTier: String? = nil
         var capabilities: [String]? = nil
+        /// The plan as claude.ai names it, when it sends one.
+        var planDisplayName: String? = nil
+        var planDisplayLabel: String? = nil
     }
 
     let organizations: [Organization]
@@ -16,6 +19,8 @@ extension AnthropicOrganizationsResponse.Organization: Decodable {
     private enum CodingKeys: String, CodingKey {
         case uuid, name, capabilities
         case rateLimitTier = "rate_limit_tier"
+        case planDisplayName = "plan_display_name"
+        case planDisplayLabel = "plan_display_label"
     }
 }
 
@@ -27,7 +32,17 @@ extension AnthropicOrganizationsResponse.Organization {
             return "API"
         }
 
-        return AnthropicPlanName.from(rateLimitTier: rateLimitTier, capabilities: capabilities)
+        return planName
+    }
+
+    /// The server's own plan name when it sends one, so a renamed or new
+    /// plan shows without an app update; otherwise the tier's plan.
+    var planName: String? {
+        let sent = [planDisplayName, planDisplayLabel]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+
+        return sent ?? AnthropicPlanName.from(rateLimitTier: rateLimitTier, capabilities: capabilities)
     }
 }
 
@@ -62,21 +77,22 @@ extension AnthropicOrganizationsResponse: Decodable {
 enum AnthropicPlanName {
     private struct Plan {
         let name: String
-        /// Matched as a case-insensitive substring of the rate-limit tier.
-        let tierMarker: String?
+        /// Any one matched as a case-insensitive substring of the rate-limit tier.
+        let tierMarkers: [String]
         /// Matched against whole capability tokens, so "project" is never "pro".
         let capabilityMatches: @Sendable (String) -> Bool
     }
 
-    // Highest plan first; the first plan any source matches wins. A bare
-    // `claude_max` capability cannot tell 5x from 20x, so it is just "Max".
+    // Highest plan first; the first plan any source matches wins, so the
+    // bare "max" marker only sees tiers Ultra has already passed over.
+    // Max 20x became Ultra and Max 5x became Max when the plans were renamed.
     private static let plans: [Plan] = [
-        Plan(name: "Max 20x", tierMarker: "max_20x") { $0.contains("max_20x") },
-        Plan(name: "Max 5x", tierMarker: "max_5x") { $0.contains("max_5x") },
-        Plan(name: "Max", tierMarker: nil) { $0 == "claude_max" },
-        Plan(name: "Enterprise", tierMarker: "enterprise") { $0 == "claude_enterprise" },
-        Plan(name: "Team", tierMarker: "team") { $0 == "claude_team" },
-        Plan(name: "Pro", tierMarker: "pro") { $0 == "claude_pro" },
+        Plan(name: "Ultra", tierMarkers: ["ultra", "max_20x"]) { $0 == "claude_ultra" || $0.contains("max_20x") },
+        Plan(name: "Max", tierMarkers: ["max"]) { $0 == "claude_max" || $0.contains("max_5x") },
+        Plan(name: "Enterprise", tierMarkers: ["enterprise"]) { $0 == "claude_enterprise" },
+        Plan(name: "Team", tierMarkers: ["team"]) { $0 == "claude_team" },
+        Plan(name: "Pro", tierMarkers: ["pro"]) { $0 == "claude_pro" },
+        Plan(name: "Free", tierMarkers: ["free"]) { $0 == "claude_free" },
     ]
 
     /// The rate-limit tier and the capabilities both name the plan; the
@@ -86,7 +102,7 @@ enum AnthropicPlanName {
         let tokens = (capabilities ?? []).map { $0.lowercased() }
 
         return plans.first { plan in
-            if let marker = plan.tierMarker, tier.contains(marker) {
+            if plan.tierMarkers.contains(where: { tier.contains($0) }) {
                 return true
             }
 

@@ -352,18 +352,19 @@ import Testing
     }
 
     @Test func planNameFromTier() {
-        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_5x", capabilities: nil) == "Max 5x")
-        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_20x", capabilities: nil) == "Max 20x")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_5x", capabilities: nil) == "Max")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_20x", capabilities: nil) == "Ultra")
         #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_pro", capabilities: nil) == "Pro")
         #expect(AnthropicPlanName.from(rateLimitTier: "DEFAULT_CLAUDE_TEAM", capabilities: nil) == "Team")
         #expect(AnthropicPlanName.from(rateLimitTier: "default_enterprise", capabilities: nil) == "Enterprise")
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: nil) == nil)
-        #expect(AnthropicPlanName.from(rateLimitTier: "default_free", capabilities: ["chat"]) == nil)
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_free", capabilities: ["chat"]) == "Free")
+        #expect(AnthropicPlanName.from(rateLimitTier: "auto_trust_tier_b", capabilities: ["api"]) == nil)
     }
 
     @Test func planNameFallsBackToCapabilities() {
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["chat", "claude_pro"]) == "Pro")
-        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_5x", capabilities: ["claude_pro"]) == "Max 5x")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_5x", capabilities: ["claude_pro"]) == "Max")
     }
 
     @Test func planNameMatchesCapabilityTokensExactly() {
@@ -371,13 +372,13 @@ import Testing
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["claude_pro_extra", "teamwork"]) == nil)
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["Claude_Team"]) == "Team")
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["claude_enterprise"]) == "Enterprise")
-        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["default_claude_max_5x"]) == "Max 5x")
-        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["default_claude_max_20x"]) == "Max 20x")
+        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["default_claude_max_5x"]) == "Max")
+        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["default_claude_max_20x"]) == "Ultra")
     }
 
-    @Test func bareMaxCapabilityCannotTellTheMultiplier() {
+    @Test func anyMaxTierIsMaxUnlessItIsTheOldTwentyTimesOne() {
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["chat", "claude_max"]) == "Max")
-        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_20x", capabilities: ["claude_max"]) == "Max 20x")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_max_20x", capabilities: ["claude_max"]) == "Ultra")
     }
 
     @Test func highestPlanWinsRegardlessOfOrder() {
@@ -385,7 +386,7 @@ import Testing
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["claude_max", "claude_pro"]) == "Max")
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["claude_pro", "claude_team"]) == "Team")
         #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["claude_team", "claude_enterprise"]) == "Enterprise")
-        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["max_5x", "max_20x"]) == "Max 20x")
-        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_pro", capabilities: ["claude_max_5x"]) == "Max 5x")
+        #expect(AnthropicPlanName.from(rateLimitTier: nil, capabilities: ["max_5x", "max_20x"]) == "Ultra")
+        #expect(AnthropicPlanName.from(rateLimitTier: "default_claude_pro", capabilities: ["claude_max_5x"]) == "Max")
     }
 }

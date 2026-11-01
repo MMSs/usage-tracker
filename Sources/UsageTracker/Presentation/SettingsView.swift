@@ -671,7 +671,7 @@ struct ProviderSettingsView: View {
 struct OrganizationPickerRow: View {
     @ObservedObject var half: HalfViewModel
 
-    /// Wide enough for "<email>'s Organization · Max 20x"; longer labels
+    /// Wide enough for "<email>'s Organization · Ultra"; longer labels
     /// are cut in the middle by the pop-up button.
     static let pickerMaxWidth: CGFloat = 250
 
