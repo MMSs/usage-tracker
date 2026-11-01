@@ -120,10 +120,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
         let item: NSTabViewItem
         switch page {
         case .general:
-            let host = SettingsPageController { report in
+            // Weak: the page lives inside this controller's window. The model
+            // is captured on its own so the page never holds the controller.
+            let model = model
+            let host = SettingsPageController { [weak self] report in
                 AnyView(SettingsPageLayout(reportHeight: report) {
-                    // Weak: the page lives inside this controller's window.
-                    GeneralSettingsView(appModel: self.model) { [weak self] provider in
+                    GeneralSettingsView(appModel: model) { provider in
                         self?.showAppearance(of: provider)
                     }
                 })

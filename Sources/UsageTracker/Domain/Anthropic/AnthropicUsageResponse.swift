@@ -24,6 +24,8 @@ struct AnthropicUsageResponse: Equatable, Sendable {
         let resetsAt: Date?
         let modelID: String?
         let modelDisplayName: String?
+        /// `resets_at` is present and not null but is not an ISO 8601 date.
+        var hasUnreadableReset = false
     }
 
     let fiveHour: UsageWindow?
@@ -31,6 +33,20 @@ struct AnthropicUsageResponse: Equatable, Sendable {
     let limits: [ScopedLimit]
     /// Older per-model weekly windows (`seven_day_opus`), keyed by suffix.
     let legacyModelWindows: [String: UsageWindow]
+
+    /// The 5-hour session: `five_hour`, or the `limits` entry of kind
+    /// `session` when that window is missing or null (claude.ai dropped the
+    /// window first, so either may go).
+    var sessionWindow: UsageWindow? { fiveHour ?? window(ofKind: "session") }
+
+    /// The weekly window: `seven_day`, or the `limits` entry of kind `weekly_all`.
+    var weeklyWindow: UsageWindow? { sevenDay ?? window(ofKind: "weekly_all") }
+
+    private func window(ofKind kind: String) -> UsageWindow? {
+        limits.first { $0.kind == kind }.map {
+            UsageWindow(utilization: $0.percent, resetsAt: $0.resetsAt, hasUnreadableReset: $0.hasUnreadableReset)
+        }
+    }
 }
 
 extension AnthropicUsageResponse {
@@ -115,6 +131,8 @@ extension AnthropicUsageResponse.ScopedLimit: Decodable {
         kind = try container.decode(String.self, forKey: .kind)
         percent = container.decodeLossyNumber(forKey: .percent)
         resetsAt = (try? container.decodeIfPresent(Date.self, forKey: .resetsAt)) ?? nil
+        hasUnreadableReset = resetsAt == nil && container.contains(.resetsAt)
+            && (try? container.decodeNil(forKey: .resetsAt)) == false
         let model = (try? container.decodeIfPresent(Scope.self, forKey: .scope))??.model
         modelID = model?.id
         modelDisplayName = model?.displayName

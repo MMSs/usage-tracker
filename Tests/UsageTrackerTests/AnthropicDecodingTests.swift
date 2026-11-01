@@ -41,6 +41,32 @@ import Testing
         #expect(response.legacyModelWindows.values.allSatisfy { $0.utilization == nil })
     }
 
+    /// The shape seen on 1 Nov 2026: `five_hour` null and no session under
+    /// `limits` either, the weekly window still at the top level.
+    @Test func aNullFiveHourWithNoSessionLimitHasNoSessionWindow() throws {
+        let response = try usage("""
+        {"five_hour":null,"seven_day":{"utilization":4,"resets_at":"2026-11-03T07:00:00+00:00"},
+         "limits":[{"kind":"weekly_all","percent":4,"resets_at":"2026-11-03T07:00:00.567028+00:00"},
+                   {"kind":"weekly_scoped","percent":2,"scope":{"model":{"display_name":"Fable"}}}]}
+        """)
+
+        #expect(response.sessionWindow == nil)
+        #expect(response.weeklyWindow?.utilization == 4)
+        #expect(response.weeklyWindow?.resetsAt == (try date("2026-11-03T07:00:00Z")))
+    }
+
+    @Test func missingWindowsFallBackToTheLimitsList() throws {
+        let response = try usage("""
+        {"limits":[{"kind":"session","percent":"30","resets_at":"2026-10-24T22:59:59Z"},
+                   {"kind":"weekly_all","percent":25,"resets_at":"next tuesday"}]}
+        """)
+
+        #expect(response.sessionWindow == AnthropicUsageResponse.UsageWindow(utilization: 30, resetsAt: try date("2026-10-24T22:59:59Z")))
+        #expect(response.weeklyWindow?.utilization == 25)
+        #expect(response.weeklyWindow?.resetsAt == nil)
+        #expect(response.weeklyWindow?.hasUnreadableReset == true)
+    }
+
     @Test func unreadableResetIsFlaggedNotDropped() throws {
         let bad = try usage(#"{"five_hour":{"utilization":37.0,"resets_at":"next tuesday"}}"#)
         #expect(bad.fiveHour?.utilization == 37)

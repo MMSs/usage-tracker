@@ -158,6 +158,29 @@ struct AnthropicUsageServiceTests {
         #expect(count(client, suffix: "/usage") == 2)
     }
 
+    @Test func windowsListedOnlyUnderLimitsAreUsage() async throws {
+        var routes = try routes(overage: false)
+        routes["/usage"] = .ok(json: #"{"five_hour":null,"seven_day":null,"limits":[{"kind":"session","percent":3}]}"#)
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        let snapshot = try await service.fetchSubscription(sessionKey: "k")
+
+        #expect(snapshot.usage.limits.map(\.kind) == ["session"])
+        #expect(count(client, suffix: "/usage") == 1)
+    }
+
+    @Test func anUnreadableResetUnderLimitsIsADecodingFailure() async throws {
+        var routes = try routes(overage: false)
+        routes["/usage"] = .ok(json: #"{"limits":[{"kind":"session","percent":3,"resets_at":"next tuesday"}]}"#)
+        let client = RoutingHTTPClient(routes: routes)
+        let service = AnthropicUsageService(client: client)
+
+        await #expect(throws: FetchError.decoding) {
+            try await service.fetchSubscription(sessionKey: "k")
+        }
+    }
+
     @Test func serverErrorOnUsageIsNotRetried() async throws {
         var routes = try routes(overage: false)
         routes["/usage"] = .status(500)

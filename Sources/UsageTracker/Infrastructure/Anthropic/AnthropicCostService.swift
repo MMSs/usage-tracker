@@ -3,7 +3,8 @@ import os
 
 @MainActor
 protocol AnthropicCostFetching {
-    func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [CostDay]
+    /// `today` says whether the month has a whole UTC day to report yet.
+    func fetchMonthToDate(adminKey: String, month: CyclePeriod, today: Date, calendar: Calendar) async throws -> [CostDay]
 }
 
 final class AnthropicCostService: AnthropicCostFetching {
@@ -15,7 +16,18 @@ final class AnthropicCostService: AnthropicCostFetching {
         self.client = client
     }
 
-    func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [CostDay] {
+    func fetchMonthToDate(adminKey: String, month: CyclePeriod, today: Date, calendar: Calendar) async throws -> [CostDay] {
+        // The API reports whole UTC days only and clamps `ending_at` to the
+        // start of the current one. On the month's first UTC day that leaves
+        // an empty range, which it refuses all day with a 400 ("ending date
+        // must be after starting date"); there is nothing to ask for yet.
+        guard let firstDayEnd = Self.utc.date(byAdding: .day, value: 1, to: Self.utcMidnightDate(of: month.start, in: calendar)),
+              today >= firstDayEnd
+        else {
+            Log.http.info("cost_report not requested: the month's first UTC day has not ended")
+            return []
+        }
+
         let baseQuery = [
             ("starting_at", Self.utcMidnight(of: month.start, in: calendar)),
             ("ending_at", Self.utcMidnight(of: month.end, in: calendar)),
@@ -81,11 +93,25 @@ final class AnthropicCostService: AnthropicCostFetching {
         return value
     }
 
+    private static let utc: Calendar = {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+
+        return calendar
+    }()
+
     /// `YYYY-MM-DDT00:00:00Z` for the calendar date `date` falls on in `calendar`.
     private static func utcMidnight(of date: Date, in calendar: Calendar) -> String {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
 
         return String(format: "%04d-%02d-%02dT00:00:00Z", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+
+    /// UTC midnight of the calendar date `date` falls on in `calendar`.
+    private static func utcMidnightDate(of date: Date, in calendar: Calendar) -> Date {
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+
+        return utc.date(from: DateComponents(year: parts.year, month: parts.month, day: parts.day)) ?? date
     }
 
     private func request(query: [(name: String, value: String)], adminKey: String) -> URLRequest {
