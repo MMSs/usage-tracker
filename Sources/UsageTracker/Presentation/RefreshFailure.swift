@@ -66,7 +66,7 @@ extension RefreshFailure {
         switch self {
         case .challenge: "blocked by the provider's bot check"
         case .unauthorized: "credential expired"
-        case let .httpStatus(code): "server error \(code)"
+        case let .httpStatus(code): (400..<500).contains(code) ? "request rejected (HTTP \(code))" : "server error \(code)"
         case .rateLimited: "rate limited"
         case .decoding: "unexpected response"
         case .keychain: "couldn't read Keychain"

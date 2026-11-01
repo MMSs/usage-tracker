@@ -186,6 +186,7 @@ enum PopoverPresentation {
         failure: RefreshFailure?,
         service: HalfService,
         display: HalfDisplay? = nil,
+        shortWindowMissing: Bool = false,
         now: Date = Date(),
         calendar: Calendar = .current,
         uses24Hour: Bool = CountdownFormatter.systemUses24Hour
@@ -207,6 +208,9 @@ enum PopoverPresentation {
             )
         case .ready where display == .status(.error), .loading where display == .status(.error):
             explanation = ("\(service.name) sent nothing the app can show.", mayHaveChanged, .warning)
+        case .ready where shortWindowMissing, .loading where shortWindowMissing:
+            // The refresh worked, but a window the provider always lists is gone: a shape change, not an idle account.
+            explanation = ("\(service.name) sent no session window.", mayHaveChanged, .warning)
         case .ready, .loading, .unconfigured:
             return nil
         }
@@ -231,12 +235,23 @@ enum PopoverPresentation {
             failure: model.lastFailure?.cause,
             service: descriptor.service(for: model.half),
             display: display,
+            shortWindowMissing: shortWindowMissing(from: model.report, half: model.half, descriptor: descriptor),
             now: now
         )
     }
 
+    /// True when a subscription report lacks the short window its provider
+    /// lists (the session); claude.ai was seen to stop sending it.
+    static func shortWindowMissing(from report: ProviderReport?, half: Half, descriptor: ProviderDescriptor) -> Bool {
+        guard half == .subscription, let report, let shortID = descriptor.shortWindowID else {
+            return false
+        }
+
+        return !report.windows.contains { $0.id == shortID }
+    }
+
     private static let retries = "It retries automatically."
-    private static let mayHaveChanged = "It may have changed; check for an update."
+    private static let mayHaveChanged = "The API may have changed; check for an update."
 
     private static func failureExplanation(
         _ failure: RefreshFailure,
@@ -250,8 +265,11 @@ enum PopoverPresentation {
             ("Couldn't reach \(service.host).", "Check your connection; it retries automatically.", .warning)
         case .challenge:
             ("\(service.host) asked for a browser check.", "Open \(service.host) in your browser, then Refresh.", .warning)
+        case let .httpStatus(code) where (400..<500).contains(code):
+            // The request itself was refused; no retry fixes that, an update does.
+            ("\(service.name) rejected the app's request (HTTP \(code)).", mayHaveChanged, .warning)
         case let .httpStatus(code):
-            ("\(service.name) returned an error (HTTP \(code)).", retries, .warning)
+            ("\(service.name) returned a server error (HTTP \(code)).", retries, .warning)
         case let .rateLimited(until?) where until > now:
             ("\(service.name) is rate limiting requests; retrying at \(CountdownFormatter.clockTime(until, now: now, calendar: calendar, uses24Hour: uses24Hour)).", nil, .warning)
         case .rateLimited:

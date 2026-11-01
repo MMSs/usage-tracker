@@ -122,12 +122,52 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
-    @Test func httpStatusNamesTheServiceAndCode() {
-        #expect(error(.httpStatus(429), half: .api, service: Self.console) == HalfErrorMessage(
-            text: "API spend: Anthropic API returned an error (HTTP 429).",
+    @Test func aServerErrorNamesTheServiceAndCodeAndRetries() {
+        #expect(error(.httpStatus(503), half: .api, service: Self.console) == HalfErrorMessage(
+            text: "API spend: Anthropic API returned a server error (HTTP 503).",
             fix: "It retries automatically.",
             severity: .warning
         ))
+    }
+
+    /// A 4xx is the app's request being refused, which no retry fixes: the
+    /// API has changed under it, and only an update can follow.
+    @Test(arguments: [400, 404, 422])
+    func aClientErrorIsARejectedRequest(code: Int) {
+        #expect(error(.httpStatus(code), half: .api, service: Self.console) == HalfErrorMessage(
+            text: "API spend: Anthropic API rejected the app's request (HTTP \(code)).",
+            fix: "The API may have changed; check for an update.",
+            severity: .warning
+        ))
+    }
+
+    /// A refresh that succeeds without the session window is a shape change
+    /// too, not an idle account: the window is listed whether or not it runs.
+    @Test func aReportWithoutItsSessionWindowIsExplained() {
+        let message = PopoverPresentation.halfError(
+            half: .subscription, status: .ready, failure: nil, service: Self.claude, shortWindowMissing: true
+        )
+
+        #expect(message == HalfErrorMessage(
+            text: "Plan usage: claude.ai sent no session window.",
+            fix: "The API may have changed; check for an update.",
+            severity: .warning
+        ))
+        #expect(PopoverPresentation.halfError(half: .subscription, status: .ready, failure: nil, service: Self.claude) == nil)
+    }
+
+    @Test func shortWindowMissingOnlyForAReadySubscriptionReportWithoutIt() {
+        let anthropic = ProviderRegistry.descriptor(for: .anthropic)
+        let session = LimitWindow(id: "session", label: "Session", percentUsed: 1, resetsAt: nil, parentID: nil)
+        let weekly = LimitWindow(id: "weekly", label: "Weekly", percentUsed: 1, resetsAt: nil, parentID: nil)
+        let withoutSession = ProviderReport(planName: nil, windows: [weekly], extras: [], spend: nil)
+        let withSession = ProviderReport(planName: nil, windows: [session, weekly], extras: [], spend: nil)
+
+        #expect(PopoverPresentation.shortWindowMissing(from: withoutSession, half: .subscription, descriptor: anthropic))
+        #expect(!PopoverPresentation.shortWindowMissing(from: withSession, half: .subscription, descriptor: anthropic))
+        #expect(!PopoverPresentation.shortWindowMissing(from: nil, half: .subscription, descriptor: anthropic))
+        #expect(!PopoverPresentation.shortWindowMissing(from: withoutSession, half: .api, descriptor: anthropic))
+        #expect(!PopoverPresentation.shortWindowMissing(from: withoutSession, half: .subscription, descriptor: ProviderRegistry.descriptor(for: .cursor)))
     }
 
     private func rateLimited(until: Date, now: Date, uses24Hour: Bool = true) -> HalfErrorMessage? {
@@ -179,7 +219,7 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
     @Test func decodingSuggestsAnUpdate() {
         #expect(error(.decoding) == HalfErrorMessage(
             text: "Plan usage: claude.ai sent a response the app doesn't understand.",
-            fix: "It may have changed; check for an update.",
+            fix: "The API may have changed; check for an update.",
             severity: .warning
         ))
     }
@@ -227,7 +267,7 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         )
         #expect(message == HalfErrorMessage(
             text: "API spend: Anthropic API sent nothing the app can show.",
-            fix: "It may have changed; check for an update.",
+            fix: "The API may have changed; check for an update.",
             severity: .warning
         ))
 
@@ -237,7 +277,7 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
     }
 
     @Test func lineJoinsTextAndFix() {
-        #expect(error(.httpStatus(500))?.line == "Plan usage: claude.ai returned an error (HTTP 500). It retries automatically.")
+        #expect(error(.httpStatus(500))?.line == "Plan usage: claude.ai returned a server error (HTTP 500). It retries automatically.")
         #expect(HalfErrorMessage(text: "A", fix: nil, severity: .critical).line == "A")
     }
 
