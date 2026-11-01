@@ -79,12 +79,15 @@ fi
 # push and keychain sharing. With USAGE_TRACKER_PROVISIONING_PROFILE set, the
 # profile is embedded and the app is signed with entitlements derived from
 # it. Left unset, the newest macOS profile for this app that Xcode has
-# downloaded (Settings > Accounts > Download Manual Profiles) is used, so a
-# plain rebuild keeps sync. Set it empty to build without one; CI has no
-# profiles, so its builds run as before and say sync isn't available.
+# downloaded (Settings > Accounts > Download Manual Profiles) and that fits
+# the signing identity is used, so a plain rebuild keeps sync: a development
+# profile (it lists devices) for an Apple Development identity, a Developer
+# ID profile (it lists none) for a Developer ID one. Set it empty to build
+# without one; CI has no profiles, so its builds run as before and say sync
+# isn't available.
 entitlements=()
 profile="${USAGE_TRACKER_PROVISIONING_PROFILE-}"
-if [[ -z "${USAGE_TRACKER_PROVISIONING_PROFILE+set}" ]]; then
+if [[ -z "${USAGE_TRACKER_PROVISIONING_PROFILE+set}" && "$identity" != "-" ]]; then
   mkdir -p "$root/build"
   candidate_plist="$root/build/candidate-profile.plist"
   for candidate in "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.provisionprofile(Nom); do
@@ -92,6 +95,13 @@ if [[ -z "${USAGE_TRACKER_PROVISIONING_PROFILE+set}" ]]; then
     candidate_app="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.application-identifier" "$candidate_plist" 2>/dev/null)" || continue
     [[ "$candidate_app" == *.com.mohabsam.usage-tracker ]] || continue
     /usr/libexec/PlistBuddy -c "Print :Platform" "$candidate_plist" 2>/dev/null | grep -q OSX || continue
+    lists_devices=false
+    /usr/libexec/PlistBuddy -c "Print :ProvisionedDevices" "$candidate_plist" > /dev/null 2>&1 && lists_devices=true
+    if [[ "$identity" == "Apple Development"* ]]; then
+      [[ "$lists_devices" == true ]] || continue
+    else
+      [[ "$lists_devices" == false ]] || continue
+    fi
     profile="$candidate"
     break
   done
