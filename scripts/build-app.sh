@@ -96,13 +96,15 @@ if [[ -n "$profile" ]]; then
 
   # A profile grants wildcards and both environments; a signed app names
   # exactly what it uses. A release talks to the production CloudKit.
+  # plutil reads a dot as a key-path separator, so the dots in entitlement
+  # names are escaped.
   environment=Development
   [[ -n "${USAGE_TRACKER_VERSION:-}" ]] && environment=Production
-  plutil -replace com.apple.developer.icloud-container-environment -string "$environment" "$plist"
-  plutil -replace com.apple.developer.icloud-services -json '["CloudKit"]' "$plist"
+  plutil -replace 'com\.apple\.developer\.icloud-container-environment' -string "$environment" "$plist"
+  plutil -replace 'com\.apple\.developer\.icloud-services' -json '["CloudKit"]' "$plist"
   plutil -replace keychain-access-groups -json "[\"$app_id\"]" "$plist"
-  for unused in com.apple.developer.ubiquity-kvstore-identifier com.apple.developer.ubiquity-container-identifiers \
-    com.apple.developer.icloud-container-development-container-identifiers; do
+  for unused in 'com\.apple\.developer\.ubiquity-kvstore-identifier' 'com\.apple\.developer\.ubiquity-container-identifiers' \
+    'com\.apple\.developer\.icloud-container-development-container-identifiers'; do
     plutil -remove "$unused" "$plist" 2>/dev/null || true
   done
   entitlements=(--entitlements "$plist")
