@@ -55,6 +55,39 @@ struct AnthropicReportMapperTests {
         ])
     }
 
+    /// claude.ai dropped the top-level `five_hour` window; the same session
+    /// is still listed under `limits` as kind `session`, and the weekly one
+    /// as `weekly_all`.
+    @Test func missingWindowsComeFromTheLimitsList() {
+        let report = map(snapshot(
+            limits: [
+                Scoped(kind: "session", percent: 42, resetsAt: fiveHourReset, modelID: nil, modelDisplayName: nil),
+                Scoped(kind: "weekly_all", percent: 17.5, resetsAt: weeklyReset, modelID: nil, modelDisplayName: nil),
+                scoped(id: "fable", name: "Fable", percent: 5),
+            ]
+        ))
+
+        #expect(report.windows == [
+            LimitWindow(id: "session", label: "Session", percentUsed: 42, resetsAt: fiveHourReset, parentID: nil, windowLength: 5 * 3600),
+            LimitWindow(id: "weekly", label: "Weekly", percentUsed: 17.5, resetsAt: weeklyReset, parentID: nil, windowLength: 7 * 86400),
+            LimitWindow(id: "weekly:fable", label: "Fable", percentUsed: 5, resetsAt: weeklyReset, parentID: "weekly", windowLength: 7 * 86400),
+        ])
+    }
+
+    @Test func theWindowsOutrankTheLimitsList() {
+        let report = map(snapshot(
+            fiveHour: Window(utilization: 10, resetsAt: fiveHourReset),
+            sevenDay: Window(utilization: 20, resetsAt: weeklyReset),
+            limits: [
+                Scoped(kind: "session", percent: 42, resetsAt: nil, modelID: nil, modelDisplayName: nil),
+                Scoped(kind: "weekly_all", percent: 17.5, resetsAt: nil, modelID: nil, modelDisplayName: nil),
+            ]
+        ))
+
+        #expect(report.windows.map(\.percentUsed) == [10, 20])
+        #expect(report.windows.map(\.resetsAt) == [fiveHourReset, weeklyReset])
+    }
+
     /// The same idle shape OpenAI was seen to send: a reset a whole window
     /// away that slides forward on every fetch.
     @Test func aWindowResettingAWholeLengthAwayHasNotStarted() {
@@ -111,7 +144,7 @@ struct AnthropicReportMapperTests {
                 scoped(id: nil, name: "No id", percent: 5),
                 scoped(id: nil, name: nil, percent: 4),
                 scoped(id: "empty", name: "", percent: 3),
-                scoped(id: "other", name: "Other", percent: 1, kind: "session"),
+                scoped(id: "other", name: "Other", percent: 1, kind: "daily"),
             ]
         ))
 
