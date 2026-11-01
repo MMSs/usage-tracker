@@ -54,13 +54,21 @@ fi
 touch "$bundle"
 
 # Sign with a stable identity when one is available, so Keychain keeps
-# trusting the app across rebuilds instead of asking after each one. Without
-# one (CI), sign ad hoc so the embedded framework and the app still form a
+# trusting the app across rebuilds instead of asking after each one: an Apple
+# Development certificate first, else the Developer ID one releases use, which
+# also lets a local build share Keychain items with the released app. Without
+# either (CI), sign ad hoc so the embedded framework and the app still form a
 # valid signature. Set USAGE_TRACKER_SIGNING_IDENTITY to pick an identity, or
 # to - for ad hoc. A real identity also gets the hardened runtime and a secure
 # timestamp, which notarization requires.
-identity="${USAGE_TRACKER_SIGNING_IDENTITY:-$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep -o '"Apple Development: [^"]*"' | head -1 | tr -d '"' || true)}"
+identity="${USAGE_TRACKER_SIGNING_IDENTITY:-}"
+if [[ -z "$identity" ]]; then
+  identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+  for prefix in "Apple Development" "Developer ID Application"; do
+    identity="$(grep -o "\"$prefix: [^\"]*\"" <<< "$identities" | head -1 | tr -d '"' || true)"
+    [[ -n "$identity" ]] && break
+  done
+fi
 identity="${identity:--}"
 sign=(codesign --force --sign "$identity")
 if [[ "$identity" != "-" ]]; then
