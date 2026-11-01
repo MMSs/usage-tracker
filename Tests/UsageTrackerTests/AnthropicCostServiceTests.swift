@@ -44,7 +44,7 @@ struct AnthropicCostServiceTests {
         let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: try fixture("anthropic-cost-report"))])
         let service = AnthropicCostService(client: client)
 
-        _ = try await service.fetchMonthToDate(adminKey: "sk-ant-admin-test", month: october, calendar: calendar)
+        _ = try await service.fetchMonthToDate(adminKey: "sk-ant-admin-test", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         let request = try #require(client.requests.first)
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
@@ -71,7 +71,7 @@ struct AnthropicCostServiceTests {
         ])
         let service = AnthropicCostService(client: client)
 
-        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         #expect(days == [
             CostDay(day: local(2026, 10, 1), dollars: Decimal(string: "1.505")!),
@@ -87,7 +87,7 @@ struct AnthropicCostServiceTests {
         let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: try fixture("anthropic-cost-report"))])
         let service = AnthropicCostService(client: client)
 
-        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         #expect(days == [
             CostDay(day: local(2026, 10, 1), dollars: Decimal(string: "12.345678")!),
@@ -102,7 +102,7 @@ struct AnthropicCostServiceTests {
         ])
         let service = AnthropicCostService(client: client)
 
-        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         #expect(days == [CostDay(day: local(2026, 10, 5), dollars: Decimal(string: "3.5")!)])
     }
@@ -113,7 +113,7 @@ struct AnthropicCostServiceTests {
         ])
         let service = AnthropicCostService(client: client)
 
-        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         // 00:00Z on 3 Oct is still 2 Oct in Los Angeles; the bucket belongs to 3 Oct.
         #expect(days.first?.day == calendar.startOfDay(for: local(2026, 10, 3)))
@@ -126,7 +126,7 @@ struct AnthropicCostServiceTests {
         ])
         let service = AnthropicCostService(client: client)
 
-        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         #expect(days == [CostDay(day: local(2026, 10, 3), dollars: 1)])
     }
@@ -140,7 +140,7 @@ struct AnthropicCostServiceTests {
         let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: body), "page=p1": .ok(json: body)])
         let service = AnthropicCostService(client: client)
 
-        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         #expect(days.count == 1)
         #expect(client.requests.count <= 2)
@@ -151,7 +151,7 @@ struct AnthropicCostServiceTests {
         let service = AnthropicCostService(client: client)
 
         await #expect(throws: FetchError.unauthorized) {
-            try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+            try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
         }
     }
 
@@ -163,7 +163,7 @@ struct AnthropicCostServiceTests {
         let before = Date()
 
         let error = await #expect(throws: FetchError.self) {
-            try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+            try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
         }
 
         guard case let .rateLimited(until?)? = error else {
@@ -190,7 +190,7 @@ struct AnthropicCostServiceTests {
         let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: body)])
         let service = AnthropicCostService(client: client)
 
-        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
 
         #expect(days == [CostDay(day: local(2026, 10, 1), dollars: Decimal(string: "2.2345")!)])
     }
@@ -203,7 +203,7 @@ struct AnthropicCostServiceTests {
         let service = AnthropicCostService(client: client)
 
         await #expect(throws: FetchError.decoding) {
-            try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+            try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
         }
     }
 
@@ -214,8 +214,35 @@ struct AnthropicCostServiceTests {
         let service = AnthropicCostService(client: client)
 
         await #expect(throws: FetchError.decoding) {
-            try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+            try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
         }
+    }
+
+    /// The Admin API has only whole UTC days, so on the month's first one
+    /// the range holds nothing yet: asking for it is a 400 all day.
+    @Test func theMonthsFirstUTCDayIsNotRequested() async throws {
+        let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: try fixture("anthropic-cost-report"))])
+        let service = AnthropicCostService(client: client)
+        let november = CyclePeriod(start: local(2026, 11, 1), end: local(2026, 12, 1))
+        // 1 Nov 15:00 in Los Angeles is 1 Nov 23:00 UTC: still the first UTC day.
+        let today = calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 15))!
+
+        let days = try await service.fetchMonthToDate(adminKey: "k", month: november, today: today, calendar: calendar)
+
+        #expect(days == [])
+        #expect(client.requests.isEmpty)
+    }
+
+    @Test func theMonthsSecondUTCDayIsRequested() async throws {
+        let client = RoutingHTTPClient(routes: ["limit=31": .ok(json: #"{"data":[],"has_more":false,"next_page":null}"#)])
+        let service = AnthropicCostService(client: client)
+        let november = CyclePeriod(start: local(2026, 11, 1), end: local(2026, 12, 1))
+        // 1 Nov 17:30 in Los Angeles is 2 Nov 01:30 UTC.
+        let today = calendar.date(from: DateComponents(year: 2026, month: 11, day: 1, hour: 17, minute: 30))!
+
+        _ = try await service.fetchMonthToDate(adminKey: "k", month: november, today: today, calendar: calendar)
+
+        #expect(client.requests.count == 1)
     }
 
     @Test func malformedBodyIsADecodingError() async throws {
@@ -223,7 +250,7 @@ struct AnthropicCostServiceTests {
         let service = AnthropicCostService(client: client)
 
         await #expect(throws: FetchError.decoding) {
-            try await service.fetchMonthToDate(adminKey: "k", month: october, calendar: calendar)
+            try await service.fetchMonthToDate(adminKey: "k", month: october, today: local(2026, 10, 24), calendar: calendar)
         }
     }
 }
@@ -239,7 +266,7 @@ struct AnthropicAPIReportServiceTests {
             self.days = days
         }
 
-        func fetchMonthToDate(adminKey: String, month: CyclePeriod, calendar: Calendar) async throws -> [CostDay] {
+        func fetchMonthToDate(adminKey: String, month: CyclePeriod, today: Date, calendar: Calendar) async throws -> [CostDay] {
             adminKeys.append(adminKey)
             months.append(month)
 

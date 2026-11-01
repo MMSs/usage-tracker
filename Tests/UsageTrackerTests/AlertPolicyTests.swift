@@ -196,6 +196,7 @@ struct AlertPolicyTests {
         #expect(RefreshFailure.challenge.alertCause == "blocked by the provider's bot check")
         #expect(RefreshFailure.unauthorized.alertCause == "credential expired")
         #expect(RefreshFailure.httpStatus(503).alertCause == "server error 503")
+        #expect(RefreshFailure.httpStatus(400).alertCause == "request rejected (HTTP 400)")
         #expect(RefreshFailure.rateLimited(until: nil).alertCause == "rate limited")
         #expect(RefreshFailure.decoding.alertCause == "unexpected response")
         #expect(RefreshFailure.keychain.alertCause == "couldn't read Keychain")

@@ -122,10 +122,21 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         ))
     }
 
-    @Test func httpStatusNamesTheServiceAndCode() {
-        #expect(error(.httpStatus(429), half: .api, service: Self.console) == HalfErrorMessage(
-            text: "API spend: Anthropic API returned an error (HTTP 429).",
+    @Test func aServerErrorNamesTheServiceAndCodeAndRetries() {
+        #expect(error(.httpStatus(503), half: .api, service: Self.console) == HalfErrorMessage(
+            text: "API spend: Anthropic API returned a server error (HTTP 503).",
             fix: "It retries automatically.",
+            severity: .warning
+        ))
+    }
+
+    /// A 4xx is the app's request being refused, which no retry fixes: the
+    /// API has changed under it, and only an update can follow.
+    @Test(arguments: [400, 404, 422])
+    func aClientErrorIsARejectedRequest(code: Int) {
+        #expect(error(.httpStatus(code), half: .api, service: Self.console) == HalfErrorMessage(
+            text: "API spend: Anthropic API rejected the app's request (HTTP \(code)).",
+            fix: "The API may have changed; check for an update.",
             severity: .warning
         ))
     }
@@ -179,7 +190,7 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
     @Test func decodingSuggestsAnUpdate() {
         #expect(error(.decoding) == HalfErrorMessage(
             text: "Plan usage: claude.ai sent a response the app doesn't understand.",
-            fix: "It may have changed; check for an update.",
+            fix: "The API may have changed; check for an update.",
             severity: .warning
         ))
     }
@@ -227,7 +238,7 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
         )
         #expect(message == HalfErrorMessage(
             text: "API spend: Anthropic API sent nothing the app can show.",
-            fix: "It may have changed; check for an update.",
+            fix: "The API may have changed; check for an update.",
             severity: .warning
         ))
 
@@ -237,7 +248,7 @@ private func cycleMoney(limit: Decimal?) -> MoneyRow {
     }
 
     @Test func lineJoinsTextAndFix() {
-        #expect(error(.httpStatus(500))?.line == "Plan usage: claude.ai returned an error (HTTP 500). It retries automatically.")
+        #expect(error(.httpStatus(500))?.line == "Plan usage: claude.ai returned a server error (HTTP 500). It retries automatically.")
         #expect(HalfErrorMessage(text: "A", fix: nil, severity: .critical).line == "A")
     }
 

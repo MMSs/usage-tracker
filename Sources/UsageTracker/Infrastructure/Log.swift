@@ -61,6 +61,37 @@ enum LogFormat {
         }
     }
 
+    /// The server's own explanation of a failure: the `type` and `message`
+    /// of an API error envelope, or a top-level `message`, `detail` or
+    /// `error` string. Nil for anything else, such as an HTML challenge page.
+    /// Cut to 200 characters. It describes the request, never a credential.
+    static func errorSummary(_ data: Data) -> String? {
+        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return nil
+        }
+
+        var parts: [String] = []
+        switch object["error"] {
+        case let error as [String: Any]:
+            parts += [error["type"] as? String, error["message"] as? String].compactMap { $0 }
+        case let error as String:
+            parts.append(error)
+        default:
+            for key in ["message", "detail"] where parts.isEmpty {
+                if let text = object[key] as? String {
+                    parts.append(text)
+                }
+            }
+        }
+
+        guard !parts.isEmpty else {
+            return nil
+        }
+
+        let text = parts.joined(separator: ": ")
+        return text.count > 200 ? String(text.prefix(200)) + "…" : text
+    }
+
     /// "data[1].amount", or "root" for the top level.
     private static func path(_ codingPath: [any CodingKey]) -> String {
         guard !codingPath.isEmpty else {

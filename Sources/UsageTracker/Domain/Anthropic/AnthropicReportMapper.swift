@@ -9,7 +9,7 @@ enum AnthropicReportMapper {
         let usage = snapshot.usage
         var windows: [LimitWindow] = []
 
-        if let fiveHour = usage.fiveHour {
+        if let fiveHour = usage.sessionWindow {
             windows.append(LimitWindow(
                 id: "session",
                 label: "Session",
@@ -20,7 +20,7 @@ enum AnthropicReportMapper {
             ))
         }
 
-        if let sevenDay = usage.sevenDay {
+        if let sevenDay = usage.weeklyWindow {
             windows.append(LimitWindow(
                 id: weeklyID,
                 label: "Weekly",

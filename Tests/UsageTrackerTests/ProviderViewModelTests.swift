@@ -94,7 +94,7 @@ import Testing
         let half = try #require(model.subscription)
         #expect(half.report != nil)
         #expect(PopoverPresentation.halfError(half, descriptor: model.descriptor, display: nil)?.text
-            == "Plan usage: Cursor returned an error (HTTP 502).")
+            == "Plan usage: Cursor returned a server error (HTTP 502).")
     }
 
     @Test func settingsStatusHasALinePerFailingHalf() async {
@@ -107,7 +107,7 @@ import Testing
 
         #expect(ProviderStatus.make(for: model, item: nil).lines == [
             .init(text: "Plan usage: claude.ai asked for a browser check. Open claude.ai in your browser, then Refresh.", tone: .warning),
-            .init(text: "API spend: Anthropic API returned an error (HTTP 503). It retries automatically.", tone: .warning),
+            .init(text: "API spend: Anthropic API returned a server error (HTTP 503). It retries automatically.", tone: .warning),
         ])
 
         model.api?.isEnabled = false
