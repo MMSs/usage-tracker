@@ -18,6 +18,8 @@ struct CursorUsageResponse: Decodable, Equatable {
     let billingCycleEnd: Date
     let individualUsage: IndividualUsage
     let isUnlimited: Bool
+    /// The plan's key, such as `free` or `pro_plus`; absent on old responses.
+    var membershipType: String? = nil
 }
 
 // Cursor's JSON omits zero-valued fields. Team plans report `overall`;
@@ -58,4 +60,37 @@ extension CursorUsageResponse.IndividualUsage.Overall {
 struct PercentSplit: Equatable {
     let auto: Decimal
     let api: Decimal
+}
+
+enum CursorPlanName {
+    /// Cursor's plans by their membership keys; Hobby is what the free
+    /// plan is called on the pricing page.
+    private static let known: [String: String] = [
+        "free": "Hobby",
+        "hobby": "Hobby",
+        "free_trial": "Pro Trial",
+        "pro": "Pro",
+        "pro_plus": "Pro+",
+        "ultra": "Ultra",
+        "team": "Teams",
+        "teams": "Teams",
+        "business": "Business",
+        "enterprise": "Enterprise",
+    ]
+
+    /// A key the table does not know still reads as a name ("pro_max"
+    /// becomes "Pro max"), so a new plan shows without an app update.
+    static func from(membershipType: String?) -> String? {
+        guard let key = membershipType?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !key.isEmpty else {
+            return nil
+        }
+
+        if let name = known[key] {
+            return name
+        }
+
+        let words = key.replacingOccurrences(of: "_", with: " ")
+
+        return words.prefix(1).uppercased() + words.dropFirst()
+    }
 }
