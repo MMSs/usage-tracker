@@ -72,7 +72,8 @@ jobs:
               base="$prev"
             else
               stamp="$(git log -1 --format='%at %s' "$prev")"
-              base="$(git log --first-parent --format='%H%x09%at %s' "$sha" | awk -F'\t' -v s="$stamp" '$2==s {print $1; exit}')"
+              # Reads the whole log: stopping early breaks git's pipe, which pipefail reports.
+              base="$(git log --first-parent --format='%H%x09%at %s' "$sha" | awk -F'\t' -v s="$stamp" '!found && $2==s {print $1; found=1}')"
               if [[ -z "$base" ]]; then
                 echo "Can't find the commit of $prev on main" >&2
                 exit 1
