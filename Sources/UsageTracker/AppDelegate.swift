@@ -18,6 +18,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         model.loginItem.reconcileAtLaunch()
+        // Gatekeeper let this launch through, so the quarantine is spent.
+        let bundleURL = Bundle.main.bundleURL
+        Task.detached(priority: .utility) {
+            QuarantineRemover(bundleURL: bundleURL).run()
+        }
         // iCloud tells the app about another Mac's change with a silent push.
         // Without the push entitlement this fails quietly and pulls at each refresh still catch up.
         if model.sync?.canShareSettings == true {
