@@ -6,13 +6,14 @@ import Sparkle
 /// the appcast and public key a release build carries in its Info.plist.
 @MainActor
 final class SparkleUpdater: SoftwareUpdating {
+    private let updaterDelegate = UpdaterDelegate()
     private let userDriverDelegate = UserDriverDelegate()
     private let controller: SPUStandardUpdaterController
 
     init() {
         controller = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: updaterDelegate,
             userDriverDelegate: userDriverDelegate
         )
     }
@@ -34,11 +35,11 @@ final class SparkleUpdater: SoftwareUpdating {
     }
 
     var isUpdatePending: Bool {
-        userDriverDelegate.pending.value
+        updaterDelegate.pending.value
     }
 
     var isUpdatePendingPublisher: AnyPublisher<Bool, Never> {
-        userDriverDelegate.pending.removeDuplicates().eraseToAnyPublisher()
+        updaterDelegate.pending.removeDuplicates().eraseToAnyPublisher()
     }
 
     /// Also how a pending update is shown: Sparkle brings up the update it found.
@@ -47,24 +48,46 @@ final class SparkleUpdater: SoftwareUpdating {
     }
 }
 
-/// Gentle reminders for a background app: a scheduled update found while the
-/// user is busy elsewhere doesn't open a window; the menu bar shows a dot
-/// instead until the user opens it or the update session ends. When Sparkle
-/// does show a window, the app comes forward first, since it has no Dock
-/// icon and the window would otherwise open behind the front app.
+/// Tracks whether an update is waiting, in the foreground or background: on
+/// from the moment a check finds one until the user installs or skips it, or
+/// a later check finds none. Closing Sparkle's window ("Later") keeps it on.
 @MainActor
-private final class UserDriverDelegate: NSObject, @preconcurrency SPUStandardUserDriverDelegate {
+private final class UpdaterDelegate: NSObject, @preconcurrency SPUUpdaterDelegate {
     let pending = CurrentValueSubject<Bool, Never>(false)
 
-    var supportsGentleScheduledUpdateReminders: Bool {
-        true
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        pending.send(true)
     }
 
-    func standardUserDriverShouldHandleShowingScheduledUpdate(
-        _ update: SUAppcastItem,
-        andInImmediateFocus immediateFocus: Bool
-    ) -> Bool {
-        immediateFocus
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        pending.send(false)
+    }
+
+    func updater(
+        _ updater: SPUUpdater,
+        userDidMake choice: SPUUserUpdateChoice,
+        forUpdate updateItem: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        switch choice {
+        case .install, .skip:
+            pending.send(false)
+        case .dismiss:
+            break
+        @unknown default:
+            break
+        }
+    }
+}
+
+/// The app has no Dock icon, so a scheduled update's window would otherwise
+/// open behind whatever app is in front. Sparkle's guidance for background
+/// apps is to support gentle reminders and bring the app forward when the
+/// standard user driver is about to show an update.
+@MainActor
+private final class UserDriverDelegate: NSObject, @preconcurrency SPUStandardUserDriverDelegate {
+    var supportsGentleScheduledUpdateReminders: Bool {
+        true
     }
 
     func standardUserDriverWillHandleShowingUpdate(
@@ -73,17 +96,8 @@ private final class UserDriverDelegate: NSObject, @preconcurrency SPUStandardUse
         state: SPUUserUpdateState
     ) {
         guard handleShowingUpdate else {
-            pending.send(true)
             return
         }
         NSApp.activate()
-    }
-
-    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
-        pending.send(false)
-    }
-
-    func standardUserDriverWillFinishUpdateSession() {
-        pending.send(false)
     }
 }
