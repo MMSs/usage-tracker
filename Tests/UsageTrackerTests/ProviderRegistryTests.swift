@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import UsageTracker
 
@@ -26,6 +27,20 @@ import Testing
 
     @Test func aHalfWithoutAServiceFallsBackToTheProviderName() {
         #expect(ProviderRegistry.descriptor(for: .cursor).service(for: .api) == HalfService(name: "Cursor", host: "Cursor"))
+    }
+
+    @Test func eachActiveHalfLinksToItsProviderUsagePage() {
+        #expect(ProviderRegistry.descriptor(for: .cursor).dashboards == [
+            .subscription: URL(string: "https://cursor.com/dashboard/usage")!,
+        ])
+        #expect(ProviderRegistry.descriptor(for: .anthropic).dashboards == [
+            .subscription: URL(string: "https://claude.ai/settings/usage")!,
+            .api: URL(string: "https://platform.claude.com/cost")!,
+        ])
+        #expect(ProviderRegistry.descriptor(for: .openai).dashboards == [
+            .subscription: URL(string: "https://chatgpt.com/codex/cloud/settings/usage")!,
+            .api: URL(string: "https://platform.openai.com/usage")!,
+        ])
     }
 
     @Test func registryListsCursorAnthropicOpenAIInOrder() {

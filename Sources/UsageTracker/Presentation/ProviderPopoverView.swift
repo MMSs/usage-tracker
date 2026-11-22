@@ -145,7 +145,24 @@ struct ProviderPopoverView: View {
         label: String, half: HalfViewModel, display: HalfDisplay?, now: Date, @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionLabel(label)
+            if let url = provider.descriptor.dashboards[half.half] {
+                Link(destination: url) {
+                    HStack(spacing: 3) {
+                        sectionLabel(label)
+                        Image(systemName: "arrow.up.right")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .pointerStyle(.link)
+                .simultaneousGesture(TapGesture().onEnded { closePopover() })
+                .help("Open \(provider.descriptor.service(for: half.half).name) usage")
+                .accessibilityHint("Opens \(url.host() ?? "the provider's") usage page")
+            } else {
+                sectionLabel(label)
+            }
 
             // Shown with or without a report, so the menu bar's error mark always has an explanation.
             if let error = PopoverPresentation.halfError(half, descriptor: provider.descriptor, display: display, now: now) {
