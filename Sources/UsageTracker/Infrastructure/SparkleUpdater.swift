@@ -33,19 +33,38 @@ final class SparkleUpdater: SoftwareUpdating {
             .eraseToAnyPublisher()
     }
 
+    var isUpdatePending: Bool {
+        userDriverDelegate.pending.value
+    }
+
+    var isUpdatePendingPublisher: AnyPublisher<Bool, Never> {
+        userDriverDelegate.pending.removeDuplicates().eraseToAnyPublisher()
+    }
+
+    /// Also how a pending update is shown: Sparkle brings up the update it found.
     func checkForUpdates() {
         controller.checkForUpdates(nil)
     }
 }
 
-/// The app has no Dock icon, so a scheduled update's window would otherwise
-/// open behind whatever app is in front. Sparkle's guidance for background
-/// apps is to support gentle reminders and bring the app forward when the
-/// standard user driver is about to show an update.
+/// Gentle reminders for a background app: a scheduled update found while the
+/// user is busy elsewhere doesn't open a window; the menu bar shows a dot
+/// instead until the user opens it or the update session ends. When Sparkle
+/// does show a window, the app comes forward first, since it has no Dock
+/// icon and the window would otherwise open behind the front app.
 @MainActor
 private final class UserDriverDelegate: NSObject, @preconcurrency SPUStandardUserDriverDelegate {
+    let pending = CurrentValueSubject<Bool, Never>(false)
+
     var supportsGentleScheduledUpdateReminders: Bool {
         true
+    }
+
+    func standardUserDriverShouldHandleShowingScheduledUpdate(
+        _ update: SUAppcastItem,
+        andInImmediateFocus immediateFocus: Bool
+    ) -> Bool {
+        immediateFocus
     }
 
     func standardUserDriverWillHandleShowingUpdate(
@@ -54,8 +73,17 @@ private final class UserDriverDelegate: NSObject, @preconcurrency SPUStandardUse
         state: SPUUserUpdateState
     ) {
         guard handleShowingUpdate else {
+            pending.send(true)
             return
         }
         NSApp.activate()
+    }
+
+    func standardUserDriverDidReceiveUserAttention(forUpdate update: SUAppcastItem) {
+        pending.send(false)
+    }
+
+    func standardUserDriverWillFinishUpdateSession() {
+        pending.send(false)
     }
 }
