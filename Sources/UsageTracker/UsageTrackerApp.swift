@@ -29,13 +29,14 @@ struct ProviderMenuBarScene: Scene {
 
     private var item: MenuBarItem {
         let now = Date()
-        return MenuBarItemBuilder.make(
+        let built = MenuBarItemBuilder.make(
             descriptor: provider.descriptor,
             subscription: provider.snapshot(.subscription),
             api: provider.snapshot(.api),
             apiBudget: model.budget(for: provider.id),
             now: now
         ) ?? MenuBarItem(provider: provider.id, subscription: .status(.loading), api: nil)
+        return built.withUpdateBadge(model.updateBadgeProvider == provider.id)
     }
 
     var body: some Scene {

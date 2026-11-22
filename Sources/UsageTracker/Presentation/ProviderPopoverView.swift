@@ -52,6 +52,10 @@ struct ProviderPopoverView: View {
                 apiSection(half, display: item?.api, now: now)
             }
 
+            if appModel.updates.isUpdatePending {
+                updateRow
+            }
+
             footer
         }
         .padding(16))
@@ -437,6 +441,23 @@ struct ProviderPopoverView: View {
     }
 
     // MARK: Footer
+
+    /// Shown while a background check found an update; opens Sparkle's window.
+    private var updateRow: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(.tint)
+                .frame(width: 6, height: 6)
+            Text("Update available")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Button("Install") {
+                appModel.updates.showUpdate()
+            }
+            .controlSize(.small)
+        }
+    }
 
     private var footer: some View {
         HStack(spacing: 6) {

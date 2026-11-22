@@ -36,6 +36,23 @@ import Testing
         #expect(updater.checkCallCount == 1)
     }
 
+    @Test func pendingFollowsTheUpdaterAndShowingOpensSparkle() {
+        let updater = FakeSoftwareUpdater()
+        updater.pendingSubject.send(true)
+        let model = UpdatesModel(updater: updater, build: release)
+
+        #expect(model.isUpdatePending, "read on start")
+        model.showUpdate()
+        #expect(updater.checkCallCount == 1)
+
+        updater.pendingSubject.send(false)
+        #expect(model.isUpdatePending == false)
+    }
+
+    @Test func noUpdaterIsNeverPending() {
+        #expect(UpdatesModel(updater: nil, build: release).isUpdatePending == false)
+    }
+
     @Test func showsTheVersion() {
         let model = UpdatesModel(updater: FakeSoftwareUpdater(), build: release)
 

@@ -6,13 +6,14 @@ import Sparkle
 /// the appcast and public key a release build carries in its Info.plist.
 @MainActor
 final class SparkleUpdater: SoftwareUpdating {
+    private let updaterDelegate = UpdaterDelegate()
     private let userDriverDelegate = UserDriverDelegate()
     private let controller: SPUStandardUpdaterController
 
     init() {
         controller = SPUStandardUpdaterController(
             startingUpdater: true,
-            updaterDelegate: nil,
+            updaterDelegate: updaterDelegate,
             userDriverDelegate: userDriverDelegate
         )
     }
@@ -33,8 +34,49 @@ final class SparkleUpdater: SoftwareUpdating {
             .eraseToAnyPublisher()
     }
 
+    var isUpdatePending: Bool {
+        updaterDelegate.pending.value
+    }
+
+    var isUpdatePendingPublisher: AnyPublisher<Bool, Never> {
+        updaterDelegate.pending.removeDuplicates().eraseToAnyPublisher()
+    }
+
+    /// Also how a pending update is shown: Sparkle brings up the update it found.
     func checkForUpdates() {
         controller.checkForUpdates(nil)
+    }
+}
+
+/// Tracks whether an update is waiting, in the foreground or background: on
+/// from the moment a check finds one until the user installs or skips it, or
+/// a later check finds none. Closing Sparkle's window ("Later") keeps it on.
+@MainActor
+private final class UpdaterDelegate: NSObject, @preconcurrency SPUUpdaterDelegate {
+    let pending = CurrentValueSubject<Bool, Never>(false)
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        pending.send(true)
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater) {
+        pending.send(false)
+    }
+
+    func updater(
+        _ updater: SPUUpdater,
+        userDidMake choice: SPUUserUpdateChoice,
+        forUpdate updateItem: SUAppcastItem,
+        state: SPUUserUpdateState
+    ) {
+        switch choice {
+        case .install, .skip:
+            pending.send(false)
+        case .dismiss:
+            break
+        @unknown default:
+            break
+        }
     }
 }
 
