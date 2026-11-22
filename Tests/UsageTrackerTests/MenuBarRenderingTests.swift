@@ -157,6 +157,19 @@ import Testing
         #expect(try #require(render(badged, colored)).isTemplate == false)
     }
 
+    /// The update dot is gentle: it never colours the item, keeps the logo's
+    /// size, and survives the appearance and half filters.
+    @Test func theUpdateDotStaysATemplateAndKeepsTheLogoSize() throws {
+        let colored = MenuBarAppearance(showText: false, countdown: false, showGraph: false, colored: true)
+        let dotted = MenuBarItem(provider: .anthropic, subscription: twoMeters, api: nil, updateBadge: true)
+
+        let image = try #require(render(dotted, colored))
+        #expect(image.isTemplate)
+        #expect(image.size.width == 14)
+        #expect(dotted.visible(in: colored, halves: MenuBarHalves(subscription: false, api: false)).updateBadge)
+        #expect(dotted.accessibilityText(displayName: "Claude").hasSuffix("Update available"))
+    }
+
     @Test func theDividerSitsBetweenTwoDrawingHalves() throws {
         let sub = MenuBarItem(provider: .cursor, subscription: twoMeters, api: nil)
         let api = MenuBarItem(provider: .cursor, subscription: nil, api: money)

@@ -47,6 +47,7 @@ final class AppModel: ObservableObject {
     /// Halves whose refreshes are failing, so a streak alerts once.
     private var failingTargets: Set<RefreshTarget> = []
     private var providerObservers: [AnyCancellable] = []
+    private var updatesObserver: AnyCancellable?
 
     init(
         providers: [ProviderViewModel],
@@ -91,6 +92,8 @@ final class AppModel: ObservableObject {
         providerObservers = providers.map { provider in
             provider.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
         }
+        // The menu bar scenes redraw the update dot when the pending state changes.
+        updatesObserver = updates.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }
 
         // The scheduler is owned by the model, so its closures hold the model weakly.
         scheduler = RefreshScheduler(
@@ -604,6 +607,16 @@ final class AppModel: ObservableObject {
     /// app's set-up item rather than any usage.
     var showsSetUpItem: Bool {
         !providers.contains(where: \.isConfigured)
+    }
+
+    /// The one provider item that carries the update dot: the leftmost item,
+    /// and none while the set-up item shows or no update is waiting.
+    var updateBadgeProvider: Provider? {
+        guard updates.isUpdatePending, !showsSetUpItem else {
+            return nil
+        }
+
+        return Self.menuBarDisplayOrder(insertedProviders).first
     }
 
     func provider(_ id: Provider) -> ProviderViewModel {

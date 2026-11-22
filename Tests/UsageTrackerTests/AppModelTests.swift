@@ -17,7 +17,7 @@ import Testing
         .openai: StubReportFetcher(result: .success(makeReport(3))),
     ]
 
-    private func makeModel() -> AppModel {
+    private func makeModel(updates: UpdatesModel = UpdatesModel(updater: nil, build: BuildInfo(infoDictionary: nil))) -> AppModel {
         let providers = ProviderRegistry.all.map { descriptor in
             ProviderViewModel(
                 descriptor: descriptor,
@@ -34,6 +34,7 @@ import Testing
             appearanceStore: MemoryMenuBarAppearanceStore(),
             budgetStore: budgets,
             loginItem: .stub(),
+            updates: updates,
             sleepObserver: ControllableSleepObserver(),
             networkObserver: ControllableNetworkObserver(),
             sleep: { [sleeper] duration in await sleeper.sleep(duration) },
@@ -564,6 +565,33 @@ import Testing
             #expect(store.loadSettings(for: .anthropic).legacyHiddenHalves.isEmpty)
             #expect(!store.settings(for: .anthropic).showsSubscriptionInMenuBar)
         }
+    }
+
+    @Test func onlyTheLeftmostItemCarriesTheUpdateDot() {
+        configureAll()
+        let updater = FakeSoftwareUpdater()
+        let model = makeModel(updates: UpdatesModel(updater: updater, build: BuildInfo(infoDictionary: nil)))
+
+        #expect(model.updateBadgeProvider == nil, "nothing pending")
+
+        updater.pendingSubject.send(true)
+        // Display order is registry order reversed, so OpenAI sits leftmost.
+        #expect(model.updateBadgeProvider == .openai)
+
+        model.setSettings(ProviderSettings(isEnabled: false), for: .openai)
+        #expect(model.updateBadgeProvider == .anthropic, "moves to the next visible item")
+
+        updater.pendingSubject.send(false)
+        #expect(model.updateBadgeProvider == nil)
+    }
+
+    @Test func theSetUpItemCarriesNoUpdateDot() {
+        let updater = FakeSoftwareUpdater()
+        updater.pendingSubject.send(true)
+        let model = makeModel(updates: UpdatesModel(updater: updater, build: BuildInfo(infoDictionary: nil)))
+
+        #expect(model.showsSetUpItem)
+        #expect(model.updateBadgeProvider == nil)
     }
 
     @Test func disabledProvidersAreNeitherInsertedNorRefreshed() async {

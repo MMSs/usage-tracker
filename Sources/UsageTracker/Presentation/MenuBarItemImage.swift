@@ -104,7 +104,7 @@ private struct MenuBarItemContent: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            LogoView(provider: item.provider, badged: item.logoBadge, palette: palette)
+            LogoView(provider: item.provider, badged: item.logoBadge, updateDot: item.updateBadge, palette: palette)
 
             if let subscription = drawn(item.subscription) {
                 HalfView(display: subscription, appearance: appearance, palette: palette)
@@ -130,11 +130,16 @@ private struct MenuBarItemContent: View {
 }
 
 /// The provider glyph; a badge cuts a gap out of its bottom-right corner and
-/// puts an exclamation mark in it. The frame stays 14x14.
+/// puts an exclamation mark in it, or, for a waiting update, a small dot in
+/// the foreground colour. The "!" wins. The frame stays 14x14.
 private struct LogoView: View {
     let provider: Provider
     let badged: Bool
+    let updateDot: Bool
     let palette: MenuBarPalette
+
+    private let dotDiameter: CGFloat = 5
+    private var cutsCorner: Bool { badged || updateDot }
 
     private let size: CGFloat = 14
     private let badgeDiameter: CGFloat = 7
@@ -146,7 +151,7 @@ private struct LogoView: View {
         ProviderGlyph(provider: provider)
             .fill(palette.foreground)
             .mask {
-                if badged {
+                if cutsCorner {
                     Rectangle()
                         .overlay {
                             Circle()
@@ -167,6 +172,11 @@ private struct LogoView: View {
                     }
                     .foregroundStyle(palette.error)
                     .position(x: center, y: center)
+                } else if updateDot {
+                    Circle()
+                        .fill(palette.foreground)
+                        .frame(width: dotDiameter, height: dotDiameter)
+                        .position(x: center, y: center)
                 }
             }
             .frame(width: size, height: size)

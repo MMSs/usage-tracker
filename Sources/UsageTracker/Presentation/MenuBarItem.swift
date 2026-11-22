@@ -92,6 +92,9 @@ struct MenuBarItem: Equatable {
     let api: HalfDisplay?
     /// A half failed: the logo carries a "!" badge, even when that half is hidden.
     let logoBadge: Bool
+    /// An update is waiting: the logo carries a small dot, unless the "!" badge
+    /// already takes the corner. Only one item in the menu bar sets it.
+    let updateBadge: Bool
     /// What VoiceOver says about failed halves the menu bar doesn't draw.
     let hiddenFailures: [String]
 
@@ -100,12 +103,14 @@ struct MenuBarItem: Equatable {
         subscription: HalfDisplay?,
         api: HalfDisplay?,
         logoBadge: Bool = false,
+        updateBadge: Bool = false,
         hiddenFailures: [String] = []
     ) {
         self.provider = provider
         self.subscription = subscription
         self.api = api
         self.logoBadge = logoBadge
+        self.updateBadge = updateBadge
         self.hiddenFailures = hiddenFailures
     }
 
@@ -114,7 +119,8 @@ struct MenuBarItem: Equatable {
             subscription?.accessibilityText(half: .subscription),
             api?.accessibilityText(half: .api),
         ]
-        return ([displayName] + halves.compactMap { $0 } + hiddenFailures).joined(separator: ", ")
+        let update = updateBadge ? ["Update available"] : []
+        return ([displayName] + halves.compactMap { $0 } + hiddenFailures + update).joined(separator: ", ")
     }
 }
 
@@ -149,7 +155,12 @@ extension MenuBarItem {
             }
         }
 
-        return MenuBarItem(provider: provider, subscription: subscription, api: api, logoBadge: logoBadge, hiddenFailures: hidden)
+        return MenuBarItem(provider: provider, subscription: subscription, api: api, logoBadge: logoBadge, updateBadge: updateBadge, hiddenFailures: hidden)
+    }
+
+    /// The same item with the update dot on or off.
+    func withUpdateBadge(_ on: Bool) -> MenuBarItem {
+        MenuBarItem(provider: provider, subscription: subscription, api: api, logoBadge: logoBadge, updateBadge: on, hiddenFailures: hiddenFailures)
     }
 }
 
