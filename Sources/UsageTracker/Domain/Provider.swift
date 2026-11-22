@@ -67,6 +67,8 @@ struct ProviderDescriptor: Identifiable, Sendable {
     /// "weekly" or "cycle".
     let longWindowID: String
     let meterNames: MeterNames
+    /// The provider's own page for each half's usage, linked under its section.
+    var dashboards: [Half: URL] = [:]
 
     var subscriptionFields: [CredentialField] { fields.filter { $0.half == .subscription } }
     var apiFields: [CredentialField] { fields.filter { $0.half == .api } }
@@ -115,7 +117,8 @@ enum ProviderRegistry {
         services: [.subscription: HalfService(name: "Cursor", host: "cursor.com")],
         shortWindowID: nil,
         longWindowID: "cycle",
-        meterNames: MeterNames(short: "Today", long: "Cycle")
+        meterNames: MeterNames(short: "Today", long: "Cycle"),
+        dashboards: [.subscription: URL(string: "https://cursor.com/dashboard/usage")!]
     )
 
     private static let anthropic = ProviderDescriptor(
@@ -165,7 +168,11 @@ enum ProviderRegistry {
         ],
         shortWindowID: "session",
         longWindowID: "weekly",
-        meterNames: MeterNames(short: "Session", long: "Weekly")
+        meterNames: MeterNames(short: "Session", long: "Weekly"),
+        dashboards: [
+            .subscription: URL(string: "https://claude.ai/settings/usage")!,
+            .api: URL(string: "https://platform.claude.com/cost")!,
+        ]
     )
 
     private static let openai = ProviderDescriptor(
@@ -215,6 +222,10 @@ enum ProviderRegistry {
         ],
         shortWindowID: "session",
         longWindowID: "weekly",
-        meterNames: MeterNames(short: "Session", long: "Weekly")
+        meterNames: MeterNames(short: "Session", long: "Weekly"),
+        dashboards: [
+            .subscription: URL(string: "https://chatgpt.com/codex/cloud/settings/usage")!,
+            .api: URL(string: "https://platform.openai.com/usage")!,
+        ]
     )
 }

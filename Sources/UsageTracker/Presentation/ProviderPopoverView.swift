@@ -166,6 +166,15 @@ struct ProviderPopoverView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            if let url = provider.descriptor.dashboards[half.half] {
+                Link(destination: url) {
+                    Label("Open \(provider.descriptor.service(for: half.half).name) usage", systemImage: "arrow.up.right.square")
+                        .font(.caption)
+                }
+                .simultaneousGesture(TapGesture().onEnded { closePopover() })
+                .help(url.absoluteString)
+            }
         }
     }
 
